@@ -38,7 +38,7 @@ async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 type ClinicRow = { id: string; name: string; code: string; created_at: string };
-type PersonRow = { id: string; clinic_id: string; full_name: string; email: string; role: Person["role"]; status: Person["status"]; pin_hash: string | null; created_at: string };
+type PersonRow = { id: string; clinic_id: string; full_name: string; email: string; role: Person["role"]; status: Person["status"]; pin_hash: string | null; scope?: Person["scope"]; created_at: string };
 type AgreementRow = {
   id: string;
   clinic_id: string;
@@ -125,6 +125,7 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
       role: row.role,
       status: row.status,
       pinHash: row.pin_hash,
+      scope: row.scope,
       createdAt: row.created_at,
     })),
     templates: [...customTemplates.filter((item) => !sourceIds.has(item.id)), ...SOURCE_TEMPLATES],
@@ -190,6 +191,8 @@ export async function upsertPerson(person: Person) {
       role: person.role,
       status: person.status,
       pin_hash: person.pinHash,
+      scope: person.scope ?? (person.role === "manager" ? "clinic" : "self"),
+      updated_at: new Date().toISOString(),
       created_at: person.createdAt,
     }),
   });
