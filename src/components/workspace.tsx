@@ -16,6 +16,9 @@ import { extractSourceDocument } from "@/lib/confirm/extract";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectIcon, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type View = "overview" | "agreements" | "templates" | "people" | "locations" | "audit" | "settings";
@@ -152,6 +155,8 @@ export function Workspace() {
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [clinicFilter, setClinicFilter] = useState("");
+  const [templateFilter, setTemplateFilter] = useState("");
   const [activeRole, setActiveRole] = useState<Role | "">("");
   const [typedName, setTypedName] = useState("");
   const [token, setToken] = useState("");
@@ -193,7 +198,12 @@ export function Workspace() {
 
   const filtered = visibleAgreements.filter((item) => {
     const haystack = `${item.title} ${item.activity} ${personName(store, item.employeeId)}`.toLowerCase();
-    return (!query || haystack.includes(query.toLowerCase())) && (!statusFilter || item.status === statusFilter);
+    return (
+      (!query || haystack.includes(query.toLowerCase())) &&
+      (!statusFilter || item.status === statusFilter) &&
+      (!clinicFilter || item.branchId === clinicFilter) &&
+      (!templateFilter || item.templateId === templateFilter)
+    );
   });
 
   async function onCreate(event: FormEvent<HTMLFormElement>) {
@@ -330,6 +340,7 @@ export function Workspace() {
   }
 
   return (
+    <TooltipProvider>
     <main className="min-h-screen bg-ground text-ink lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="flex flex-col bg-linear-to-b from-forest to-forest-dark px-4 py-6 text-sidebar-text lg:sticky lg:top-0 lg:h-screen">
         <div className="mb-6 flex items-center gap-3 border-b border-white/10 px-2 pb-6">
@@ -483,19 +494,42 @@ export function Workspace() {
                 aria-label="Search agreements"
                 className="min-h-10 min-w-48 flex-1 rounded-md border border-line bg-paper px-3 text-sm"
               />
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                aria-label="Filter by status"
-                className="min-h-10 rounded-md border border-line bg-paper px-3 text-sm"
-              >
-                <option value="">All statuses</option>
-                {Object.entries(STATUS_LABEL).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger aria-label="Filter by status">
+                  <SelectValue placeholder="All statuses" />
+                  <SelectIcon />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  {Object.entries(STATUS_LABEL).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={clinicFilter} onValueChange={setClinicFilter}>
+                <SelectTrigger aria-label="Filter by clinic">
+                  <SelectValue placeholder="All clinics" />
+                  <SelectIcon />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All clinics</SelectItem>
+                  {store.branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={templateFilter} onValueChange={setTemplateFilter}>
+                <SelectTrigger aria-label="Filter by source form">
+                  <SelectValue placeholder="All source forms" />
+                  <SelectIcon />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All source forms</SelectItem>
+                  {approvedTemplates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="mx-auto grid max-w-7xl gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(280px,0.75fr)]">
               <AgreementQueue
@@ -1056,6 +1090,7 @@ export function Workspace() {
         </Modal>
       )}
     </main>
+    </TooltipProvider>
   );
 }
 
@@ -1376,7 +1411,7 @@ function Detail({
             <input autoFocus value={typedName} onChange={(event) => setTypedName(event.target.value)} required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
           </label>
           <label className="grid grid-cols-[18px_1fr] items-start gap-2 text-[11px] font-medium text-status-green-fg">
-            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-0.5" />
+            <Checkbox checked={consent} onCheckedChange={setConsent} />
             <span>{consentCopy()}</span>
           </label>
           <div className="flex flex-wrap justify-end gap-2 pt-1">
@@ -1430,7 +1465,9 @@ function Detail({
         <TabsContent value="wording">
           <div className="my-4 rounded-md border border-line bg-ground p-3">
             <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Frozen snapshot SHA-256</p>
-            <code className="mt-1 block break-all text-[10px] text-status-green-fg">{agreement.snapshotHash}</code>
+            <Tooltip label="SHA-256 of the frozen issued wording and fields. If paper is lost, this hash identifies the stored copy.">
+              <code className="mt-1 block break-all text-[10px] text-status-green-fg">{agreement.snapshotHash}</code>
+            </Tooltip>
           </div>
           <div className="my-4 rounded-md border border-line bg-ground p-3">
             <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Issued template wording</p>
