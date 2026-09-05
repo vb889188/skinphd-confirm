@@ -160,6 +160,7 @@ export function Workspace() {
   const [templateFilter, setTemplateFilter] = useState("");
   const [peopleQuery, setPeopleQuery] = useState("");
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<Role | "">("");
   const [typedName, setTypedName] = useState("");
   const [token, setToken] = useState("");
@@ -178,6 +179,7 @@ export function Workspace() {
 
   const selected = store.agreements.find((item) => item.id === selectedId) ?? null;
   const editingPerson = store.people.find((person) => person.id === editingPersonId) ?? null;
+  const editingTemplate = store.templates.find((template) => template.id === editingTemplateId) ?? null;
   const employees = store.people.filter((person) => person.role === "employee" && person.status === "active");
   const managers = store.people.filter((person) => person.role === "manager" && person.status === "active");
   const witnesses = store.people.filter((person) => person.role === "witness" && person.status === "active");
@@ -602,9 +604,16 @@ export function Workspace() {
                     {template.passPercent ? ` · ${template.passPercent}% pass` : ""}
                     {template.mandatoryMonths ? ` · ${template.mandatoryMonths} month stay` : ""}
                   </p>
+                  <p className="mt-2 line-clamp-4 text-[11px] leading-relaxed text-muted">
+                    {template.content ? template.content.slice(0, 280) : "No wording stored yet."}
+                  </p>
+                  <p className="mt-1 text-[10px] text-muted">{template.content.length} characters stored</p>
                   <b className={cn("mt-3 inline-flex rounded-full px-2 py-1 text-[9px] font-extrabold", toneClass[template.status === "approved" ? "green" : "slate"])}>
                     {template.status}
                   </b>
+                  <button type="button" className="mt-3 block rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setEditingTemplateId(template.id)}>
+                    View / edit wording
+                  </button>
                 </article>
               ))}
             </div>
@@ -1167,6 +1176,58 @@ export function Workspace() {
                 Cancel
               </button>
               <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper">Save details</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {editingTemplate && (
+        <Modal onClose={() => setEditingTemplateId(null)} title={editingTemplate.name} eyebrow={`Source form v${editingTemplate.version}`}>
+          <form
+            className="grid gap-2.5 px-5 py-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+              try {
+                store.updateTemplate({
+                  id: editingTemplate.id,
+                  name: String(values.name),
+                  module: String(values.module),
+                  content: String(values.content),
+                  dailyRateRands: values.dailyRateRands ? Number(values.dailyRateRands) : null,
+                  defaultDays: values.defaultDays ? Number(values.defaultDays) : null,
+                  passPercent: values.passPercent ? Number(values.passPercent) : null,
+                  mandatoryMonths: values.mandatoryMonths ? Number(values.mandatoryMonths) : null,
+                  hasWaiver: values.hasWaiver === "on",
+                  equipmentLabel: String(values.equipmentLabel || "") || null,
+                });
+                setEditingTemplateId(null);
+                setError("");
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not update the source form");
+              }
+            }}
+          >
+            <p className="text-[11px] leading-relaxed text-muted">
+              This is the stored source wording. Issued packs keep the snapshot they were frozen with. Do not invent new legal clauses.
+            </p>
+            <input name="name" required defaultValue={editingTemplate.name} className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <input name="module" defaultValue={editingTemplate.module} className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <input name="dailyRateRands" type="number" min={0} defaultValue={editingTemplate.dailyRateRands ?? ""} placeholder="Daily rate if printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <input name="defaultDays" type="number" min={0} defaultValue={editingTemplate.defaultDays ?? ""} placeholder="Days if printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <input name="passPercent" type="number" min={0} max={100} defaultValue={editingTemplate.passPercent ?? ""} placeholder="Pass % if printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <input name="mandatoryMonths" type="number" min={0} defaultValue={editingTemplate.mandatoryMonths ?? ""} placeholder="Mandatory months if printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <input name="equipmentLabel" defaultValue={editingTemplate.equipmentLabel ?? ""} placeholder="Equipment label if printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <label className="flex items-center gap-2 text-[11px] text-muted">
+              <input name="hasWaiver" type="checkbox" defaultChecked={editingTemplate.hasWaiver} />
+              Source file includes a waiver addendum
+            </label>
+            <textarea name="content" required rows={16} defaultValue={editingTemplate.content} className="rounded-md border border-line px-2.5 py-2 text-sm" />
+            <div className="flex justify-end gap-2">
+              <button type="button" className="min-h-10 rounded-md border border-line px-4 text-xs font-bold text-muted" onClick={() => setEditingTemplateId(null)}>
+                Close
+              </button>
+              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper">Save wording</button>
             </div>
           </form>
         </Modal>

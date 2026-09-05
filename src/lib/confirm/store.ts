@@ -79,6 +79,18 @@ type Actions = {
     byteSize?: number;
   }) => Promise<string>;
   addBranch: (input: { name: string; code: string }) => string;
+  updateTemplate: (input: {
+    id: string;
+    name: string;
+    module: string;
+    content: string;
+    dailyRateRands: number | null;
+    defaultDays: number | null;
+    passPercent: number | null;
+    mandatoryMonths: number | null;
+    hasWaiver: boolean;
+    equipmentLabel: string | null;
+  }) => void;
   noteEmailSent: (agreementId: string, toEmail: string) => void;
   markReminded: (agreementId: string) => void;
 };
@@ -314,6 +326,49 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           }).catch(() => undefined);
         }
         return id;
+      },
+      updateTemplate: (input) => {
+        requireCapability(actor(get()), "templates", "Edit source forms");
+        const state = get();
+        const template = state.templates.find((item) => item.id === input.id);
+        if (!template) throw new Error("Choose a source form first");
+        const name = input.name.trim();
+        const content = input.content.trim();
+        if (!name) throw new Error("Template name is required");
+        if (content.length < 80) throw new Error("Keep the supplied wording. Do not leave the form empty.");
+        const now = new Date().toISOString();
+        const version = content !== template.content ? String((Number(template.version) || 1) + 1) + ".0" : template.version;
+        set({
+          templates: state.templates.map((item) =>
+            item.id === input.id
+              ? {
+                  ...item,
+                  name,
+                  module: input.module.trim() || name,
+                  content,
+                  dailyRateRands: input.dailyRateRands,
+                  defaultDays: input.defaultDays,
+                  passPercent: input.passPercent,
+                  mandatoryMonths: input.mandatoryMonths,
+                  hasWaiver: input.hasWaiver,
+                  equipmentLabel: input.equipmentLabel,
+                  version,
+                }
+              : item,
+          ),
+          audit: [
+            {
+              id: randomId("AUD"),
+              agreementId: null,
+              actor: ACTOR,
+              action: "Source document edited",
+              detail: `${name} v${version} wording was updated. Issued packs keep their frozen snapshot.`,
+              createdAt: now,
+            },
+            ...state.audit,
+          ],
+        });
+        void persistWorkspace(get()).catch(() => undefined);
       },
       addBranch: (input) => {
         requireCapability(actor(get()), "clinics", "Add clinics");
