@@ -195,13 +195,22 @@ export function Workspace() {
 
   const stats = useMemo(() => {
     const open = visibleAgreements.filter((item) => item.status === "awaiting_signatures" || item.status === "partially_signed");
+    const signed = (agreementId: string, role: Role) =>
+      store.signatures.some((item) => item.agreementId === agreementId && item.role === role && item.outcome === "signed");
+    const today = new Date().toISOString().slice(0, 10);
+    const reminderMs = 3 * 24 * 60 * 60 * 1000;
     return {
       completed: visibleAgreements.filter((item) => item.status === "completed").length,
       needsAction: open.length,
       awaiting: visibleAgreements.filter((item) => item.status === "awaiting_signatures").length,
       templates: approvedTemplates.length,
+      issuedToday: visibleAgreements.filter((item) => item.createdAt.slice(0, 10) === today).length,
+      waitingEmployee: open.filter((item) => !signed(item.id, "employee")).length,
+      waitingFranchisee: open.filter((item) => !signed(item.id, "manager")).length,
+      waitingWitness: open.filter((item) => item.witnessId && !signed(item.id, "witness")).length,
+      remindersDue: open.filter((item) => !item.lastRemindedAt || Date.now() - new Date(item.lastRemindedAt).getTime() > reminderMs).length,
     };
-  }, [visibleAgreements, approvedTemplates.length]);
+  }, [visibleAgreements, approvedTemplates.length, store.signatures]);
 
   const filtered = visibleAgreements.filter((item) => {
     const haystack = `${item.title} ${item.activity} ${personName(store, item.employeeId)}`.toLowerCase();
@@ -469,6 +478,15 @@ export function Workspace() {
 
         {view === "overview" && (
           <div className="mx-auto grid max-w-7xl gap-4">
+            {isManager && (
+              <section className="grid grid-cols-2 gap-3 lg:grid-cols-5" aria-label="Head Office desk">
+                <Stat icon="+" tone="slate" label="Issued today" value={stats.issuedToday} note="Frozen packs created today" />
+                <Stat icon="E" tone="amber" label="Waiting on employee" value={stats.waitingEmployee} note="Employee name not recorded" />
+                <Stat icon="F" tone="blue" label="Waiting on franchisee" value={stats.waitingFranchisee} note="Franchisee name not recorded" />
+                <Stat icon="W" tone="violet" label="Waiting on witness" value={stats.waitingWitness} note="Witness still outstanding" />
+                <Stat icon="!" tone="green" label="Reminders due" value={stats.remindersDue} note="Open packs with no reminder in 3 days" />
+              </section>
+            )}
             <section className="overflow-hidden rounded-lg border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Open these first</p>
@@ -1375,12 +1393,13 @@ function NavButton({
   );
 }
 
-function Stat({ icon, tone, label, value, note }: { icon: string; tone: "green" | "amber" | "blue" | "slate"; label: string; value: number; note: string }) {
+function Stat({ icon, tone, label, value, note }: { icon: string; tone: "green" | "amber" | "blue" | "slate" | "violet"; label: string; value: number; note: string }) {
   const iconTone = {
     green: "bg-status-green-bg text-status-green-fg",
     amber: "bg-status-amber-bg text-status-amber-fg",
     blue: "bg-status-blue-bg text-status-blue-fg",
     slate: "bg-status-slate-bg text-status-slate-fg",
+    violet: "bg-status-violet-bg text-status-violet-fg",
   }[tone];
   return (
     <article className="min-h-32 rounded-2xl border border-line bg-paper p-5 shadow-[0_8px_24px_rgba(20,63,50,0.05)]">
