@@ -114,7 +114,8 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
     approvedAt: row.approved_at,
     createdAt: row.created_at,
   }));
-  const sourceIds = new Set(SOURCE_TEMPLATES.map((item) => item.id));
+  const byId = new Map(SOURCE_TEMPLATES.map((item) => [item.id, item]));
+  for (const row of customTemplates) byId.set(row.id, row);
   return {
     branches: clinics.map((row) => ({ id: row.id, name: row.name, code: row.code, createdAt: row.created_at })),
     people: people.map((row) => ({
@@ -128,7 +129,7 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
       scope: row.scope,
       createdAt: row.created_at,
     })),
-    templates: [...customTemplates.filter((item) => !sourceIds.has(item.id)), ...SOURCE_TEMPLATES],
+    templates: [...byId.values()],
     agreements: agreements.map((row) => ({
       id: row.id,
       title: row.title,
@@ -273,7 +274,6 @@ export async function upsertAudit(event: AuditEvent) {
 }
 
 export async function upsertTemplate(template: Template) {
-  if (SOURCE_TEMPLATES.some((item) => item.id === template.id)) return;
   await rest("confirm_templates?on_conflict=id", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },

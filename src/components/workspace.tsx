@@ -1193,13 +1193,17 @@ export function Workspace() {
                   id: editingTemplate.id,
                   name: String(values.name),
                   module: String(values.module),
+                  category: String(values.category) as "training" | "equipment" | "internal_waiver",
+                  sourceFile: String(values.sourceFile),
                   content: String(values.content),
                   dailyRateRands: values.dailyRateRands ? Number(values.dailyRateRands) : null,
                   defaultDays: values.defaultDays ? Number(values.defaultDays) : null,
                   passPercent: values.passPercent ? Number(values.passPercent) : null,
                   mandatoryMonths: values.mandatoryMonths ? Number(values.mandatoryMonths) : null,
                   hasWaiver: values.hasWaiver === "on",
+                  requiresWitness: values.requiresWitness === "on",
                   equipmentLabel: String(values.equipmentLabel || "") || null,
+                  status: String(values.status) as "approved" | "superseded" | "draft",
                 });
                 setEditingTemplateId(null);
                 setError("");
@@ -1213,6 +1217,17 @@ export function Workspace() {
             </p>
             <input name="name" required defaultValue={editingTemplate.name} className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
             <input name="module" defaultValue={editingTemplate.module} className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <input name="sourceFile" required defaultValue={editingTemplate.sourceFile} className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <select name="category" required defaultValue={editingTemplate.category} className="min-h-10 rounded-md border border-line px-2.5 text-sm">
+              <option value="training">Training cost agreement</option>
+              <option value="equipment">Equipment cost agreement</option>
+              <option value="internal_waiver">Internal waiver addendum</option>
+            </select>
+            <select name="status" required defaultValue={editingTemplate.status} className="min-h-10 rounded-md border border-line px-2.5 text-sm">
+              <option value="approved">Approved</option>
+              <option value="draft">Draft</option>
+              <option value="superseded">Superseded</option>
+            </select>
             <input name="dailyRateRands" type="number" min={0} defaultValue={editingTemplate.dailyRateRands ?? ""} placeholder="Daily rate if printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
             <input name="defaultDays" type="number" min={0} defaultValue={editingTemplate.defaultDays ?? ""} placeholder="Days if printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
             <input name="passPercent" type="number" min={0} max={100} defaultValue={editingTemplate.passPercent ?? ""} placeholder="Pass % if printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
@@ -1221,6 +1236,10 @@ export function Workspace() {
             <label className="flex items-center gap-2 text-[11px] text-muted">
               <input name="hasWaiver" type="checkbox" defaultChecked={editingTemplate.hasWaiver} />
               Source file includes a waiver addendum
+            </label>
+            <label className="flex items-center gap-2 text-[11px] text-muted">
+              <input name="requiresWitness" type="checkbox" defaultChecked={editingTemplate.requiresWitness} />
+              Requires a witness signature
             </label>
             <textarea name="content" required rows={16} defaultValue={editingTemplate.content} className="rounded-md border border-line px-2.5 py-2 text-sm" />
             <div className="flex justify-end gap-2">

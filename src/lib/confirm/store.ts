@@ -83,13 +83,17 @@ type Actions = {
     id: string;
     name: string;
     module: string;
+    category: "training" | "equipment" | "internal_waiver";
+    sourceFile: string;
     content: string;
     dailyRateRands: number | null;
     defaultDays: number | null;
     passPercent: number | null;
     mandatoryMonths: number | null;
     hasWaiver: boolean;
+    requiresWitness: boolean;
     equipmentLabel: string | null;
+    status: "approved" | "superseded" | "draft";
   }) => void;
   noteEmailSent: (agreementId: string, toEmail: string) => void;
   markReminded: (agreementId: string) => void;
@@ -334,10 +338,16 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (!template) throw new Error("Choose a source form first");
         const name = input.name.trim();
         const content = input.content.trim();
+        const sourceFile = input.sourceFile.trim() || template.sourceFile;
         if (!name) throw new Error("Template name is required");
-        if (content.length < 80) throw new Error("Keep the supplied wording. Do not leave the form empty.");
+        if (content.length < 40) throw new Error("Keep the supplied wording. Do not leave the form empty.");
         const now = new Date().toISOString();
-        const version = content !== template.content ? String((Number(template.version) || 1) + 1) + ".0" : template.version;
+        const changed =
+          content !== template.content ||
+          name !== template.name ||
+          sourceFile !== template.sourceFile ||
+          input.category !== template.category;
+        const version = changed ? String((Number(template.version) || 1) + 1) + ".0" : template.version;
         set({
           templates: state.templates.map((item) =>
             item.id === input.id
@@ -345,13 +355,17 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
                   ...item,
                   name,
                   module: input.module.trim() || name,
+                  category: input.category,
+                  sourceFile,
                   content,
                   dailyRateRands: input.dailyRateRands,
                   defaultDays: input.defaultDays,
                   passPercent: input.passPercent,
                   mandatoryMonths: input.mandatoryMonths,
                   hasWaiver: input.hasWaiver,
+                  requiresWitness: input.requiresWitness,
                   equipmentLabel: input.equipmentLabel,
+                  status: input.status,
                   version,
                 }
               : item,
