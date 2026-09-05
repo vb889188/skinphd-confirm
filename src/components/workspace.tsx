@@ -10,6 +10,7 @@ import {
 import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
 import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
+import { can, canViewAgreement } from "@/lib/confirm/access";
 import { isProductionMode } from "@/lib/confirm/remote";
 import { buildEmployeeMail, buildReminderMail, buildSignedRecordMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
@@ -185,8 +186,7 @@ export function Workspace() {
   const isManager = current?.role === "manager";
   const visibleAgreements = store.agreements.filter((item) => {
     if (!current) return false;
-    if (current.role === "manager") return true;
-    return item.employeeId === current.id || item.managerId === current.id || item.witnessId === current.id;
+    return canViewAgreement(current.role, current.id, item);
   });
 
   const stats = useMemo(() => {
@@ -357,11 +357,11 @@ export function Workspace() {
           <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Work</p>
           <NavButton current={view} id="overview" label="Home" count={stats.needsAction} onSelect={setView} />
           <NavButton current={view} id="agreements" label="Agreements" count={visibleAgreements.length} onSelect={setView} />
-          {isManager && <NavButton current={view} id="templates" label="Source forms" count={approvedTemplates.length} onSelect={setView} />}
-          {isManager && <NavButton current={view} id="people" label="Staff" count={store.people.length} onSelect={setView} />}
-          <NavButton current={view} id="locations" label="Clinics" count={store.branches.length} onSelect={setView} />
+          {can(current.role, "templates") && <NavButton current={view} id="templates" label="Source forms" count={approvedTemplates.length} onSelect={setView} />}
+          {can(current.role, "staff") && <NavButton current={view} id="people" label="Staff" count={store.people.length} onSelect={setView} />}
+          {can(current.role, "clinics") && <NavButton current={view} id="locations" label="Clinics" count={store.branches.length} onSelect={setView} />}
           <p className="mt-7 mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Record</p>
-          {isManager && <NavButton current={view} id="audit" label="History" onSelect={setView} />}
+          {can(current.role, "audit") && <NavButton current={view} id="audit" label="History" onSelect={setView} />}
           <NavButton current={view} id="settings" label="Settings" onSelect={setView} />
         </nav>
         <div className="mt-auto hidden items-center gap-2.5 border-t border-white/10 px-2 pt-4 lg:grid lg:grid-cols-[38px_1fr]">
@@ -585,7 +585,7 @@ export function Workspace() {
           </>
         )}
 
-        {view === "templates" && isManager && (
+        {view === "templates" && can(current.role, "templates") && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_360px]">
             <div className="grid gap-3 sm:grid-cols-2">
               {store.templates.map((template) => (
@@ -717,7 +717,7 @@ export function Workspace() {
           </div>
         )}
 
-        {view === "people" && (
+        {view === "people" && can(current.role, "staff") && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_320px]">
             <div className="grid gap-3">
               <input
@@ -808,7 +808,7 @@ export function Workspace() {
           </div>
         )}
 
-        {view === "locations" && (
+        {view === "locations" && can(current.role, "clinics") && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.6fr)_300px]">
             <section className="overflow-hidden rounded-lg border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
@@ -849,7 +849,7 @@ export function Workspace() {
           </div>
         )}
 
-        {view === "audit" && (
+        {view === "audit" && can(current.role, "audit") && (
           <section className="mx-auto max-w-7xl overflow-hidden rounded-lg border border-line bg-paper">
             <div className="border-b border-line px-5 py-4">
               <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Control</p>
@@ -927,10 +927,12 @@ export function Workspace() {
                   Use Export JSON after each training day. On the server also run scripts/backup-confirm.sh so Confirm tables have a dated copy. The signed snapshot in this workspace is the record if paper is misplaced.
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
+                  {can(current.role, "export") && (
                   <button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted" onClick={downloadExport}>
                     <Download className="size-3.5" />
                     Export JSON
                   </button>
+                  )}
                   {!isProductionMode() && (
                     <button
                       type="button"

@@ -12,6 +12,11 @@ import {
 } from "./rules";
 import type { Agreement, Role, Snapshot, WorkspaceState } from "./types";
 import { persistWorkspace, loadRemoteWorkspace, remoteEnabled, upsertSourceFile } from "./remote";
+import { requireManager } from "./access";
+
+function actorRole(state: WorkspaceState): Role | undefined {
+  return state.people.find((person) => person.id === state.currentPersonId)?.role;
+}
 
 export type CreateInput = {
   title: string;
@@ -160,6 +165,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         });
       },
       addPerson: async (input) => {
+        requireManager(actorRole(get()), "Add staff");
         const fullName = input.fullName.trim();
         const email = input.email.trim().toLowerCase();
         const pin = input.pin.trim();
@@ -183,6 +189,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
       updatePerson: async (input) => {
+        requireManager(actorRole(get()), "Edit staff");
         const state = get();
         const person = state.people.find((item) => item.id === input.id);
         if (!person) throw new Error("Choose a person first");
@@ -208,6 +215,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
       },
       removePerson: (id) => {
+        requireManager(actorRole(get()), "Remove staff");
         const state = get();
         const person = state.people.find((item) => item.id === id);
         if (!person) throw new Error("Choose a person first");
@@ -236,6 +244,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
       },
       addTemplate: async (input) => {
+        requireManager(actorRole(get()), "Upload source forms");
         const name = input.name.trim();
         const content = input.content.trim();
         const sourceFile = input.sourceFile.trim();
@@ -307,6 +316,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
       addBranch: (input) => {
+        requireManager(actorRole(get()), "Add clinics");
         const name = input.name.trim();
         const code = input.code.trim().toUpperCase();
         if (!name || !code) throw new Error("Clinic name and code are required");
@@ -325,6 +335,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
       noteEmailSent: (agreementId, toEmail) => {
+        requireManager(actorRole(get()), "Email packs");
         const state = get();
         const agreement = state.agreements.find((item) => item.id === agreementId);
         if (!agreement) throw new Error("Choose an agreement first");
@@ -338,6 +349,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
       },
       markReminded: (agreementId) => {
+        requireManager(actorRole(get()), "Send reminders");
         const state = get();
         const agreement = state.agreements.find((item) => item.id === agreementId);
         if (!agreement) throw new Error("Choose an agreement first");
@@ -352,6 +364,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
       },
       createAgreement: async (input) => {
+        requireManager(actorRole(get()), "Issue agreements");
         const errors = requiredFieldErrors(input);
         if (errors.length) throw new Error(errors[0]);
         const state = get();
@@ -449,6 +462,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
       issueLink: async (agreementId, role) => {
+        requireManager(actorRole(get()), "Issue signing links");
         const state = get();
         const agreement = state.agreements.find((item) => item.id === agreementId);
         if (!agreement) throw new Error("Agreement not found");
