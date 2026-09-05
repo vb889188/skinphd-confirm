@@ -69,6 +69,7 @@ type Actions = {
     equipmentLabel: string | null;
   }) => string;
   addBranch: (input: { name: string; code: string }) => string;
+  noteEmailSent: (agreementId: string, toEmail: string) => void;
 };
 
 export const useWorkspace = create<WorkspaceState & Actions>()(
@@ -248,6 +249,19 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         });
         void persistWorkspace(get()).catch(() => undefined);
         return id;
+      },
+      noteEmailSent: (agreementId, toEmail) => {
+        const state = get();
+        const agreement = state.agreements.find((item) => item.id === agreementId);
+        if (!agreement) throw new Error("Choose an agreement first");
+        const now = new Date().toISOString();
+        set({
+          audit: [
+            { id: randomId("AUD"), agreementId, actor: ACTOR, action: "Employee email opened", detail: `Issue pack addressed to ${toEmail} for ${agreement.title}.`, createdAt: now },
+            ...state.audit,
+          ],
+        });
+        void persistWorkspace(get()).catch(() => undefined);
       },
       createAgreement: async (input) => {
         const errors = requiredFieldErrors(input);

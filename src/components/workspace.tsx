@@ -11,10 +11,94 @@ import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
 import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { isProductionMode } from "@/lib/confirm/remote";
+import { buildEmployeeMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
+import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 type View = "overview" | "agreements" | "templates" | "people" | "locations" | "audit" | "settings";
+
+function nextStep(state: WorkspaceState, agreement: Agreement) {
+  if (agreement.status === "completed") return "Finished. Print or email the pack.";
+  if (agreement.status === "declined") return "Declined. Issue a new pack if needed.";
+  if (agreement.status === "superseded") return "Replaced by a newer record.";
+  const signed = new Set(
+    state.signatures.filter((item) => item.agreementId === agreement.id && item.outcome === "signed").map((item) => item.role),
+  );
+  if (!signed.has("employee")) return "Next: the employee signs.";
+  if (!signed.has("manager")) return "Next: the franchisee signs.";
+  if (agreement.witnessId && !signed.has("witness")) return "Next: the witness signs.";
+  return "Signatures still outstanding.";
+}
+
+function roleLabel(role: string) {
+  if (role === "manager") return "Franchisee";
+  if (role === "witness") return "Witness";
+  return "Employee";
+}
+
+function signedRoles(state: WorkspaceState, agreement: Agreement) {
+  return new Set(
+    state.signatures.filter((item) => item.agreementId === agreement.id && item.outcome === "signed").map((item) => item.role),
+  );
+}
+
+function progressSteps(state: WorkspaceState, agreement: Agreement) {
+  const signed = signedRoles(state, agreement);
+  const done = agreement.status === "completed";
+  const declined = agreement.status === "declined";
+  const steps = [
+    { id: "issued", label: "Issued", done: true },
+    { id: "employee", label: "Employee", done: signed.has("employee") || done },
+    { id: "manager", label: "Franchisee", done: signed.has("manager") || done },
+  ];
+  if (agreement.witnessId) steps.push({ id: "witness", label: "Witness", done: signed.has("witness") || done });
+  steps.push({ id: "complete", label: "Complete", done });
+  return { steps, declined, current: steps.findIndex((step) => !step.done) };
+}
+
+function ProgressTrack({ state, agreement, compact = false }: { state: WorkspaceState; agreement: Agreement; compact?: boolean }) {
+  const { steps, declined, current } = progressSteps(state, agreement);
+  const completeCount = steps.filter((step) => step.done).length;
+  return (
+    <div className={compact ? "min-w-40" : "my-4 rounded-md border border-line bg-ground px-4 py-3"} aria-label="Agreement progress">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">
+          {declined ? "Stopped" : `${completeCount} of ${steps.length} steps`}
+        </p>
+        {!compact && <span className="text-[11px] text-muted">{nextStep(state, agreement)}</span>}
+      </div>
+      <Progress value={(completeCount / steps.length) * 100} className="mb-3" />
+      <div className="flex items-center gap-1">
+        {steps.map((step, index) => (
+          <div key={step.id} className="flex min-w-0 flex-1 items-center gap-1">
+            <span
+              className={cn(
+                "grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-extrabold",
+                declined && !step.done && "bg-danger-bg text-danger-fg",
+                step.done && "bg-accent text-paper",
+                !step.done && !declined && index === current && "bg-status-amber-bg text-status-amber-fg",
+                !step.done && !declined && index !== current && "bg-paper text-muted border border-line",
+              )}
+            >
+              {step.done ? "✓" : index + 1}
+            </span>
+            {!compact && (
+              <span className={cn("truncate text-[11px]", step.done ? "text-ink" : "text-muted")}>
+                {step.label}
+              </span>
+            )}
+            {index < steps.length - 1 && (
+              <span className={cn("h-0.5 min-w-2 flex-1 rounded-full", step.done ? "bg-accent" : "bg-line")} />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function initials(value: string) {
   return value
@@ -211,13 +295,22 @@ export function Workspace() {
   }
 
   const headings: Record<View, string> = {
-    overview: current ? `Good evening, ${current.fullName.split(" ")[0]}` : "Skin PhD Confirm",
-    agreements: "Agreement records",
-    templates: "Approved templates",
-    people: "People directory",
-    locations: "Clinic locations",
-    audit: "Audit history",
+    overview: current ? `${current.fullName.split(" ")[0]}, here is the path` : "Skin PhD Confirm",
+    agreements: "Agreements",
+    templates: "Source forms",
+    people: "Staff directory",
+    locations: "Clinics",
+    audit: "What changed",
     settings: "Workspace settings",
+  };
+  const summaries: Record<View, string> = {
+    overview: "Choose a source form, fill the blanks, collect three signatures, then keep the snapshot.",
+    agreements: "Open a record to see who still needs to sign.",
+    templates: "These are the Skin PhD forms. Wording is stored as supplied.",
+    people: "Employees, franchisees and witnesses who can appear on an agreement.",
+    locations: "Clinic names and codes used on issued packs.",
+    audit: "A log of issue, sign and update actions.",
+    settings: "PIN, export and hosting controls.",
   };
 
   if (!current) {
@@ -242,21 +335,21 @@ export function Workspace() {
           </span>
         </div>
         <nav aria-label="Primary navigation" className="flex gap-2 overflow-x-auto lg:block lg:overflow-visible">
-          <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Workspace</p>
-          <NavButton current={view} id="overview" label="Overview" count={stats.needsAction + stats.awaiting} onSelect={setView} />
+          <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Work</p>
+          <NavButton current={view} id="overview" label="How it works" count={stats.needsAction} onSelect={setView} />
           <NavButton current={view} id="agreements" label="Agreements" count={visibleAgreements.length} onSelect={setView} />
-          <NavButton current={view} id="templates" label="Templates" count={approvedTemplates.length} onSelect={setView} />
-          {isManager && <NavButton current={view} id="people" label="People" count={store.people.length} onSelect={setView} />}
-          <NavButton current={view} id="locations" label="Locations" count={store.branches.length} onSelect={setView} />
-          <p className="mt-7 mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Control</p>
-          {isManager && <NavButton current={view} id="audit" label="Audit history" onSelect={setView} />}
+          <NavButton current={view} id="templates" label="Source forms" count={approvedTemplates.length} onSelect={setView} />
+          {isManager && <NavButton current={view} id="people" label="Staff" count={store.people.length} onSelect={setView} />}
+          <NavButton current={view} id="locations" label="Clinics" count={store.branches.length} onSelect={setView} />
+          <p className="mt-7 mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Record</p>
+          {isManager && <NavButton current={view} id="audit" label="History" onSelect={setView} />}
           <NavButton current={view} id="settings" label="Settings" onSelect={setView} />
         </nav>
         <div className="mt-auto hidden items-center gap-2.5 border-t border-white/10 px-2 pt-4 lg:grid lg:grid-cols-[38px_1fr]">
           <span className="grid size-9 place-items-center rounded-full bg-sage text-[11px] font-extrabold text-forest">{initials(current.fullName)}</span>
           <span>
             <strong className="block text-xs text-paper">{current.fullName.split(" ")[0]}</strong>
-            <small className="capitalize text-[11px] text-sidebar-label">{current.role}</small>
+            <small className="capitalize text-[11px] text-sidebar-label">{roleLabel(current.role)}</small>
           </span>
         </div>
       </aside>
@@ -264,9 +357,9 @@ export function Workspace() {
       <section className="min-w-0 px-4 py-6 sm:px-8 lg:px-14">
         <header className="mx-auto mb-6 flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="mb-1 text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Employee agreement operations</p>
+            <p className="mb-1 text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Skin PhD Confirm</p>
             <h1 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">{headings[view]}</h1>
-            <p className="mt-2 text-sm text-muted">Keep every agreement complete, signed and easy to prove.</p>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{summaries[view]}</p>
           </div>
           <div className="flex items-center gap-2.5">
             <span className="grid size-10 place-items-center rounded-[10px] border border-line bg-paper text-[11px] font-extrabold text-accent tabular-nums">
@@ -286,7 +379,7 @@ export function Workspace() {
                 onClick={() => setShowCreate(true)}
               >
                 <Plus className="size-3.5" />
-                Create agreement
+                Issue agreement
               </button>
             )}
           </div>
@@ -308,7 +401,59 @@ export function Workspace() {
           </div>
         )}
 
-        {(view === "overview" || view === "agreements") && (
+        {view === "overview" && (
+          <div className="mx-auto grid max-w-7xl gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
+            <section className="overflow-hidden rounded-lg border border-line bg-paper">
+              <div className="border-b border-line px-5 py-4">
+                <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">The logic</p>
+                <h2 className="font-display text-xl font-medium">Four steps, in order</h2>
+              </div>
+              <ol className="grid gap-0 px-5">
+                {[
+                  ["1. Source form", "Pick an approved Skin PhD training or equipment form. The printed wording is frozen."],
+                  ["2. Issue", "Fill employee, clinic, dates and deemed cost. That snapshot cannot quietly change later."],
+                  ["3. Sign", "Employee, franchisee and witness type their names against that exact snapshot."],
+                  ["4. Keep", "Print or email the pack. The hash and history stay with the record."],
+                ].map(([title, copy]) => (
+                  <li key={title} className="border-b border-line py-4 last:border-b-0">
+                    <strong className="block text-sm">{title}</strong>
+                    <p className="mt-1 text-[13px] leading-relaxed text-muted">{copy}</p>
+                  </li>
+                ))}
+              </ol>
+            </section>
+            <section className="overflow-hidden rounded-lg border border-line bg-paper">
+              <div className="border-b border-line px-5 py-4">
+                <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Waiting on someone</p>
+                <h2 className="font-display text-xl font-medium">Open these first</h2>
+              </div>
+              <div className="px-2 py-2">
+                {visibleAgreements.filter((item) => item.status === "awaiting_signatures" || item.status === "partially_signed").slice(0, 6).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="flex w-full flex-col items-start gap-1 rounded-md px-3 py-3 text-left hover:bg-ground"
+                    onClick={() => {
+                      setSelectedId(item.id);
+                      setView("agreements");
+                    }}
+                  >
+                    <strong className="text-sm">{item.title}</strong>
+                    <small className="text-[11px] text-muted">{nextStep(store, item)}</small>
+                    <ProgressTrack state={store} agreement={item} compact />
+                  </button>
+                ))}
+                {visibleAgreements.every((item) => item.status !== "awaiting_signatures" && item.status !== "partially_signed") && (
+                  <p className="px-3 py-6 text-[13px] leading-relaxed text-muted">
+                    Nothing is waiting. {isManager ? "Issue an agreement from a source form to start." : "When a pack is assigned to you, it will show here."}
+                  </p>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {view === "agreements" && (
           <>
             <section className="mx-auto mb-4 grid max-w-7xl grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Agreement summary">
               <Stat icon="↗" tone="green" label="Completed agreements" value={stats.completed} note="Locked with signature evidence" />
@@ -938,8 +1083,8 @@ function AgreementQueue({
     <section className="overflow-hidden rounded-lg border border-line bg-paper">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
-          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Priority queue</p>
-          <h2 className="font-display text-xl font-medium">Agreement records</h2>
+          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Records</p>
+          <h2 className="font-display text-xl font-medium">Who still needs to act</h2>
         </div>
         {canCreate && (
           <button type="button" className="text-[11px] font-bold text-accent no-print" onClick={onCreate}>
@@ -977,7 +1122,7 @@ function AgreementQueue({
                 <span className="min-w-0">
                   <strong className="block truncate text-xs">{item.title}</strong>
                   <small className="mt-0.5 block truncate text-[10px] text-muted">
-                    {personName(state, item.employeeId)} · {branchLabel(state, item.branchId)}
+                    {personName(state, item.employeeId)} · {nextStep(state, item)}
                   </small>
                 </span>
               </div>
@@ -985,6 +1130,7 @@ function AgreementQueue({
                 <b className={cn("inline-flex rounded-full px-2 py-1 text-[9px] font-extrabold", toneClass[STATUS_TONE[item.status]])}>
                   {STATUS_LABEL[item.status]}
                 </b>
+                <ProgressTrack state={state} agreement={item} compact />
               </span>
               <span className="text-[10px] text-muted tabular-nums">
                 {state.signatures.filter((sig) => sig.agreementId === item.id && sig.outcome === "signed").length} of {item.requiredSignatures}
@@ -1012,20 +1158,20 @@ function Modal({
   children: ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-20 grid place-items-center bg-forest-dark/60 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-auto rounded-xl bg-paper shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-paper/95 px-5 py-4">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
           <div>
-            <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">{eyebrow}</p>
-            <h2 id="modal-title" className="font-display text-xl font-medium">{title}</h2>
+            <DialogDescription>{eyebrow}</DialogDescription>
+            <DialogTitle>{title}</DialogTitle>
           </div>
           <button type="button" className="grid size-8 place-items-center rounded-md bg-ground text-lg text-muted" onClick={onClose} aria-label="Close">
             ×
           </button>
-        </header>
+        </DialogHeader>
         {children}
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1062,14 +1208,29 @@ function Detail({
 }) {
   const open = agreement.status === "awaiting_signatures" || agreement.status === "partially_signed";
   const actor = state.people.find((person) => person.id === state.currentPersonId);
+  const mail = buildEmployeeMail(state, agreement, typeof window === "undefined" ? "http://139.59.183.201:8080" : window.location.origin);
+  const recordEmail = useWorkspace((store) => store.noteEmailSent);
   return (
     <div className="px-5 py-4">
-      <div className="mb-3 flex justify-end no-print">
+      <div className="mb-3 flex flex-wrap justify-end gap-2 no-print">
+        <button
+          type="button"
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted"
+          onClick={() => {
+            if (!mail.to) return;
+            recordEmail(agreement.id, mail.to);
+            navigator.clipboard?.writeText(`${mail.subject}\n\n${mail.body}`).catch(() => undefined);
+            window.location.href = employeeMailHref(mail);
+          }}
+        >
+          Email employee pack
+        </button>
         <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted" onClick={() => window.print()}>
           <Printer className="size-3.5" />
           Print issued pack
         </button>
       </div>
+      <ProgressTrack state={state} agreement={agreement} />
       <Row label="Employee" value={personName(state, agreement.employeeId)} />
       <Row label="Manager" value={personName(state, agreement.managerId)} />
       <Row label="Branch" value={branchLabel(state, agreement.branchId)} />
@@ -1082,7 +1243,7 @@ function Detail({
           {STATUS_LABEL[agreement.status]}
         </b>
       </div>
-      <Row label="Activity" value={agreement.activity} />
+      <Row label="Next step" value={nextStep(state, agreement)} />
       <Row label="Deemed cost" value={rands(agreement.costCents)} />
       <Row label="Attendance / dates" value={`${agreement.startsOn || "Not set"} → ${agreement.endsOn || "Not set"}`} />
       {agreement.snapshot.fields.days != null && <Row label="Course days" value={String(agreement.snapshot.fields.days)} />}
@@ -1097,14 +1258,13 @@ function Detail({
       {agreement.snapshot.fields.equipmentModel && <Row label="Equipment model" value={agreement.snapshot.fields.equipmentModel} />}
       {agreement.snapshot.fields.equipmentSerial && <Row label="Serial number" value={agreement.snapshot.fields.equipmentSerial} />}
       {agreement.snapshot.fields.additionalDescription && <Row label="Additional description" value={agreement.snapshot.fields.additionalDescription} />}
-      <div className="my-4 rounded-md border border-line bg-ground p-3">
-        <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Frozen snapshot SHA-256</p>
-        <code className="mt-1 block break-all text-[10px] text-status-green-fg">{agreement.snapshotHash}</code>
-      </div>
-      <div className="my-4 rounded-md border border-line bg-ground p-3">
-        <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Issued template wording</p>
-        <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-status-green-fg">{agreement.snapshot.template.content}</p>
-      </div>
+      <Tabs defaultValue={open ? "sign" : "pack"} className="mt-4">
+        <TabsList className="no-print">
+          <TabsTrigger value="pack">Issued pack</TabsTrigger>
+          <TabsTrigger value="wording">Frozen wording</TabsTrigger>
+          <TabsTrigger value="sign">Sign</TabsTrigger>
+        </TabsList>
+        <TabsContent value="pack">
       <article className="print-document my-4 rounded-md border border-line bg-paper p-5">
         <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Skin PhD Confirm · issued document</p>
         <h3 className="mt-2 font-display text-xl">{agreement.title}</h3>
@@ -1120,6 +1280,18 @@ function Detail({
         <p className="mt-4 whitespace-pre-wrap text-[12px] leading-relaxed">{agreement.snapshot.template.content}</p>
         <p className="mt-4 text-[10px] text-muted">Snapshot {agreement.snapshotHash}</p>
       </article>
+        </TabsContent>
+        <TabsContent value="wording">
+          <div className="my-4 rounded-md border border-line bg-ground p-3">
+            <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Frozen snapshot SHA-256</p>
+            <code className="mt-1 block break-all text-[10px] text-status-green-fg">{agreement.snapshotHash}</code>
+          </div>
+          <div className="my-4 rounded-md border border-line bg-ground p-3">
+            <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Issued template wording</p>
+            <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-status-green-fg">{agreement.snapshot.template.content}</p>
+          </div>
+        </TabsContent>
+        <TabsContent value="sign">
       <p className="rounded-md bg-sage px-3 py-3 text-[10px] leading-relaxed text-status-green-fg no-print">
         Typed signatures prove workspace capture against the frozen snapshot. They are not OTP-verified identity.
       </p>
@@ -1206,6 +1378,8 @@ function Detail({
           </div>
         </form>
       )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -1227,9 +1401,9 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
       <section className="w-full max-w-md overflow-hidden rounded-lg border border-line bg-paper shadow-sm">
         <div className="bg-linear-to-b from-forest to-forest-dark px-6 py-7 text-paper">
           <p className="text-[10px] font-extrabold tracking-[0.14em] text-sage uppercase">Skin PhD Confirm</p>
-          <h1 className="mt-2 font-display text-3xl font-medium">Private workspace sign-in</h1>
-          <p className="mt-2 text-sm text-sidebar-soft">
-            Use your work email and PIN. Managers issue agreements. Employees and witnesses only see assigned records.
+          <h1 className="mt-2 font-display text-3xl font-medium">Sign in to Confirm</h1>
+          <p className="mt-2 text-sm leading-relaxed text-sidebar-soft">
+            Franchisees issue packs. Employees and witnesses only open packs assigned to them. Then all three sign the same frozen wording.
           </p>
         </div>
         <form
