@@ -167,6 +167,7 @@ export function Workspace() {
   const [token, setToken] = useState("");
   const [consent, setConsent] = useState(false);
   const [issuedToken, setIssuedToken] = useState("");
+  const [notice, setNotice] = useState("");
   const [draftTemplateId, setDraftTemplateId] = useState("");
 
   useEffect(() => {
@@ -265,11 +266,18 @@ export function Workspace() {
       });
       const latest = useWorkspace.getState().agreements.find((item) => item.id === selected.id);
       haptic(action === "decline" ? "warn" : latest?.status === "completed" ? "complete" : "success");
+      setNotice(
+        action === "decline"
+          ? "Decline recorded."
+          : latest?.status === "completed"
+            ? "Saved. The signed pack is now the kept copy."
+            : "Saved. Signature recorded on the frozen snapshot.",
+      );
       if (action === "sign" && latest?.status === "completed") {
         const mail = buildSignedRecordMail(useWorkspace.getState(), latest, window.location.origin);
-        if (mail.to) window.location.href = employeeMailHref(mail);
+        if (mail.to) window.open(employeeMailHref(mail), "_self");
       }
-      setTypedName("");
+      setTypedName(current?.fullName ?? "");
       setToken("");
       setConsent(false);
       setIssuedToken("");
@@ -425,6 +433,11 @@ export function Workspace() {
             {error}
           </div>
         )}
+        {notice && (
+          <div className="mx-auto mb-4 max-w-7xl rounded-[10px] border border-status-green-bg bg-status-green-bg px-3 py-2.5 text-[12px] font-medium text-status-green-fg" role="status">
+            {notice}
+          </div>
+        )}
 
         {view === "overview" && (
           <div className="mx-auto grid max-w-7xl gap-4">
@@ -441,6 +454,7 @@ export function Workspace() {
                     className="flex w-full flex-col gap-2 px-5 py-4 text-left hover:bg-ground sm:flex-row sm:items-center sm:justify-between"
                     onClick={() => {
                       setSelectedId(item.id);
+                      setView("agreements");
                       const signer = item.snapshot.signers.find((entry) => entry.id === current.id);
                       if (signer) {
                         setActiveRole(signer.role);
@@ -1612,11 +1626,11 @@ function Detail({
             <Checkbox checked={consent} onCheckedChange={setConsent} />
             <span>{consentCopy()}</span>
           </label>
-          <div className="flex flex-wrap justify-end gap-2 pt-1">
-            <button type="button" className="min-h-10 rounded-md border border-danger-line bg-danger-bg px-4 text-xs font-bold text-danger-fg disabled:opacity-65" disabled={saving} onClick={() => void onSign("decline")}>
+          <div className="sticky bottom-0 z-10 -mx-4 mt-2 flex flex-wrap justify-end gap-2 border-t border-line bg-sage/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-1">
+            <button type="button" className="min-h-11 rounded-md border border-danger-line bg-danger-bg px-4 text-xs font-bold text-danger-fg disabled:opacity-65" disabled={saving} onClick={() => void onSign("decline")}>
               Decline
             </button>
-            <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper disabled:opacity-65" disabled={saving}>
+            <button className="min-h-11 min-w-40 rounded-md bg-accent px-4 text-xs font-bold text-paper disabled:opacity-65" disabled={saving}>
               {saving ? "Saving…" : "Record typed signature"}
             </button>
           </div>
