@@ -288,13 +288,18 @@ export function Workspace() {
   }
 
   async function onSign(action: "sign" | "decline") {
-    if (!selected || !activeRole) return;
+    if (!selected) return;
+    const role = activeRole;
+    if (!role) {
+      setError("Select whose name you are recording first");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
       await store.captureSignature({
         agreementId: selected.id,
-        role: activeRole,
+        role,
         typedName,
         consentAccepted: consent,
         action,
@@ -1397,6 +1402,8 @@ export function Workspace() {
             onIssue={onIssue}
             onIssueCode={onIssueCode}
             onSign={onSign}
+            error={error}
+            notice={notice}
           />
         </Modal>
       )}
@@ -1596,6 +1603,8 @@ function Detail({
   onIssue,
   onIssueCode,
   onSign,
+  error,
+  notice,
 }: {
   state: WorkspaceState;
   agreement: Agreement;
@@ -1612,6 +1621,8 @@ function Detail({
   onIssue: (role: Role) => Promise<void>;
   onIssueCode: (role: Role) => Promise<void>;
   onSign: (action: "sign" | "decline") => Promise<void>;
+  error: string;
+  notice: string;
 }) {
   const open = agreement.status === "awaiting_signatures" || agreement.status === "partially_signed";
   const actor = state.people.find((person) => person.id === state.currentPersonId);
@@ -1621,7 +1632,7 @@ function Detail({
   });
   const signingRole = activeRole || (nextSigner && (actor?.role === "manager" || actor?.id === nextSigner.id) ? nextSigner.role : "");
   useEffect(() => {
-    if (!signingRole || activeRole) return;
+    if (!signingRole || activeRole === signingRole) return;
     setActiveRole(signingRole);
     const signer = agreement.snapshot.signers.find((item) => item.role === signingRole);
     if (signer) setTypedName(signer.name);
@@ -1668,6 +1679,8 @@ function Detail({
         </button>
       </div>
       <ProgressTrack state={state} agreement={agreement} />
+      {error && <p className="mb-3 rounded-md bg-danger-bg px-3 py-2 text-[12px] text-danger-fg">{error}</p>}
+      {notice && <p className="mb-3 rounded-md bg-status-green-bg px-3 py-2 text-[12px] text-status-green-fg">{notice}</p>}
       <Row label="Employee" value={personName(state, agreement.employeeId)} />
       <Row label="Franchisee" value={personName(state, agreement.managerId)} />
       <Row label="SkinPhD branch" value={branchLabel(state, agreement.branchId)} />
