@@ -128,6 +128,15 @@ function rands(cents: number) {
   return new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(cents / 100);
 }
 
+function packTitle(value: string) {
+  return value
+    .replace(/\s+You have been accepted for:[\s\S]*$/i, "")
+    .replace(/\s+DATE OF ATTENDANCE:[\s\S]*$/i, "")
+    .replace(/_{2,}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim() || value;
+}
+
 function personName(state: Pick<WorkspaceState, "people">, id: string) {
   return state.people.find((person) => person.id === id)?.fullName ?? id;
 }
@@ -548,7 +557,7 @@ export function Workspace() {
                     }}
                   >
                     <span className="min-w-0">
-                      <strong className="block text-sm">{item.title}</strong>
+                      <strong className="block text-sm">{packTitle(item.title)}</strong>
                       <small className="text-[12px] text-muted">{nextStep(store, item)}</small>
                     </span>
                     <span className="flex items-center gap-3">
@@ -1370,7 +1379,7 @@ export function Workspace() {
       )}
 
       {selected && (
-        <Modal onClose={() => setSelectedId(null)} title={selected.title} eyebrow={selected.id}>
+        <Modal onClose={() => setSelectedId(null)} title={packTitle(selected.title)} eyebrow={selected.id}>
           <Detail
             state={store}
             agreement={selected}
@@ -1605,6 +1614,17 @@ function Detail({
 }) {
   const open = agreement.status === "awaiting_signatures" || agreement.status === "partially_signed";
   const actor = state.people.find((person) => person.id === state.currentPersonId);
+  const nextSigner = agreement.snapshot.signers.find((signer) => {
+    const signature = state.signatures.find((item) => item.agreementId === agreement.id && item.role === signer.role);
+    return signature?.outcome !== "signed";
+  });
+  const signingRole = activeRole || (nextSigner && (actor?.role === "manager" || actor?.id === nextSigner.id) ? nextSigner.role : "");
+  useEffect(() => {
+    if (!signingRole || activeRole) return;
+    setActiveRole(signingRole);
+    const signer = agreement.snapshot.signers.find((item) => item.role === signingRole);
+    if (signer) setTypedName(signer.name);
+  }, [signingRole, activeRole, agreement.snapshot.signers, setActiveRole, setTypedName]);
   const mail = buildEmployeeMail(state, agreement, typeof window === "undefined" ? "https://confirm.relpdev.uk" : window.location.origin);
   const recordEmail = useWorkspace((store) => store.noteEmailSent);
   return (
@@ -1648,10 +1668,9 @@ function Detail({
       </div>
       <ProgressTrack state={state} agreement={agreement} />
       <Row label="Employee" value={personName(state, agreement.employeeId)} />
-      <Row label="Manager" value={personName(state, agreement.managerId)} />
+      <Row label="Franchisee" value={personName(state, agreement.managerId)} />
       <Row label="SkinPhD branch" value={branchLabel(state, agreement.branchId)} />
-      <Row label="Template" value={`${agreement.snapshot.template.name} · v${agreement.snapshot.template.version}`} />
-      <Row label="Module" value={agreement.snapshot.template.module} />
+      <Row label="Source form" value={`${agreement.snapshot.template.category.replaceAll("_", " ")} · v${agreement.snapshot.template.version}`} />
       {agreement.snapshot.template.hasWaiver && <Row label="Waiver addendum" value="Included from source form" />}
       <div className="flex justify-between gap-5 border-b border-line py-3.5 text-[11px]">
         <span className="text-muted">Status</span>
@@ -1662,68 +1681,52 @@ function Detail({
       <Row label="Next step" value={nextStep(state, agreement)} />
       {open && (
         <div className="my-4 rounded-md border border-accent/20 bg-sage p-4 no-print">
-          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Type your name</p>
-          <p className="mt-1 mb-3 text-[12px] leading-relaxed text-status-green-fg">
-            Sign against the frozen snapshot. This is the kept copy if the print is lost.
-          </p>
+          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Who signs</p>
+          <p className="mt-1 mb-3 text-[12px] leading-relaxed text-status-green-fg">{nextStep(state, agreement)}</p>
       <div className="grid gap-2">
         {agreement.snapshot.signers.map((signer) => {
           const signature = state.signatures.find((item) => item.agreementId === agreement.id && item.role === signer.role);
-          const link = state.links.find((item) => item.agreementId === agreement.id && item.role === signer.role);
+          const isCurrent = signingRole === signer.role;
           return (
-            <article key={signer.role} className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-line bg-paper p-3">
-              <div>
-                <strong className="block text-sm">{signer.name}</strong>
-                <small className="mt-1 block text-[10px] text-muted">
-                  {roleLabel(signer.role)}
-                  {signature?.outcome === "signed"
-                    ? ` · signed ${shortTime(signature.signedAt)}`
-                    : signature?.outcome === "declined"
-                      ? " · declined"
-                      : " · outstanding"}
-                  {link ? ` · link ${link.status}` : ""}
-                </small>
-              </div>
-              {signature?.outcome !== "signed" && (actor?.role === "manager" || actor?.id === signer.id) && (
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent"
-                    onClick={() => {
-                      setActiveRole(signer.role);
-                      setTypedName(signer.name);
-                    }}
-                  >
-                    {activeRole === signer.role ? "Selected" : "Select to sign"}
-                  </button>
-                    <button type="button" className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent disabled:opacity-65" disabled={saving} onClick={() => void onIssueCode(signer.role)}>
-                      Email sign code
-                    </button>
-                    {actor?.role === "manager" && (
-                    <button type="button" className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent disabled:opacity-65" disabled={saving} onClick={() => onIssue(signer.role)}>
-                      Issue link
-                    </button>
-                  )}
-                </div>
-              )}
+            <article key={signer.role} className={cn("rounded-[10px] border bg-paper p-3", isCurrent ? "border-accent" : "border-line")}>
+              <strong className="block text-sm">{signer.name}</strong>
+              <small className="mt-1 block text-[11px] text-muted">
+                {roleLabel(signer.role)}
+                {signature?.outcome === "signed"
+                  ? ` · signed ${shortTime(signature.signedAt)}`
+                  : signature?.outcome === "declined"
+                    ? " · declined"
+                    : isCurrent
+                      ? " · signing now"
+                      : " · waiting"}
+              </small>
             </article>
           );
         })}
       </div>
-      {issuedToken && (
-        <div className="my-3 rounded-md border border-line bg-ground p-3">
-          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">One-time signing token</p>
-          <code className="mt-1 block break-all text-[10px] text-status-green-fg">{issuedToken}</code>
-        </div>
-      )}
-      {activeRole && (
+      {signingRole && (
         <form
           className="mt-3 grid gap-2.5"
           onSubmit={(event) => {
             event.preventDefault();
+            if (!activeRole && signingRole) setActiveRole(signingRole);
             void onSign("sign");
           }}
         >
+          <p className="text-[11px] font-bold text-ink">
+            Record {roleLabel(signingRole)} signature
+          </p>
+          <button
+            type="button"
+            className="min-h-10 rounded-md border border-line bg-paper text-xs font-bold text-accent disabled:opacity-65"
+            disabled={saving}
+            onClick={() => {
+              if (!activeRole && signingRole) setActiveRole(signingRole);
+              void onIssueCode(signingRole as Role);
+            }}
+          >
+            Email 6-digit code to this signer
+          </button>
           <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
             Email code
             <input value={token} onChange={(event) => setToken(event.target.value)} required inputMode="numeric" minLength={6} maxLength={6} placeholder="6-digit code" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal tracking-[0.3em] text-ink" />
