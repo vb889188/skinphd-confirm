@@ -12,4 +12,4 @@ Tenant `49937a9c-4c8c-420f-bac7-f2ff3f22f43e`. Tables stay named `confirm_*`. `c
 - `confirm_signing_links` — hashed one-time tokens
 - `confirm_audit` — issue, sign, reminder, directory actions
 
-RLS on every table requires header `x-confirm-workspace`.
+Indexes cover tenant plus branch, status, created_at, employee, snapshot hash, agreement signatures, and audit time.
