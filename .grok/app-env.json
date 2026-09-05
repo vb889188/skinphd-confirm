@@ -1,0 +1,10 @@
+{
+  "VITE_AUTH_ENABLED": "false",
+  "VITE_CONFIRM_MODE": "production",
+  "VITE_SUPABASE_URL": "https://nncecsszisodfnaibjyw.supabase.co",
+  "VITE_SUPABASE_ANON_KEY": "sb_publishable_Awm7V0LMYhv7l8nEqoVfOQ_4xqV-Sqs",
+  "VITE_CONFIRM_WORKSPACE_KEY": "sph-confirm-7f3a9c2e-brooklyn",
+  "deploy": {
+    "database": false
+  }
+}

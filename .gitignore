@@ -1,0 +1,11 @@
+node_modules
+.output
+.vercel
+.nitro
+dist
+screenshots
+attachments
+artifacts
+*.pptx
+.grok/preview.log
+.grok/preview.pid

@@ -1,0 +1,15 @@
+services:
+  confirm:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-https://nncecsszisodfnaibjyw.supabase.co}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-sb_publishable_Awm7V0LMYhv7l8nEqoVfOQ_4xqV-Sqs}
+        VITE_CONFIRM_WORKSPACE_KEY: ${VITE_CONFIRM_WORKSPACE_KEY:-sph-confirm-7f3a9c2e-brooklyn}
+        VITE_CONFIRM_MODE: production
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      VITE_AUTH_ENABLED: "false"
+    restart: unless-stopped

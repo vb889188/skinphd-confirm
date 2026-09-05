@@ -1,0 +1,9 @@
+node_modules
+.git
+screenshots
+artifacts
+attachments
+.grok/preview.log
+.grok/preview.pid
+dist
+.output
