@@ -12,7 +12,7 @@ import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { can, canViewAgreement } from "@/lib/confirm/access";
 import { isProductionMode } from "@/lib/confirm/remote";
-import { buildEmployeeMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
+import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { haptic } from "@/lib/confirm/haptics";
 import { Progress } from "@/components/ui/progress";
@@ -253,6 +253,24 @@ export function Workspace() {
       form.reset();
       setShowCreate(false);
       setSelectedId(id);
+      const created = useWorkspace.getState().agreements.find((item) => item.id === id);
+      const franchisee = store.people.find((person) => person.id === String(values.managerId));
+      const employee = store.people.find((person) => person.id === String(values.employeeId));
+      if (franchisee?.email && created) {
+        window.open(
+          employeeMailHref(
+            buildFranchiseeIssuedMail({
+              toName: franchisee.fullName,
+              toEmail: franchisee.email,
+              title: created.title,
+              employeeName: employee?.fullName ?? "Employee",
+              siteUrl: window.location.origin,
+            }),
+          ),
+          "_self",
+        );
+      }
+      setNotice("Pack issued. Tell the franchisee and send the employee the pack email.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the agreement");
     } finally {
@@ -285,6 +303,27 @@ export function Workspace() {
       if (action === "sign" && latest?.status === "completed") {
         const mail = buildSignedRecordMail(useWorkspace.getState(), latest, window.location.origin);
         if (mail.to) window.open(employeeMailHref(mail), "_self");
+      } else if (action === "sign" && latest) {
+        const snapshot = useWorkspace.getState();
+        const next = latest.snapshot.signers.find(
+          (signer) => !snapshot.signatures.some((item) => item.agreementId === latest.id && item.role === signer.role && item.outcome === "signed"),
+        );
+        const person = next ? snapshot.people.find((item) => item.id === next.id) : null;
+        if (person?.email && next) {
+          window.open(
+            employeeMailHref(
+              buildNextSignerMail({
+                toName: person.fullName,
+                toEmail: person.email,
+                title: latest.title,
+                role: next.role === "manager" ? "franchisee" : next.role,
+                previousSigner: typedName,
+                siteUrl: window.location.origin,
+              }),
+            ),
+            "_self",
+          );
+        }
       }
       setTypedName(current?.fullName ?? "");
       setToken("");

@@ -37,8 +37,7 @@ export function buildWelcomeMail(input: {
       "Sign in here:",
       input.siteUrl,
       "",
-      "Change the PIN under Settings after the first sign-in. Do not forward this email.",
-      "This mailbox message does not mean an agreement is signed.",
+      "Change the PIN under Settings after the first sign-in.",
       "",
       "SkinPhD Confirm",
     ].join("\n"),
@@ -59,7 +58,56 @@ export function buildSignCodeMail(input: { fullName: string; email: string; titl
       "",
       input.siteUrl,
       "",
-      "If you did not expect this pack, tell SkinPhD Head Office. The code is not a completed signature.",
+      "SkinPhD Confirm",
+    ].join("\n"),
+  };
+}
+
+export function buildFranchiseeIssuedMail(input: {
+  toName: string;
+  toEmail: string;
+  title: string;
+  employeeName: string;
+  siteUrl: string;
+}): EmployeeMail {
+  return {
+    to: input.toEmail,
+    subject: `Pack issued — ${input.title}`,
+    body: [
+      `Hello ${input.toName},`,
+      "",
+      "A SkinPhD Confirm pack was issued for your branch.",
+      `Employee: ${input.employeeName}`,
+      `Agreement: ${input.title}`,
+      "",
+      "The employee should sign first. You sign after that name is recorded.",
+      input.siteUrl,
+      "",
+      "SkinPhD Confirm",
+    ].join("\n"),
+  };
+}
+
+export function buildNextSignerMail(input: {
+  toName: string;
+  toEmail: string;
+  title: string;
+  role: string;
+  previousSigner: string;
+  siteUrl: string;
+}): EmployeeMail {
+  return {
+    to: input.toEmail,
+    subject: `Your turn to sign — ${input.title}`,
+    body: [
+      `Hello ${input.toName},`,
+      "",
+      `${input.previousSigner} has recorded a typed signature.`,
+      `SkinPhD Confirm is waiting for you as ${input.role}.`,
+      "",
+      input.siteUrl,
+      "",
+      "Open the pack, request a sign code if needed, then type your name.",
       "",
       "SkinPhD Confirm",
     ].join("\n"),
@@ -69,35 +117,24 @@ export function buildSignCodeMail(input: { fullName: string; email: string; titl
 export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
   const employee = state.people.find((person) => person.id === agreement.employeeId);
   const manager = state.people.find((person) => person.id === agreement.managerId);
-  const witness = agreement.witnessId ? state.people.find((person) => person.id === agreement.witnessId) : null;
   const clinic = state.branches.find((branch) => branch.id === agreement.branchId);
-  const to = employee?.email ?? "";
-  const subject = `SkinPhD Confirm: ${agreement.title}`;
-  const body = [
-    `Hello ${employee?.fullName ?? "colleague"},`,
-    "",
-    "SkinPhD Confirm has issued an employee agreement pack for your review and signature.",
-    "",
-    "Agreement",
-    `- Title: ${agreement.title}`,
-    `- Status: ${agreement.status.replaceAll("_", " ")}`,
-    `- Template: ${agreement.snapshot.template.name} v${agreement.snapshot.template.version}`,
-    `- Module: ${agreement.snapshot.template.module}`,
-    `- SkinPhD branch: ${clinic ? `${clinic.name} (${clinic.code})` : "Not set"}`,
-    `- Employee: ${employee?.fullName ?? "Not set"}`,
-    `- Franchisee: ${manager?.fullName ?? "Not set"}`,
-    `- Witness: ${witness?.fullName ?? "Not assigned"}`,
-    `- Deemed cost: R${(agreement.costCents / 100).toLocaleString("en-ZA")}`,
-    `- Snapshot: ${agreement.snapshotHash}`,
-    "",
-    "Open the workspace to sign with your typed name:",
-    siteUrl,
-    "",
-    "This email records issued fields only. It does not confirm competence, treatment authorisation, or a payroll deduction.",
-    "",
-    "SkinPhD Confirm",
-  ].join("\n");
-  return { to, subject, body };
+  return {
+    to: employee?.email ?? "",
+    subject: `SkinPhD Confirm: ${agreement.title}`,
+    body: [
+      `Hello ${employee?.fullName ?? "colleague"},`,
+      "",
+      "A pack is ready for your typed signature.",
+      `- Title: ${agreement.title}`,
+      `- Franchisee: ${manager?.fullName ?? "Not set"}`,
+      `- SkinPhD branch: ${clinic ? `${clinic.name} (${clinic.code})` : "Not set"}`,
+      `- Snapshot: ${agreement.snapshotHash}`,
+      "",
+      siteUrl,
+      "",
+      "SkinPhD Confirm",
+    ].join("\n"),
+  };
 }
 
 export function buildReminderMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
@@ -112,11 +149,7 @@ export function buildReminderMail(state: WorkspaceState, agreement: Agreement, s
     subject: `Reminder: SkinPhD Confirm signature outstanding — ${agreement.title}`,
     body: [
       "A SkinPhD Confirm pack is waiting for signature.",
-      "",
-      `Agreement: ${agreement.title}`,
       `Outstanding: ${outstanding.map((item) => item.role).join(", ") || "none"}`,
-      `Snapshot: ${agreement.snapshotHash}`,
-      "",
       siteUrl,
       "",
       "SkinPhD Confirm",
@@ -127,18 +160,14 @@ export function buildReminderMail(state: WorkspaceState, agreement: Agreement, s
 export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
   const employee = state.people.find((person) => person.id === agreement.employeeId);
   const manager = state.people.find((person) => person.id === agreement.managerId);
-  const to = [employee?.email, manager?.email].filter((email): email is string => Boolean(email)).join(",");
   return {
-    to,
+    to: [employee?.email, manager?.email].filter((email): email is string => Boolean(email)).join(","),
     subject: `Signed record stored: ${agreement.title}`,
     body: [
       "The agreement is complete. SkinPhD Confirm has stored the signed record.",
-      "",
-      `Title: ${agreement.title}`,
       `Employee: ${employee?.fullName ?? "Not set"}`,
       `Franchisee: ${manager?.fullName ?? "Not set"}`,
       `Snapshot: ${agreement.snapshotHash}`,
-      "",
       siteUrl,
       "",
       "SkinPhD Confirm",
