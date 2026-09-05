@@ -546,6 +546,6 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return status;
       },
     }),
-    { name: "skinphd-confirm.workspace.v7" },
+    { name: "skinphd-confirm.workspace.v8" },
   ),
 );
