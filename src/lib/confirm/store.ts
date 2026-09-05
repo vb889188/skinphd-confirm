@@ -55,6 +55,8 @@ type Actions = {
   ensurePilotPack: () => Promise<string | null>;
   hydrateRemote: () => Promise<void>;
   addPerson: (input: { fullName: string; email: string; role: Role; branchId: string; pin: string }) => Promise<string>;
+  updatePerson: (input: { id: string; fullName: string; email: string; role: Role; branchId: string; status: "active" | "inactive"; pin?: string }) => Promise<void>;
+  removePerson: (id: string) => void;
   addTemplate: (input: {
     name: string;
     category: "training" | "equipment" | "internal_waiver";
@@ -179,6 +181,59 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         });
         void persistWorkspace(get()).catch(() => undefined);
         return id;
+      },
+      updatePerson: async (input) => {
+        const state = get();
+        const person = state.people.find((item) => item.id === input.id);
+        if (!person) throw new Error("Choose a person first");
+        const fullName = input.fullName.trim();
+        const email = input.email.trim().toLowerCase();
+        if (!fullName) throw new Error("Name is required");
+        if (!email) throw new Error("Email is required");
+        if (state.people.some((item) => item.id !== input.id && item.email === email)) throw new Error("That email is already in the directory");
+        if (!state.branches.some((branch) => branch.id === input.branchId)) throw new Error("Choose a clinic");
+        const pin = input.pin?.trim();
+        if (pin && !/^\d{4,8}$/.test(pin)) throw new Error("Choose a 4 to 8 digit PIN");
+        const pinHash = pin ? await sha256Hex(`${email}|${pin}`) : person.pinHash;
+        const now = new Date().toISOString();
+        set({
+          people: state.people.map((item) =>
+            item.id === input.id ? { ...item, fullName, email, role: input.role, branchId: input.branchId, status: input.status, pinHash } : item,
+          ),
+          audit: [
+            { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person updated", detail: `${fullName} details were updated.`, createdAt: now },
+            ...state.audit,
+          ],
+        });
+        void persistWorkspace(get()).catch(() => undefined);
+      },
+      removePerson: (id) => {
+        const state = get();
+        const person = state.people.find((item) => item.id === id);
+        if (!person) throw new Error("Choose a person first");
+        if (person.id === state.currentPersonId) throw new Error("Sign out first before removing this identity");
+        const linked = state.agreements.some(
+          (item) => item.employeeId === id || item.managerId === id || item.witnessId === id,
+        );
+        const now = new Date().toISOString();
+        if (linked) {
+          set({
+            people: state.people.map((item) => (item.id === id ? { ...item, status: "inactive" as const } : item)),
+            audit: [
+              { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person deactivated", detail: `${person.fullName} was deactivated because signed records still name them.`, createdAt: now },
+              ...state.audit,
+            ],
+          });
+        } else {
+          set({
+            people: state.people.filter((item) => item.id !== id),
+            audit: [
+              { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person removed", detail: `${person.fullName} was removed from the directory.`, createdAt: now },
+              ...state.audit,
+            ],
+          });
+        }
+        void persistWorkspace(get()).catch(() => undefined);
       },
       addTemplate: async (input) => {
         const name = input.name.trim();

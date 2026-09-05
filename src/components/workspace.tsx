@@ -157,6 +157,8 @@ export function Workspace() {
   const [statusFilter, setStatusFilter] = useState("");
   const [clinicFilter, setClinicFilter] = useState("");
   const [templateFilter, setTemplateFilter] = useState("");
+  const [peopleQuery, setPeopleQuery] = useState("");
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<Role | "">("");
   const [typedName, setTypedName] = useState("");
   const [token, setToken] = useState("");
@@ -174,6 +176,7 @@ export function Workspace() {
   }, [current?.role, store]);
 
   const selected = store.agreements.find((item) => item.id === selectedId) ?? null;
+  const editingPerson = store.people.find((person) => person.id === editingPersonId) ?? null;
   const employees = store.people.filter((person) => person.role === "employee" && person.status === "active");
   const managers = store.people.filter((person) => person.role === "manager" && person.status === "active");
   const witnesses = store.people.filter((person) => person.role === "witness" && person.status === "active");
@@ -716,16 +719,49 @@ export function Workspace() {
 
         {view === "people" && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_320px]">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {store.people.map((person) => (
+            <div className="grid gap-3">
+              <input
+                value={peopleQuery}
+                onChange={(event) => setPeopleQuery(event.target.value)}
+                placeholder="Search name, email, role or clinic"
+                aria-label="Search staff"
+                className="min-h-10 rounded-md border border-line bg-paper px-3 text-sm"
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+              {store.people
+                .filter((person) => {
+                  const haystack = `${person.fullName} ${person.email} ${person.role} ${branchLabel(store, person.branchId)}`.toLowerCase();
+                  return !peopleQuery || haystack.includes(peopleQuery.toLowerCase());
+                })
+                .map((person) => (
                 <article key={person.id} className="rounded-lg border border-line bg-paper p-5">
                   <strong className="block text-sm">{person.fullName}</strong>
                   <small className="mt-1.5 block text-[11px] text-muted capitalize">
-                    {person.role} · {branchLabel(store, person.branchId)}
+                    {roleLabel(person.role)} · {branchLabel(store, person.branchId)} · {person.status}
                   </small>
                   <small className="mt-1 block text-[11px] text-muted">{person.email}</small>
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setEditingPersonId(person.id)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-danger-line bg-danger-bg px-3 py-1.5 text-[11px] font-bold text-danger-fg"
+                      onClick={() => {
+                        try {
+                          store.removePerson(person.id);
+                          setError("");
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Could not remove the person");
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </article>
               ))}
+              </div>
             </div>
             <form
               className="h-fit rounded-lg border border-line bg-paper p-5"
@@ -1054,6 +1090,60 @@ export function Workspace() {
                 {saving ? "Creating…" : "Freeze and issue agreement"}
               </button>
             </footer>
+          </form>
+        </Modal>
+      )}
+
+      {editingPerson && (
+        <Modal onClose={() => setEditingPersonId(null)} title={editingPerson.fullName} eyebrow="Edit directory">
+          <form
+            className="grid gap-2.5 px-5 py-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+              void store
+                .updatePerson({
+                  id: editingPerson.id,
+                  fullName: String(values.fullName),
+                  email: String(values.email),
+                  role: String(values.role) as Role,
+                  branchId: String(values.branchId),
+                  status: String(values.status) as "active" | "inactive",
+                  pin: String(values.pin || "") || undefined,
+                })
+                .then(() => {
+                  setEditingPersonId(null);
+                  setError("");
+                })
+                .catch((err) => setError(err instanceof Error ? err.message : "Could not update the person"));
+            }}
+          >
+            <input name="fullName" required defaultValue={editingPerson.fullName} className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <input name="email" required type="email" defaultValue={editingPerson.email} className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <input name="pin" inputMode="numeric" minLength={4} maxLength={8} placeholder="New PIN (leave blank to keep)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+            <select name="role" required defaultValue={editingPerson.role} className="min-h-10 rounded-md border border-line px-2.5 text-sm">
+              <option value="employee">Employee / applicant</option>
+              <option value="manager">Franchisee / manager</option>
+              <option value="witness">Witness</option>
+            </select>
+            <select name="branchId" required defaultValue={editingPerson.branchId} className="min-h-10 rounded-md border border-line px-2.5 text-sm">
+              {store.branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>{branch.name}</option>
+              ))}
+            </select>
+            <select name="status" required defaultValue={editingPerson.status} className="min-h-10 rounded-md border border-line px-2.5 text-sm">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <p className="text-[11px] leading-relaxed text-muted">
+              If this person is named on an agreement, Delete deactivates them so the signed record stays intact.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="min-h-10 rounded-md border border-line px-4 text-xs font-bold text-muted" onClick={() => setEditingPersonId(null)}>
+                Cancel
+              </button>
+              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper">Save details</button>
+            </div>
           </form>
         </Modal>
       )}
