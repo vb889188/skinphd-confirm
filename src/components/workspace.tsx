@@ -354,8 +354,9 @@ export function Workspace() {
     try {
       const result = await store.issueSignCode(selected.id, role);
       setActiveRole(role);
-      setToken("");
-      setNotice(`Sign code prepared for ${result.email}. Send the mail, then enter the 6-digit code.`);
+      setToken(result.code);
+      setIssuedToken(result.code);
+      setNotice(`Sign code ${result.code} prepared for ${result.email}.`);
       const signer = selected.snapshot.signers.find((item) => item.role === role);
       window.location.href = employeeMailHref(
         buildSignCodeMail({
@@ -1727,6 +1728,13 @@ function Detail({
           >
             Email 6-digit code to this signer
           </button>
+          {actor?.role === "manager" && issuedToken && (
+            <div className="rounded-md border border-line bg-paper px-3 py-3">
+              <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Head Office sign code</p>
+              <p className="mt-1 font-display text-3xl tracking-[0.2em] text-ink">{issuedToken}</p>
+              <p className="mt-1 text-[11px] text-muted">Valid 15 minutes. Email also opened to the signer.</p>
+            </div>
+          )}
           <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
             Email code
             <input value={token} onChange={(event) => setToken(event.target.value)} required inputMode="numeric" minLength={6} maxLength={6} placeholder="6-digit code" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal tracking-[0.3em] text-ink" />
