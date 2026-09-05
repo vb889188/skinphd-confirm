@@ -2,12 +2,13 @@ import type { Template } from "./types";
 
 const now = "2026-09-04T20:00:00.000Z";
 
-function source(partial: Omit<Template, "version" | "status" | "approvedAt" | "createdAt" | "requiresWitness">): Template {
+function source(partial: Omit<Template, "version" | "status" | "approvedAt" | "createdAt" | "requiresWitness" | "sourceFileId">): Template {
   return {
     ...partial,
     version: "1.0",
     status: "approved",
     requiresWitness: true,
+    sourceFileId: null,
     approvedAt: now,
     createdAt: now,
   };

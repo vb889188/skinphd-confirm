@@ -59,6 +59,7 @@ type AgreementRow = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  last_reminded_at?: string | null;
 };
 type TemplateRow = {
   id: string;
@@ -78,6 +79,7 @@ type TemplateRow = {
   content: string;
   approved_at: string | null;
   created_at: string;
+  source_file_id?: string | null;
 };
 type PayloadRow = { id: string; agreement_id?: string | null; payload?: Signature | SigningLink; actor?: string; action?: string; detail?: string; created_at: string };
 
@@ -100,6 +102,7 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
     status: row.status,
     module: row.module,
     sourceFile: row.source_file,
+    sourceFileId: row.source_file_id ?? null,
     dailyRateRands: row.daily_rate_rands,
     defaultDays: row.default_days,
     passPercent: row.pass_percent,
@@ -145,6 +148,7 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
       createdBy: row.created_by,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      lastRemindedAt: row.last_reminded_at ?? null,
     })),
     signatures: signatures.map((row) => row.payload as Signature),
     links: links.map((row) => row.payload as SigningLink),
@@ -216,6 +220,7 @@ export async function upsertAgreement(agreement: Agreement) {
       created_by: agreement.createdBy,
       created_at: agreement.createdAt,
       updated_at: agreement.updatedAt,
+      last_reminded_at: agreement.lastRemindedAt,
     }),
   });
 }
@@ -278,6 +283,7 @@ export async function upsertTemplate(template: Template) {
       status: template.status,
       module: template.module,
       source_file: template.sourceFile,
+      source_file_id: template.sourceFileId,
       daily_rate_rands: template.dailyRateRands,
       default_days: template.defaultDays,
       pass_percent: template.passPercent,
@@ -304,4 +310,34 @@ export async function persistWorkspace(state: WorkspaceState) {
     ...state.audit.slice(0, 40).map(upsertAudit),
   ]);
 }
+
+export async function upsertSourceFile(file: {
+  id: string;
+  templateId?: string | null;
+  agreementId?: string | null;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  sha256: string;
+  contentBase64: string;
+  createdAt: string;
+}) {
+  await rest("confirm_source_files?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      id: file.id,
+      tenant_id: CONFIRM_TENANT_ID,
+      template_id: file.templateId ?? null,
+      agreement_id: file.agreementId ?? null,
+      file_name: file.fileName,
+      mime_type: file.mimeType,
+      byte_size: file.byteSize,
+      sha256: file.sha256,
+      content_base64: file.contentBase64,
+      created_at: file.createdAt,
+    }),
+  });
+}
+
 

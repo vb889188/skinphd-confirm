@@ -11,7 +11,7 @@ import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
 import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { isProductionMode } from "@/lib/confirm/remote";
-import { buildEmployeeMail, employeeMailHref } from "@/lib/confirm/email";
+import { buildEmployeeMail, buildReminderMail, buildSignedRecordMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -247,6 +247,11 @@ export function Workspace() {
         action,
         token: token || undefined,
       });
+      const latest = useWorkspace.getState().agreements.find((item) => item.id === selected.id);
+      if (action === "sign" && latest?.status === "completed") {
+        const mail = buildSignedRecordMail(useWorkspace.getState(), latest, window.location.origin);
+        if (mail.to) window.location.href = employeeMailHref(mail);
+      }
       setTypedName("");
       setToken("");
       setConsent(false);
@@ -413,7 +418,7 @@ export function Workspace() {
                   ["1. Source form", "Pick an approved Skin PhD training or equipment form. The printed wording is frozen."],
                   ["2. Issue", "Fill employee, clinic, dates and deemed cost. That snapshot cannot quietly change later."],
                   ["3. Sign", "Employee, franchisee and witness type their names against that exact snapshot."],
-                  ["4. Keep", "Print or email the pack. The hash and history stay with the record."],
+                  ["4. Keep the record", "Print is optional. The signed snapshot stays in Confirm so a misplaced page is not the only copy."],
                 ].map(([title, copy]) => (
                   <li key={title} className="border-b border-line py-4 last:border-b-0">
                     <strong className="block text-sm">{title}</strong>
@@ -564,8 +569,7 @@ export function Workspace() {
                   event.preventDefault();
                   const form = event.currentTarget;
                   const values = Object.fromEntries(new FormData(form).entries());
-                  try {
-                    store.addTemplate({
+                  void store.addTemplate({
                       name: String(values.name),
                       category: String(values.category) as "training" | "equipment" | "internal_waiver",
                       module: String(values.module),
@@ -577,12 +581,15 @@ export function Workspace() {
                       mandatoryMonths: values.mandatoryMonths ? Number(values.mandatoryMonths) : null,
                       hasWaiver: values.hasWaiver === "on",
                       equipmentLabel: String(values.equipmentLabel || "") || null,
-                    });
+                      fileBase64: String(values.fileBase64 || "") || undefined,
+                      mimeType: String(values.mimeType || "") || undefined,
+                      byteSize: values.byteSize ? Number(values.byteSize) : undefined,
+                    }).then(() => {
                     form.reset();
                     setError("");
-                  } catch (err) {
+                  }).catch((err) => {
                     setError(err instanceof Error ? err.message : "Could not add the document");
-                  }
+                  });
                 }}
               >
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">New source document</p>
@@ -604,6 +611,19 @@ export function Workspace() {
                         if (field) field.value = value;
                       };
                       setValue("sourceFile", file.name);
+                      if (file.size > 6_000_000) {
+                        setError("Keep source files under 6 MB");
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const result = String(reader.result || "");
+                        const base64 = result.includes(",") ? result.split(",")[1] : result;
+                        setValue("fileBase64", base64);
+                        setValue("mimeType", file.type || "application/octet-stream");
+                        setValue("byteSize", String(file.size));
+                      };
+                      reader.readAsDataURL(file);
                       void extractSourceDocument(file)
                         .then((extracted) => {
                           setValue("sourceFile", extracted.fileName);
@@ -624,6 +644,9 @@ export function Workspace() {
                     }}
                   />
                   <input name="sourceFile" required placeholder="Original file name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                  <input type="hidden" name="fileBase64" />
+                  <input type="hidden" name="mimeType" />
+                  <input type="hidden" name="byteSize" />
                   <input name="name" required placeholder="Template name as printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
                   <input name="module" placeholder="Module / machine name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
                   <select name="category" required className="min-h-10 rounded-md border border-line px-2.5 text-sm">
@@ -816,6 +839,14 @@ export function Workspace() {
                   <input name="nextPin" type="password" required placeholder="New PIN" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
                   <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper">Change PIN</button>
                 </form>
+                <div className="mt-4 rounded-md bg-ground px-3 py-3 text-[12px] leading-relaxed text-muted">
+                  <strong className="block text-ink">PIN issue and reset</strong>
+                  Head Office creates the person in Staff with a 4–8 digit PIN and tells that person privately. The person signs in and changes the PIN immediately. If a PIN is lost, Head Office issues a new one here. Do not put PINs in the agreement email.
+                </div>
+                <div className="mt-3 rounded-md bg-ground px-3 py-3 text-[12px] leading-relaxed text-muted">
+                  <strong className="block text-ink">Backup</strong>
+                  Use Export JSON after each training day. On the server also run scripts/backup-confirm.sh so Confirm tables have a dated copy. The signed snapshot in this workspace is the record if paper is misplaced.
+                </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted" onClick={downloadExport}>
                     <Download className="size-3.5" />
@@ -1225,6 +1256,21 @@ function Detail({
         >
           Email employee pack
         </button>
+        {open && (
+          <button
+            type="button"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted"
+            onClick={() => {
+              const reminder = buildReminderMail(state, agreement, window.location.origin);
+              if (!reminder.to) return;
+              recordEmail(agreement.id, reminder.to);
+              useWorkspace.getState().markReminded(agreement.id);
+              window.location.href = employeeMailHref(reminder);
+            }}
+          >
+            Remind outstanding signers
+          </button>
+        )}
         <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted" onClick={() => window.print()}>
           <Printer className="size-3.5" />
           Print issued pack

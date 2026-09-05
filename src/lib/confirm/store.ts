@@ -11,7 +11,7 @@ import {
   requiredSignatureCount,
 } from "./rules";
 import type { Agreement, Role, Snapshot, WorkspaceState } from "./types";
-import { persistWorkspace, loadRemoteWorkspace, remoteEnabled } from "./remote";
+import { persistWorkspace, loadRemoteWorkspace, remoteEnabled, upsertSourceFile } from "./remote";
 
 export type CreateInput = {
   title: string;
@@ -67,9 +67,13 @@ type Actions = {
     mandatoryMonths: number | null;
     hasWaiver: boolean;
     equipmentLabel: string | null;
-  }) => string;
+    fileBase64?: string;
+    mimeType?: string;
+    byteSize?: number;
+  }) => Promise<string>;
   addBranch: (input: { name: string; code: string }) => string;
   noteEmailSent: (agreementId: string, toEmail: string) => void;
+  markReminded: (agreementId: string) => void;
 };
 
 export const useWorkspace = create<WorkspaceState & Actions>()(
@@ -176,7 +180,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
         return id;
       },
-      addTemplate: (input) => {
+      addTemplate: async (input) => {
         const name = input.name.trim();
         const content = input.content.trim();
         const sourceFile = input.sourceFile.trim();
@@ -190,6 +194,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         );
         const version = existing ? String((Number(existing.version) || 1) + 1) + ".0" : "1.0";
         const id = randomId("TPL");
+        const fileId = input.fileBase64 ? randomId("FILE") : null;
         const now = new Date().toISOString();
         const template = {
           id,
@@ -199,6 +204,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           status: "approved" as const,
           module: input.module.trim() || name,
           sourceFile,
+          sourceFileId: fileId,
           dailyRateRands: input.dailyRateRands,
           defaultDays: input.defaultDays,
           passPercent: input.passPercent,
@@ -230,6 +236,19 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           ],
         });
         void persistWorkspace(get()).catch(() => undefined);
+        if (fileId && input.fileBase64) {
+          const digest = await sha256Hex(input.fileBase64);
+          void upsertSourceFile({
+            id: fileId,
+            templateId: id,
+            fileName: sourceFile,
+            mimeType: input.mimeType || "application/octet-stream",
+            byteSize: input.byteSize || 0,
+            sha256: digest,
+            contentBase64: input.fileBase64,
+            createdAt: now,
+          }).catch(() => undefined);
+        }
         return id;
       },
       addBranch: (input) => {
@@ -258,6 +277,20 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         set({
           audit: [
             { id: randomId("AUD"), agreementId, actor: ACTOR, action: "Employee email opened", detail: `Issue pack addressed to ${toEmail} for ${agreement.title}.`, createdAt: now },
+            ...state.audit,
+          ],
+        });
+        void persistWorkspace(get()).catch(() => undefined);
+      },
+      markReminded: (agreementId) => {
+        const state = get();
+        const agreement = state.agreements.find((item) => item.id === agreementId);
+        if (!agreement) throw new Error("Choose an agreement first");
+        const now = new Date().toISOString();
+        set({
+          agreements: state.agreements.map((item) => (item.id === agreementId ? { ...item, lastRemindedAt: now, updatedAt: now } : item)),
+          audit: [
+            { id: randomId("AUD"), agreementId, actor: ACTOR, action: "Reminder sent", detail: `Outstanding signatures were reminded for ${agreement.title}.`, createdAt: now },
             ...state.audit,
           ],
         });
@@ -341,6 +374,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           createdBy: ACTOR,
           createdAt: now,
           updatedAt: now,
+          lastRemindedAt: null,
         };
         set({
           agreements: [agreement, ...state.agreements],

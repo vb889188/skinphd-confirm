@@ -57,7 +57,51 @@ export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, s
   return { to, subject, body };
 }
 
-export function missingEmployeeEmail(person: Person | undefined) {
-  if (!person?.email) return "Add the employee email in People before sending.";
-  return null;
+export function buildReminderMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
+  const outstanding = agreement.snapshot.signers.filter((signer) =>
+    !state.signatures.some((item) => item.agreementId === agreement.id && item.role === signer.role && item.outcome === "signed"),
+  );
+  const recipients = outstanding
+    .map((signer) => state.people.find((person) => person.id === signer.id)?.email)
+    .filter((email): email is string => Boolean(email));
+  return {
+    to: recipients.join(","),
+    subject: `Reminder: Skin PhD Confirm signature outstanding — ${agreement.title}`,
+    body: [
+      "A Skin PhD Confirm pack is waiting for signature.",
+      "",
+      `Agreement: ${agreement.title}`,
+      `Outstanding: ${outstanding.map((item) => item.role).join(", ") || "none"}`,
+      `Snapshot: ${agreement.snapshotHash}`,
+      "",
+      "Sign in the workspace so the signed record is stored. Printed copies can be misplaced.",
+      siteUrl,
+      "",
+      "Skin PhD Confirm",
+    ].join("\n"),
+  };
+}
+
+export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
+  const employee = state.people.find((person) => person.id === agreement.employeeId);
+  const manager = state.people.find((person) => person.id === agreement.managerId);
+  const to = [employee?.email, manager?.email].filter((email): email is string => Boolean(email)).join(",");
+  return {
+    to,
+    subject: `Signed record stored: ${agreement.title}`,
+    body: [
+      "The agreement is complete. Skin PhD Confirm has stored the signed record.",
+      "",
+      `Title: ${agreement.title}`,
+      `Employee: ${employee?.fullName ?? "Not set"}`,
+      `Franchisee: ${manager?.fullName ?? "Not set"}`,
+      `Status: completed`,
+      `Snapshot: ${agreement.snapshotHash}`,
+      "",
+      "Keep this email with the workspace record. A printed copy is optional and can be lost.",
+      siteUrl,
+      "",
+      "Skin PhD Confirm",
+    ].join("\n"),
+  };
 }

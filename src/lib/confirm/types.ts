@@ -31,6 +31,7 @@ export type Template = {
   status: TemplateStatus;
   module: string;
   sourceFile: string;
+  sourceFileId: string | null;
   dailyRateRands: number | null;
   defaultDays: number | null;
   passPercent: number | null;
@@ -89,6 +90,7 @@ export type Agreement = {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  lastRemindedAt: string | null;
 };
 export type Signature = {
   id: string;
