@@ -15,6 +15,19 @@ export function isProductionMode() {
   return import.meta.env.VITE_CONFIRM_MODE === "production";
 }
 
+let actorHeaders: Record<string, string> = {};
+
+export function setRemoteActor(person: Person | null) {
+  actorHeaders = person
+    ? {
+        "x-confirm-person": person.id,
+        "x-confirm-role": person.role,
+        "x-confirm-scope": person.scope ?? (person.role === "manager" ? "clinic" : "self"),
+        "x-confirm-branch": person.branchId,
+      }
+    : {};
+}
+
 async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!url || !key || !workspaceKey) throw new Error("Supabase is not configured");
   const response = await fetch(`${url}/rest/v1/${path}`, {
@@ -25,6 +38,7 @@ async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
       "Content-Type": "application/json",
       Prefer: "return=minimal",
       "x-confirm-workspace": workspaceKey,
+      ...actorHeaders,
       ...(init.headers ?? {}),
     },
   });

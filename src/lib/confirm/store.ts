@@ -11,7 +11,7 @@ import {
   requiredSignatureCount,
 } from "./rules";
 import type { Agreement, Role, Snapshot, WorkspaceState } from "./types";
-import { persistWorkspace, loadRemoteWorkspace, remoteEnabled, upsertSourceFile } from "./remote";
+import { persistWorkspace, loadRemoteWorkspace, remoteEnabled, setRemoteActor, upsertSourceFile } from "./remote";
 import { requireCapability } from "./access";
 
 function actor(state: WorkspaceState) {
@@ -117,6 +117,26 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const hash = await sha256Hex(`${person.email}|${pin.trim()}`);
         if (hash !== person.pinHash) throw new Error("Check the email and PIN");
         set({ currentPersonId: person.id, sessionStartedAt: new Date().toISOString() });
+        setRemoteActor(person);
+        if (remoteEnabled()) {
+          try {
+            const remote = await loadRemoteWorkspace();
+            set({
+              ...get(),
+              currentPersonId: person.id,
+              sessionStartedAt: new Date().toISOString(),
+              branches: remote.branches.length ? remote.branches : get().branches,
+              people: remote.people.length ? remote.people : get().people,
+              templates: remote.templates.length ? remote.templates : get().templates,
+              agreements: remote.agreements,
+              signatures: remote.signatures,
+              links: remote.links,
+              audit: remote.audit,
+            });
+          } catch {
+            /* keep local */
+          }
+        }
         return person.id;
       },
       changePin: async (currentPin, nextPin) => {
@@ -143,7 +163,10 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const age = Date.now() - new Date(started).getTime();
         if (age > 8 * 60 * 60 * 1000) set({ currentPersonId: null, sessionStartedAt: null });
       },
-      signOut: () => set({ currentPersonId: null, sessionStartedAt: null }),
+      signOut: () => {
+        setRemoteActor(null);
+        set({ currentPersonId: null, sessionStartedAt: null });
+      },
       hydrateRemote: async () => {
         if (!remoteEnabled()) return;
         try {

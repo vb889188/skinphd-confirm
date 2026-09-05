@@ -12,4 +12,4 @@ Tenant `49937a9c-4c8c-420f-bac7-f2ff3f22f43e`. Tables stay named `confirm_*`. `c
 - `confirm_signing_links` — hashed one-time tokens
 - `confirm_audit` — issue, sign, reminder, directory actions
 
-Indexes cover tenant plus branch, status, created_at, employee, snapshot hash, agreement signatures, and audit time.
+RLS requires header `x-confirm-workspace`. After sign-in the client also sends `x-confirm-person`, `x-confirm-role`, `x-confirm-scope`, and `x-confirm-branch`. Employees only select agreements they are on. History and source files are manager-only. Headers can still be spoofed with the anon key until Supabase Auth is used.
