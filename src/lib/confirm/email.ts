@@ -114,26 +114,32 @@ export function buildNextSignerMail(input: {
   };
 }
 
-export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
+export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, siteUrl: string, pin?: string): EmployeeMail {
   const employee = state.people.find((person) => person.id === agreement.employeeId);
   const manager = state.people.find((person) => person.id === agreement.managerId);
   const clinic = state.branches.find((branch) => branch.id === agreement.branchId);
+  const complete = agreement.status === "completed";
   return {
     to: employee?.email ?? "",
-    subject: `SkinPhD Confirm: ${agreement.title}`,
+    subject: complete ? `Stored pack: ${agreement.title}` : `SkinPhD Confirm: ${agreement.title}`,
     body: [
       `Hello ${employee?.fullName ?? "colleague"},`,
       "",
-      "A pack is ready for your typed signature.",
+      complete ? "SkinPhD Confirm has stored this signed pack." : "A pack is ready for your typed signature.",
       `- Title: ${agreement.title}`,
+      `- Status: ${agreement.status.replaceAll("_", " ")}`,
       `- Franchisee: ${manager?.fullName ?? "Not set"}`,
       `- SkinPhD branch: ${clinic ? `${clinic.name} (${clinic.code})` : "Not set"}`,
       `- Snapshot: ${agreement.snapshotHash}`,
       "",
+      "Sign in",
       siteUrl,
+      `Email: ${employee?.email ?? ""}`,
+      pin ? `Temporary PIN: ${pin}` : "Use the PIN Head Office last issued. Ask for a reset if you do not have it.",
+      pin ? "Change this PIN under Settings after you sign in." : "",
       "",
       "SkinPhD Confirm",
-    ].join("\n"),
+    ].filter((line) => line !== "").join("\n"),
   };
 }
 

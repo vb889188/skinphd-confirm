@@ -56,6 +56,7 @@ type Actions = {
   signIn: (personId: string) => void;
   signInWithPin: (email: string, pin: string) => Promise<string>;
   changePin: (currentPin: string, nextPin: string) => Promise<void>;
+  issueTemporaryPin: (personId: string) => Promise<string>;
   expireSessionIfNeeded: () => void;
   signOut: () => void;
   ensurePilotPack: () => Promise<string | null>;
@@ -156,6 +157,24 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           ],
         });
         void persistWorkspace(get()).catch(() => undefined);
+      },
+      issueTemporaryPin: async (personId) => {
+        requireCapability(actor(get()), "staff", "Issue a temporary PIN");
+        const state = get();
+        const person = state.people.find((item) => item.id === personId);
+        if (!person) throw new Error("Choose a staff record first");
+        const pin = String(1000 + Math.floor(Math.random() * 9000));
+        const pinHash = await sha256Hex(`${person.email}|${pin}`);
+        const now = new Date().toISOString();
+        set({
+          people: state.people.map((item) => (item.id === person.id ? { ...item, pinHash } : item)),
+          audit: [
+            { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Temporary PIN issued", detail: `A new sign-in PIN was issued for ${person.fullName}.`, createdAt: now },
+            ...state.audit,
+          ],
+        });
+        void persistWorkspace(get()).catch(() => undefined);
+        return pin;
       },
       expireSessionIfNeeded: () => {
         const started = get().sessionStartedAt;

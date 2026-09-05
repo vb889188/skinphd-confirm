@@ -1648,10 +1648,20 @@ function Detail({
           type="button"
           className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted"
           onClick={() => {
-            if (!mail.to) return;
-            recordEmail(agreement.id, mail.to);
-            navigator.clipboard?.writeText(`${mail.subject}\n\n${mail.body}`).catch(() => undefined);
-            window.location.href = employeeMailHref(mail);
+            void useWorkspace
+              .getState()
+              .issueTemporaryPin(agreement.employeeId)
+              .then((pin) => {
+                const pack = buildEmployeeMail(useWorkspace.getState(), agreement, window.location.origin, pin);
+                if (!pack.to) return;
+                recordEmail(agreement.id, pack.to);
+                window.location.href = employeeMailHref(pack);
+              })
+              .catch((err) => {
+                const pack = buildEmployeeMail(state, agreement, window.location.origin);
+                if (pack.to) window.location.href = employeeMailHref(pack);
+                console.warn(err);
+              });
           }}
         >
           Email employee pack
