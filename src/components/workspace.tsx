@@ -444,6 +444,7 @@ export function Workspace() {
           </div>
         </header>
 
+        {isManager && (
         <div className="mx-auto mb-4 flex max-w-7xl items-start gap-3 rounded-[10px] border border-warn-line bg-warn-bg px-3 py-2.5 text-[11px] text-warn-fg">
           <span className="mt-1 size-1.5 shrink-0 rounded-full bg-status-amber-fg" />
           <p className="m-0">
@@ -453,6 +454,7 @@ export function Workspace() {
             View launch boundary
           </button>
         </div>
+        )}
 
         {error && (
           <div className="mx-auto mb-4 max-w-7xl rounded-[10px] border border-danger-line bg-danger-bg px-3 py-2.5 text-[11px] text-danger-fg" role="alert">
@@ -505,6 +507,7 @@ export function Workspace() {
                 )}
               </div>
             </section>
+            {isManager && (
             <section className="overflow-hidden rounded-lg border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Why this exists</p>
@@ -524,6 +527,7 @@ export function Workspace() {
                 ))}
               </ol>
             </section>
+            )}
           </div>
         )}
 
@@ -586,7 +590,7 @@ export function Workspace() {
               </Select>
               )}
             </div>
-            <div className={cn("mx-auto grid max-w-7xl gap-4", can(current, "audit") && "xl:grid-cols-[minmax(0,1.85fr)_minmax(280px,0.75fr)]")}>
+            <div className={cn("mx-auto grid max-w-7xl gap-4", current.role === "manager" && can(current, "audit") && "xl:grid-cols-[minmax(0,1.85fr)_minmax(280px,0.75fr)]")}>
               <AgreementQueue
                 state={store}
                 items={filtered}
@@ -602,7 +606,7 @@ export function Workspace() {
                 }}
                 onCreate={() => setShowCreate(true)}
               />
-              {can(current, "audit") && (
+              {current.role === "manager" && can(current, "audit") && (
               <aside className="overflow-hidden rounded-lg border border-line bg-paper">
                 <div className="border-b border-line px-5 py-4">
                   <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Live record</p>
