@@ -173,7 +173,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (!email) throw new Error("Email is required");
         if (!/^\d{4,8}$/.test(pin)) throw new Error("Choose a 4 to 8 digit PIN");
         const state = get();
-        if (!state.branches.some((branch) => branch.id === input.branchId)) throw new Error("Choose a clinic");
+        if (!state.branches.some((branch) => branch.id === input.branchId)) throw new Error("Choose a SkinPhD branch");
         if (state.people.some((person) => person.email === email)) throw new Error("That email is already in the directory");
         const id = randomId("PER");
         const now = new Date().toISOString();
@@ -198,7 +198,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (!fullName) throw new Error("Name is required");
         if (!email) throw new Error("Email is required");
         if (state.people.some((item) => item.id !== input.id && item.email === email)) throw new Error("That email is already in the directory");
-        if (!state.branches.some((branch) => branch.id === input.branchId)) throw new Error("Choose a clinic");
+        if (!state.branches.some((branch) => branch.id === input.branchId)) throw new Error("Choose a SkinPhD branch");
         const pin = input.pin?.trim();
         if (pin && !/^\d{4,8}$/.test(pin)) throw new Error("Choose a 4 to 8 digit PIN");
         const pinHash = pin ? await sha256Hex(`${email}|${pin}`) : person.pinHash;
@@ -319,15 +319,15 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         requireCapability(actor(get()), "clinics", "Add clinics");
         const name = input.name.trim();
         const code = input.code.trim().toUpperCase();
-        if (!name || !code) throw new Error("Clinic name and code are required");
+        if (!name || !code) throw new Error("SkinPhD branch name and code are required");
         const state = get();
-        if (state.branches.some((branch) => branch.code === code)) throw new Error("That clinic code already exists");
+        if (state.branches.some((branch) => branch.code === code)) throw new Error("That SkinPhD branch code already exists");
         const id = randomId("BRN");
         const now = new Date().toISOString();
         set({
           branches: [...state.branches, { id, name, code, createdAt: now }],
           audit: [
-            { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Clinic added", detail: `${name} (${code}) was added to the directory.`, createdAt: now },
+            { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "SkinPhD branch added", detail: `${name} (${code}) was added to the directory.`, createdAt: now },
             ...state.audit,
           ],
         });

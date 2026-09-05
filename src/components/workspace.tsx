@@ -317,7 +317,7 @@ export function Workspace() {
     agreements: "Agreements",
     templates: "Source forms",
     people: "Staff directory",
-    locations: "Clinics",
+    locations: "SkinPhD branches",
     audit: "What changed",
     settings: "Workspace settings",
   };
@@ -326,7 +326,7 @@ export function Workspace() {
     agreements: "Each row is a frozen pack. Open it to sign or to retrieve the stored copy.",
     templates: "Approved SkinPhD wording. Upload stores the original file with the text.",
     people: "Employees, franchisees and witnesses who can appear on an agreement.",
-    locations: "Clinic names and codes used on issued packs.",
+    locations: "SkinPhD branch names and codes used on issued packs.",
     audit: "Issue, sign, reminder and update actions.",
     settings: "PIN reset, export of records, and what this system will not decide.",
   };
@@ -359,7 +359,7 @@ export function Workspace() {
           <NavButton current={view} id="agreements" label="Agreements" count={visibleAgreements.length} onSelect={setView} />
           {can(current, "templates") && <NavButton current={view} id="templates" label="Source forms" count={approvedTemplates.length} onSelect={setView} />}
           {can(current, "staff") && <NavButton current={view} id="people" label="Staff" count={store.people.length} onSelect={setView} />}
-          {can(current, "clinics") && <NavButton current={view} id="locations" label="Clinics" count={store.branches.length} onSelect={setView} />}
+          {can(current, "clinics") && <NavButton current={view} id="locations" label="SkinPhD branches" count={store.branches.length} onSelect={setView} />}
           <p className="mt-7 mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Record</p>
           {can(current, "audit") && <NavButton current={view} id="audit" label="History" onSelect={setView} />}
           <NavButton current={view} id="settings" label="Settings" onSelect={setView} />
@@ -467,7 +467,7 @@ export function Workspace() {
               <ol className="grid gap-0 px-5 sm:grid-cols-4">
                 {[
                   ["Source", "Use an approved SkinPhD form."],
-                  ["Issue", "Fill names, clinic, dates and cost. Freeze that snapshot."],
+                  ["Issue", "Fill names, SkinPhD branch, dates and cost. Freeze that snapshot."],
                   ["Sign", "Employee, franchisee and witness type their names."],
                   ["Keep", "The signed record stays here even if the print is lost."],
                 ].map(([title, copy]) => (
@@ -510,12 +510,12 @@ export function Workspace() {
                 </SelectContent>
               </Select>
               <Select value={clinicFilter} onValueChange={setClinicFilter}>
-                <SelectTrigger aria-label="Filter by clinic">
-                  <SelectValue placeholder="All clinics" />
+                <SelectTrigger aria-label="Filter by SkinPhD branch">
+                  <SelectValue placeholder="All SkinPhD branches" />
                   <SelectIcon />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All clinics</SelectItem>
+                  <SelectItem value="all">All SkinPhD branches</SelectItem>
                   {store.branches.map((branch) => (
                     <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
                   ))}
@@ -723,7 +723,7 @@ export function Workspace() {
               <input
                 value={peopleQuery}
                 onChange={(event) => setPeopleQuery(event.target.value)}
-                placeholder="Search name, email, role or clinic"
+                placeholder="Search name, email, role or SkinPhD branch"
                 aria-label="Search staff"
                 className="min-h-10 rounded-md border border-line bg-paper px-3 text-sm"
               />
@@ -821,8 +821,8 @@ export function Workspace() {
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.6fr)_300px]">
             <section className="overflow-hidden rounded-lg border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
-                <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Clinic directory</p>
-                <h2 className="font-display text-xl font-medium">SkinPhD locations</h2>
+                <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">SkinPhD branch directory</p>
+                <h2 className="font-display text-xl font-medium">SkinPhD branches</h2>
               </div>
               <div>
                 {store.branches.map((branch) => (
@@ -843,16 +843,16 @@ export function Workspace() {
                   event.currentTarget.reset();
                   setError("");
                 } catch (err) {
-                  setError(err instanceof Error ? err.message : "Could not add the clinic");
+                  setError(err instanceof Error ? err.message : "Could not add the SkinPhD branch");
                 }
               }}
             >
-              <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Missing clinic</p>
-              <h2 className="mb-3 font-display text-xl font-medium">Add location</h2>
+              <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Missing branch</p>
+              <h2 className="mb-3 font-display text-xl font-medium">Add a SkinPhD branch</h2>
               <div className="grid gap-2.5">
-                <input name="name" required placeholder="SkinPhD clinic name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                <input name="name" required placeholder="SkinPhD branch name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
                 <input name="code" required placeholder="SKIN0000" className="min-h-10 rounded-md border border-line px-2.5 text-sm uppercase" />
-                <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper">Add clinic</button>
+                <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper">Add SkinPhD branch</button>
               </div>
             </form>
           </div>
@@ -994,7 +994,7 @@ export function Workspace() {
                 <input key={draftTemplate?.id} name="title" required defaultValue={draftTemplate?.name} className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
               </label>
               <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
-                Branch
+                SkinPhD branch
                 <select name="branchId" required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink">
                   {store.branches.map((branch) => (
                     <option key={branch.id} value={branch.id}>{branch.name} · {branch.code}</option>
@@ -1448,7 +1448,7 @@ function Detail({
       <ProgressTrack state={state} agreement={agreement} />
       <Row label="Employee" value={personName(state, agreement.employeeId)} />
       <Row label="Manager" value={personName(state, agreement.managerId)} />
-      <Row label="Branch" value={branchLabel(state, agreement.branchId)} />
+      <Row label="SkinPhD branch" value={branchLabel(state, agreement.branchId)} />
       <Row label="Template" value={`${agreement.snapshot.template.name} · v${agreement.snapshot.template.version}`} />
       <Row label="Module" value={agreement.snapshot.template.module} />
       {agreement.snapshot.template.hasWaiver && <Row label="Waiver addendum" value="Included from source form" />}
@@ -1567,7 +1567,7 @@ function Detail({
         <dl className="mt-4 grid gap-2 text-[12px] sm:grid-cols-2">
           <div><dt className="text-muted">Employee</dt><dd>{personName(state, agreement.employeeId)}</dd></div>
           <div><dt className="text-muted">Franchisee</dt><dd>{personName(state, agreement.managerId)}</dd></div>
-          <div><dt className="text-muted">Clinic</dt><dd>{branchLabel(state, agreement.branchId)}</dd></div>
+          <div><dt className="text-muted">SkinPhD branch</dt><dd>{branchLabel(state, agreement.branchId)}</dd></div>
           <div><dt className="text-muted">Deemed cost</dt><dd>{rands(agreement.costCents)}</dd></div>
           <div><dt className="text-muted">Attendance</dt><dd>{agreement.startsOn || "Not set"}</dd></div>
           <div><dt className="text-muted">Completion</dt><dd>{agreement.endsOn || "Not set"}</dd></div>
