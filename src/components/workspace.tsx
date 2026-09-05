@@ -12,7 +12,7 @@ import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { can, canViewAgreement } from "@/lib/confirm/access";
 import { isProductionMode } from "@/lib/confirm/remote";
-import { buildEmployeeMail, buildReminderMail, buildSignedRecordMail, employeeMailHref } from "@/lib/confirm/email";
+import { buildEmployeeMail, buildReminderMail, buildSignedRecordMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -778,8 +778,17 @@ export function Workspace() {
                       branchId: String(values.branchId),
                       pin: String(values.pin),
                     });
+                    const mail = buildWelcomeMail({
+                      fullName: String(values.fullName),
+                      email: String(values.email),
+                      role: String(values.role),
+                      clinic: branchLabel(store, String(values.branchId)),
+                      pin: String(values.pin),
+                      siteUrl: window.location.origin,
+                    });
                     form.reset();
                     setError("");
+                    window.location.href = employeeMailHref(mail);
                   } catch (err) {
                     setError(err instanceof Error ? err.message : "Could not add the person");
                   }
@@ -1114,6 +1123,19 @@ export function Workspace() {
                   pin: String(values.pin || "") || undefined,
                 })
                 .then(() => {
+                  const pin = String(values.pin || "");
+                  if (pin) {
+                    window.location.href = employeeMailHref(
+                      buildWelcomeMail({
+                        fullName: String(values.fullName),
+                        email: String(values.email),
+                        role: String(values.role),
+                        clinic: branchLabel(store, String(values.branchId)),
+                        pin,
+                        siteUrl: window.location.origin,
+                      }),
+                    );
+                  }
                   setEditingPersonId(null);
                   setError("");
                 })

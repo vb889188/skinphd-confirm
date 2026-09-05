@@ -1,4 +1,4 @@
-import type { Agreement, Person, WorkspaceState } from "./types";
+import type { Agreement, WorkspaceState } from "./types";
 
 export type EmployeeMail = {
   to: string;
@@ -8,6 +8,41 @@ export type EmployeeMail = {
 
 export function employeeMailHref(mail: EmployeeMail) {
   return `mailto:${encodeURIComponent(mail.to)}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`;
+}
+
+export function buildWelcomeMail(input: {
+  fullName: string;
+  email: string;
+  role: string;
+  clinic: string;
+  pin: string;
+  siteUrl: string;
+}): EmployeeMail {
+  const role =
+    input.role === "manager" ? "franchisee" : input.role === "witness" ? "witness" : "employee";
+  return {
+    to: input.email,
+    subject: "SkinPhD Confirm sign-in details",
+    body: [
+      `Hello ${input.fullName},`,
+      "",
+      "A SkinPhD Confirm workspace identity was created for you.",
+      "",
+      `Name: ${input.fullName}`,
+      `Email: ${input.email}`,
+      `Role: ${role}`,
+      `Clinic: ${input.clinic}`,
+      `Temporary PIN: ${input.pin}`,
+      "",
+      "Sign in here:",
+      input.siteUrl,
+      "",
+      "Change the PIN under Settings after the first sign-in. Do not forward this email.",
+      "This mailbox message does not mean an agreement is signed.",
+      "",
+      "SkinPhD Confirm",
+    ].join("\n"),
+  };
 }
 
 export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
