@@ -3,7 +3,7 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Skin PhD Confirm";
+const APP_NAME = "SkinPhD Confirm";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -11,7 +11,7 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: APP_NAME },
-      { name: "description", content: "Employee agreement operations, signatures and evidence for Skin PhD." },
+      { name: "description", content: "Employee agreement operations, signatures and evidence for SkinPhD." },
       { name: "theme-color", content: "#143f32" },
     ],
     links: [

@@ -1,4 +1,4 @@
-# Host Skin PhD Confirm on a private server
+# Host SkinPhD Confirm on a private server
 
 This app is an employee-agreement workspace. Host it on a private network.
 
@@ -45,7 +45,7 @@ HOST=0.0.0.0 PORT=8080 npm start
 ## Before live staff
 
 1. Change every pilot PIN from Settings after first sign-in.
-2. Confirm source-form wording with Skin PhD legal.
+2. Confirm source-form wording with SkinPhD legal.
 3. Keep the host private.
 4. Do not enter live ID numbers until that review is done.
 5. Do not use this app for payroll deductions or client consent.

@@ -1,10 +1,10 @@
-# Skin PhD Confirm — client production server
+# SkinPhD Confirm — client production server
 
 Hand this to the operator who will host the private server.
 
 ## What the server does
 
-Skin PhD Confirm issues employee training and equipment agreements from Skin PhD source forms, freezes the wording, collects employee / franchisee / witness typed signatures, and stores the snapshot hash in the SkinPhD Supabase tenant.
+SkinPhD Confirm issues employee training and equipment agreements from SkinPhD source forms, freezes the wording, collects employee / franchisee / witness typed signatures, and stores the snapshot hash in the SkinPhD Supabase tenant.
 
 It does **not** decide competence, treatment authorisation, payroll deductions, or client consent.
 
@@ -34,9 +34,9 @@ HOST=0.0.0.0 PORT=8080 npm start
 
 ## First sign-in
 
-The franchisee signs in with the issued email and PIN, then changes the PIN under Settings. Add real staff in People. Do not store live ID numbers until Skin PhD legal has approved the source wording.
+The franchisee signs in with the issued email and PIN, then changes the PIN under Settings. Add real staff in People. Do not store live ID numbers until SkinPhD legal has approved the source wording.
 
-## Still required from Skin PhD
+## Still required from SkinPhD
 
 - Approval of source wording, including 80%/90% mismatches and payroll-deduction sentences
 - Confirmation that typed-name signatures are accepted for v1

@@ -16,11 +16,11 @@ export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, s
   const witness = agreement.witnessId ? state.people.find((person) => person.id === agreement.witnessId) : null;
   const clinic = state.branches.find((branch) => branch.id === agreement.branchId);
   const to = employee?.email ?? "";
-  const subject = `Skin PhD Confirm: ${agreement.title}`;
+  const subject = `SkinPhD Confirm: ${agreement.title}`;
   const body = [
     `Hello ${employee?.fullName ?? "colleague"},`,
     "",
-    "Skin PhD Confirm has issued an employee agreement pack for your review and signature.",
+    "SkinPhD Confirm has issued an employee agreement pack for your review and signature.",
     "",
     "Agreement",
     `- Title: ${agreement.title}`,
@@ -52,7 +52,7 @@ export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, s
     agreement.snapshot.template.content.slice(0, 1600),
     agreement.snapshot.template.content.length > 1600 ? "\n[Full wording is in the workspace snapshot.]" : "",
     "",
-    "Skin PhD Confirm",
+    "SkinPhD Confirm",
   ].join("\n");
   return { to, subject, body };
 }
@@ -66,9 +66,9 @@ export function buildReminderMail(state: WorkspaceState, agreement: Agreement, s
     .filter((email): email is string => Boolean(email));
   return {
     to: recipients.join(","),
-    subject: `Reminder: Skin PhD Confirm signature outstanding — ${agreement.title}`,
+    subject: `Reminder: SkinPhD Confirm signature outstanding — ${agreement.title}`,
     body: [
-      "A Skin PhD Confirm pack is waiting for signature.",
+      "A SkinPhD Confirm pack is waiting for signature.",
       "",
       `Agreement: ${agreement.title}`,
       `Outstanding: ${outstanding.map((item) => item.role).join(", ") || "none"}`,
@@ -77,7 +77,7 @@ export function buildReminderMail(state: WorkspaceState, agreement: Agreement, s
       "Sign in the workspace so the signed record is stored. Printed copies can be misplaced.",
       siteUrl,
       "",
-      "Skin PhD Confirm",
+      "SkinPhD Confirm",
     ].join("\n"),
   };
 }
@@ -90,7 +90,7 @@ export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreemen
     to,
     subject: `Signed record stored: ${agreement.title}`,
     body: [
-      "The agreement is complete. Skin PhD Confirm has stored the signed record.",
+      "The agreement is complete. SkinPhD Confirm has stored the signed record.",
       "",
       `Title: ${agreement.title}`,
       `Employee: ${employee?.fullName ?? "Not set"}`,
@@ -101,7 +101,7 @@ export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreemen
       "Keep this email with the workspace record. A printed copy is optional and can be lost.",
       siteUrl,
       "",
-      "Skin PhD Confirm",
+      "SkinPhD Confirm",
     ].join("\n"),
   };
 }

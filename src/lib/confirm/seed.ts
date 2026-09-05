@@ -39,7 +39,7 @@ export function createSeed(): WorkspaceState {
         agreementId: null,
         actor: "System",
         action: "Source templates allocated",
-        detail: "Twelve Skin PhD employee training and equipment source forms were loaded. Client consultation remains locked. The workspace records wording and signatures; it does not run payroll deductions.",
+        detail: "Twelve SkinPhD employee training and equipment source forms were loaded. Client consultation remains locked. The workspace records wording and signatures; it does not run payroll deductions.",
         createdAt: now,
       },
     ],

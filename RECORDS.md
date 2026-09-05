@@ -1,4 +1,4 @@
-# Skin PhD Confirm records
+# SkinPhD Confirm records
 
 This system keeps signed employee agreements on record when printed pages are missing or not practical.
 

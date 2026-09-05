@@ -324,7 +324,7 @@ export function Workspace() {
   const summaries: Record<View, string> = {
     overview: "Confirm keeps the signed pack when paper is missing. Open a waiting record and type the next name.",
     agreements: "Each row is a frozen pack. Open it to sign or to retrieve the stored copy.",
-    templates: "Approved Skin PhD wording. Upload stores the original file with the text.",
+    templates: "Approved SkinPhD wording. Upload stores the original file with the text.",
     people: "Employees, franchisees and witnesses who can appear on an agreement.",
     locations: "Clinic names and codes used on issued packs.",
     audit: "Issue, sign, reminder and update actions.",
@@ -349,7 +349,7 @@ export function Workspace() {
         <div className="mb-6 flex items-center gap-3 border-b border-white/10 px-2 pb-6">
           <span className="grid size-9 place-items-center rounded-xl bg-sage font-display text-xl font-semibold text-forest">S</span>
           <span>
-            <strong className="block font-display text-base font-semibold text-paper">Skin PhD</strong>
+            <strong className="block font-display text-base font-semibold text-paper">SkinPhD</strong>
             <small className="mt-0.5 block text-[11px] tracking-[0.08em] text-sidebar-soft uppercase">Confirm</small>
           </span>
         </div>
@@ -376,7 +376,7 @@ export function Workspace() {
       <section className="min-w-0 px-4 py-6 sm:px-8 lg:px-14">
         <header className="mx-auto mb-6 flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="mb-1 text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Skin PhD Confirm</p>
+            <p className="mb-1 text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">SkinPhD Confirm</p>
             <h1 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">{headings[view]}</h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{summaries[view]}</p>
           </div>
@@ -466,7 +466,7 @@ export function Workspace() {
               </div>
               <ol className="grid gap-0 px-5 sm:grid-cols-4">
                 {[
-                  ["Source", "Use an approved Skin PhD form."],
+                  ["Source", "Use an approved SkinPhD form."],
                   ["Issue", "Fill names, clinic, dates and cost. Freeze that snapshot."],
                   ["Sign", "Employee, franchisee and witness type their names."],
                   ["Keep", "The signed record stays here even if the print is lost."],
@@ -487,7 +487,7 @@ export function Workspace() {
               <Stat icon="↗" tone="green" label="Completed agreements" value={stats.completed} note="Locked with signature evidence" />
               <Stat icon="!" tone="amber" label="Needs your action" value={stats.needsAction} note="Draft or partially signed" />
               <Stat icon="→" tone="blue" label="Awaiting signatures" value={stats.awaiting} note="Employee, manager or witness" />
-              <Stat icon="✓" tone="slate" label="Approved source templates" value={stats.templates} note="Allocated from supplied Skin PhD forms" />
+              <Stat icon="✓" tone="slate" label="Approved source templates" value={stats.templates} note="Allocated from supplied SkinPhD forms" />
             </section>
             <div className="mx-auto mb-3.5 flex max-w-7xl flex-wrap gap-2 no-print">
               <input
@@ -813,7 +813,7 @@ export function Workspace() {
             <section className="overflow-hidden rounded-lg border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Clinic directory</p>
-                <h2 className="font-display text-xl font-medium">Skin PhD locations</h2>
+                <h2 className="font-display text-xl font-medium">SkinPhD locations</h2>
               </div>
               <div>
                 {store.branches.map((branch) => (
@@ -885,7 +885,7 @@ export function Workspace() {
               <ol className="grid gap-0 px-5 py-2 text-[12px] leading-relaxed">
                 <li className="border-b border-line py-3">1. Add the remaining clinics and the real franchisee, employee and witness names in People and Locations.</li>
                 <li className="border-b border-line py-3">2. Issue one training form and one equipment form, sign all three roles, then print the frozen snapshot.</li>
-                <li className="border-b border-line py-3">3. Skin PhD legal must confirm the source wording, the 80%/90% inconsistencies, and whether payroll-deduction sentences may stay as recorded text only.</li>
+                <li className="border-b border-line py-3">3. SkinPhD legal must confirm the source wording, the 80%/90% inconsistencies, and whether payroll-deduction sentences may stay as recorded text only.</li>
                 <li className="border-b border-line py-3">4. Before live staff use: private hosting, named logins, and an approved signing method. Do not put live ID numbers into this browser pilot.</li>
                 <li className="py-3">5. Client consultation and treatment consent stay locked until those forms are supplied separately.</li>
               </ol>
@@ -954,7 +954,7 @@ export function Workspace() {
         )}
 
         <footer className="mx-auto mt-5 flex max-w-7xl justify-between text-[9px] text-muted">
-          <span>Skin PhD Confirm</span>
+          <span>SkinPhD Confirm</span>
           <span>Private employee agreement workspace</span>
         </footer>
       </section>
@@ -964,7 +964,7 @@ export function Workspace() {
           <form onSubmit={onCreate}>
             <div className="grid gap-3.5 p-5 sm:grid-cols-2">
               <p className="sm:col-span-2 rounded-md bg-sage px-3 py-3 text-[10px] leading-relaxed text-status-green-fg">
-                Source wording from the selected Skin PhD form will be frozen into a SHA-256 snapshot. This workspace records the issued fields and signatures. It does not run payroll deductions or decide competence.
+                Source wording from the selected SkinPhD form will be frozen into a SHA-256 snapshot. This workspace records the issued fields and signatures. It does not run payroll deductions or decide competence.
               </p>
               <label className="sm:col-span-2 grid gap-1.5 text-[10px] font-extrabold text-muted">
                 Source template
@@ -1175,7 +1175,7 @@ export function Workspace() {
         <Modal onClose={() => setShowBoundary(false)} title="What this system does not decide" eyebrow="Launch boundary">
           <div className="space-y-3 px-5 py-5 text-[12px] leading-relaxed text-muted">
             <p>
-              Skin PhD Confirm records employee training and equipment agreements, frozen wording, signatures and audit evidence. It does not independently determine legal enforceability, employee competence, treatment authorization, payroll deductions, repayment amounts, medical suitability, or client treatment consent.
+              SkinPhD Confirm records employee training and equipment agreements, frozen wording, signatures and audit evidence. It does not independently determine legal enforceability, employee competence, treatment authorization, payroll deductions, repayment amounts, medical suitability, or client treatment consent.
             </p>
             <p>Client consultation, medical screening, treatment-specific consent and aftercare remain locked until approved client forms are supplied.</p>
           </div>
@@ -1264,7 +1264,7 @@ function AgreementQueue({
           <span className="grid size-12 place-items-center rounded-[10px] border border-line bg-sage font-display text-lg font-bold text-accent">A</span>
           <h3 className="mt-3 font-display text-lg text-ink">No agreements yet</h3>
           <p className="mt-1 mb-4 text-[11px]">
-            {canCreate ? "Create the first agreement from an allocated Skin PhD source form." : "No agreements are assigned to this identity yet."}
+            {canCreate ? "Create the first agreement from an allocated SkinPhD source form." : "No agreements are assigned to this identity yet."}
           </p>
           {canCreate && (
             <button type="button" className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper" onClick={onCreate}>
@@ -1539,7 +1539,7 @@ function Detail({
         </TabsList>
         <TabsContent value="pack">
       <article className="print-document my-4 rounded-md border border-line bg-paper p-5">
-        <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Skin PhD Confirm · issued document</p>
+        <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">SkinPhD Confirm · issued document</p>
         <h3 className="mt-2 font-display text-xl">{agreement.title}</h3>
         <p className="mt-1 text-[12px] text-muted">{agreement.snapshot.template.module}</p>
         <dl className="mt-4 grid gap-2 text-[12px] sm:grid-cols-2">
@@ -1587,7 +1587,7 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
     <main className="grid min-h-screen place-items-center bg-ground px-4 py-10 text-ink">
       <section className="w-full max-w-md overflow-hidden rounded-lg border border-line bg-paper shadow-sm">
         <div className="bg-linear-to-b from-forest to-forest-dark px-6 py-7 text-paper">
-          <p className="text-[10px] font-extrabold tracking-[0.14em] text-sage uppercase">Skin PhD Confirm</p>
+          <p className="text-[10px] font-extrabold tracking-[0.14em] text-sage uppercase">SkinPhD Confirm</p>
           <h1 className="mt-2 font-display text-3xl font-medium">Open the kept copy</h1>
           <p className="mt-2 text-sm leading-relaxed text-sidebar-soft">
             Signed employee packs live here so a misplaced print is not the only record.
