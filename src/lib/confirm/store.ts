@@ -55,6 +55,19 @@ type Actions = {
   ensurePilotPack: () => Promise<string | null>;
   hydrateRemote: () => Promise<void>;
   addPerson: (input: { fullName: string; email: string; role: Role; branchId: string; pin: string }) => Promise<string>;
+  addTemplate: (input: {
+    name: string;
+    category: "training" | "equipment" | "internal_waiver";
+    module: string;
+    sourceFile: string;
+    content: string;
+    dailyRateRands: number | null;
+    defaultDays: number | null;
+    passPercent: number | null;
+    mandatoryMonths: number | null;
+    hasWaiver: boolean;
+    equipmentLabel: string | null;
+  }) => string;
   addBranch: (input: { name: string; code: string }) => string;
 };
 
@@ -156,6 +169,48 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           people: [...state.people, { id, branchId: input.branchId, fullName, email, role: input.role, status: "active", pinHash, createdAt: now }],
           audit: [
             { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person added", detail: `${fullName} was added as ${input.role}.`, createdAt: now },
+            ...state.audit,
+          ],
+        });
+        void persistWorkspace(get()).catch(() => undefined);
+        return id;
+      },
+      addTemplate: (input) => {
+        const name = input.name.trim();
+        const content = input.content.trim();
+        const sourceFile = input.sourceFile.trim();
+        if (!name) throw new Error("Template name is required");
+        if (!sourceFile) throw new Error("Keep the original file name");
+        if (content.length < 80) throw new Error("Paste the source wording from the uploaded document. Do not invent clauses.");
+        const state = get();
+        if (state.templates.some((item) => item.name.toLowerCase() === name.toLowerCase() && item.status === "approved")) {
+          throw new Error("An approved template with that name already exists");
+        }
+        const id = randomId("TPL");
+        const now = new Date().toISOString();
+        const template = {
+          id,
+          name,
+          category: input.category,
+          version: "1.0",
+          status: "approved" as const,
+          module: input.module.trim() || name,
+          sourceFile,
+          dailyRateRands: input.dailyRateRands,
+          defaultDays: input.defaultDays,
+          passPercent: input.passPercent,
+          mandatoryMonths: input.mandatoryMonths,
+          requiresWitness: true,
+          hasWaiver: input.hasWaiver,
+          equipmentLabel: input.equipmentLabel,
+          content,
+          approvedAt: now,
+          createdAt: now,
+        };
+        set({
+          templates: [template, ...state.templates],
+          audit: [
+            { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Source document added", detail: `${name} was added from ${sourceFile}. Wording was stored as supplied.`, createdAt: now },
             ...state.audit,
           ],
         });

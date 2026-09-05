@@ -389,25 +389,102 @@ export function Workspace() {
         )}
 
         {view === "templates" && (
-          <div className="mx-auto grid max-w-7xl gap-3 sm:grid-cols-2">
-            {store.templates.map((template) => (
-              <article key={template.id} className="rounded-lg border border-line bg-paper p-5">
-                <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">
-                  {template.category} · v{template.version}
-                  {template.hasWaiver ? " · waiver addendum" : ""}
+          <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_360px]">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {store.templates.map((template) => (
+                <article key={template.id} className="rounded-lg border border-line bg-paper p-5">
+                  <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">
+                    {template.category} · v{template.version}
+                    {template.hasWaiver ? " · waiver addendum" : ""}
+                  </p>
+                  <strong className="mt-2 block text-sm">{template.name}</strong>
+                  <p className="mt-2 text-[11px] leading-relaxed text-muted">{template.module}</p>
+                  <p className="mt-2 text-[11px] text-muted">{template.sourceFile}</p>
+                  <p className="mt-2 text-[11px] text-muted">
+                    {template.dailyRateRands ? `Source rate R${template.dailyRateRands.toLocaleString("en-ZA")} per day` : "Deemed cost entered at issue"}
+                    {template.passPercent ? ` · ${template.passPercent}% pass` : ""}
+                    {template.mandatoryMonths ? ` · ${template.mandatoryMonths} month stay` : ""}
+                  </p>
+                  <b className={cn("mt-3 inline-flex rounded-full px-2 py-1 text-[9px] font-extrabold", toneClass[template.status === "approved" ? "green" : "slate"])}>
+                    {template.status}
+                  </b>
+                </article>
+              ))}
+            </div>
+            {current.role === "manager" && (
+              <form
+                className="h-fit rounded-lg border border-line bg-paper p-5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const form = event.currentTarget;
+                  const values = Object.fromEntries(new FormData(form).entries());
+                  try {
+                    store.addTemplate({
+                      name: String(values.name),
+                      category: String(values.category) as "training" | "equipment" | "internal_waiver",
+                      module: String(values.module),
+                      sourceFile: String(values.sourceFile),
+                      content: String(values.content),
+                      dailyRateRands: values.dailyRateRands ? Number(values.dailyRateRands) : null,
+                      defaultDays: values.defaultDays ? Number(values.defaultDays) : null,
+                      passPercent: values.passPercent ? Number(values.passPercent) : null,
+                      mandatoryMonths: values.mandatoryMonths ? Number(values.mandatoryMonths) : null,
+                      hasWaiver: values.hasWaiver === "on",
+                      equipmentLabel: String(values.equipmentLabel || "") || null,
+                    });
+                    form.reset();
+                    setError("");
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Could not add the document");
+                  }
+                }}
+              >
+                <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">New source document</p>
+                <h2 className="mb-3 font-display text-xl font-medium">Upload wording</h2>
+                <p className="mb-3 text-[11px] leading-relaxed text-muted">
+                  Keep the original file name. Paste the exact source wording. Do not invent clauses, rates, or waiver text.
                 </p>
-                <strong className="mt-2 block text-sm">{template.name}</strong>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted">{template.module}</p>
-                <p className="mt-2 text-[11px] text-muted">
-                  {template.dailyRateRands ? `Source rate R${template.dailyRateRands.toLocaleString("en-ZA")} per day` : "Deemed cost entered at issue"}
-                  {template.passPercent ? ` · ${template.passPercent}% pass` : ""}
-                  {template.mandatoryMonths ? ` · ${template.mandatoryMonths} month stay` : ""}
-                </p>
-                <b className={cn("mt-3 inline-flex rounded-full px-2 py-1 text-[9px] font-extrabold", toneClass[template.status === "approved" ? "green" : "slate"])}>
-                  {template.status}
-                </b>
-              </article>
-            ))}
+                <div className="grid gap-2.5">
+                  <input
+                    type="file"
+                    accept=".txt,.pptx,.pdf,.docx"
+                    className="min-h-10 rounded-md border border-line px-2.5 py-2 text-sm"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      const form = event.currentTarget.form;
+                      if (!file || !form) return;
+                      const nameInput = form.elements.namedItem("sourceFile") as HTMLInputElement;
+                      const contentInput = form.elements.namedItem("content") as HTMLTextAreaElement;
+                      nameInput.value = file.name;
+                      if (file.type.startsWith("text/") || file.name.endsWith(".txt")) {
+                        void file.text().then((text) => {
+                          contentInput.value = text;
+                        });
+                      }
+                    }}
+                  />
+                  <input name="sourceFile" required placeholder="Original file name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                  <input name="name" required placeholder="Template name as printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                  <input name="module" placeholder="Module / machine name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                  <select name="category" required className="min-h-10 rounded-md border border-line px-2.5 text-sm">
+                    <option value="training">Training cost agreement</option>
+                    <option value="equipment">Equipment cost agreement</option>
+                    <option value="internal_waiver">Internal waiver addendum</option>
+                  </select>
+                  <input name="dailyRateRands" type="number" min={0} placeholder="Daily rate if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                  <input name="defaultDays" type="number" min={0} placeholder="Days if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                  <input name="passPercent" type="number" min={0} max={100} placeholder="Pass % if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                  <input name="mandatoryMonths" type="number" min={0} placeholder="Mandatory months if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                  <input name="equipmentLabel" placeholder="Equipment label if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
+                  <label className="flex items-center gap-2 text-[11px] text-muted">
+                    <input name="hasWaiver" type="checkbox" />
+                    Source file includes a waiver addendum
+                  </label>
+                  <textarea name="content" required rows={10} placeholder="Paste the exact source wording here" className="rounded-md border border-line px-2.5 py-2 text-sm" />
+                  <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper">Save source template</button>
+                </div>
+              </form>
+            )}
           </div>
         )}
 

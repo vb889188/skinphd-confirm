@@ -1,4 +1,4 @@
-import type { Agreement, AuditEvent, Branch, Person, Signature, SigningLink, WorkspaceState } from "./types";
+import type { Agreement, AuditEvent, Branch, Person, Signature, SigningLink, Template, WorkspaceState } from "./types";
 import { SOURCE_TEMPLATES } from "./templates";
 
 export const CONFIRM_TENANT_ID = "49937a9c-4c8c-420f-bac7-f2ff3f22f43e";
@@ -60,18 +60,58 @@ type AgreementRow = {
   created_at: string;
   updated_at: string;
 };
+type TemplateRow = {
+  id: string;
+  name: string;
+  category: Template["category"];
+  version: string;
+  status: Template["status"];
+  module: string;
+  source_file: string;
+  daily_rate_rands: number | null;
+  default_days: number | null;
+  pass_percent: number | null;
+  mandatory_months: number | null;
+  requires_witness: boolean;
+  has_waiver: boolean;
+  equipment_label: string | null;
+  content: string;
+  approved_at: string | null;
+  created_at: string;
+};
 type PayloadRow = { id: string; agreement_id?: string | null; payload?: Signature | SigningLink; actor?: string; action?: string; detail?: string; created_at: string };
 
 export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branches" | "people" | "templates" | "agreements" | "signatures" | "links" | "audit">> {
-  const [clinics, people, agreements, signatures, links, audit] = await Promise.all([
+  const [clinics, people, agreements, signatures, links, audit, uploaded] = await Promise.all([
     rest<ClinicRow[]>("confirm_clinics?select=*&order=name.asc"),
     rest<PersonRow[]>("confirm_people?select=*&order=full_name.asc"),
     rest<AgreementRow[]>("confirm_agreements?select=*&order=created_at.desc"),
     rest<PayloadRow[]>("confirm_signatures?select=*"),
     rest<PayloadRow[]>("confirm_signing_links?select=*"),
     rest<PayloadRow[]>("confirm_audit?select=*&order=created_at.desc"),
+    rest<TemplateRow[]>("confirm_templates?select=*"),
   ]);
 
+  const customTemplates: Template[] = uploaded.map((row) => ({
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    version: row.version,
+    status: row.status,
+    module: row.module,
+    sourceFile: row.source_file,
+    dailyRateRands: row.daily_rate_rands,
+    defaultDays: row.default_days,
+    passPercent: row.pass_percent,
+    mandatoryMonths: row.mandatory_months,
+    requiresWitness: row.requires_witness,
+    hasWaiver: row.has_waiver,
+    equipmentLabel: row.equipment_label,
+    content: row.content,
+    approvedAt: row.approved_at,
+    createdAt: row.created_at,
+  }));
+  const sourceIds = new Set(SOURCE_TEMPLATES.map((item) => item.id));
   return {
     branches: clinics.map((row) => ({ id: row.id, name: row.name, code: row.code, createdAt: row.created_at })),
     people: people.map((row) => ({
@@ -84,7 +124,7 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
       pinHash: row.pin_hash,
       createdAt: row.created_at,
     })),
-    templates: SOURCE_TEMPLATES,
+    templates: [...customTemplates.filter((item) => !sourceIds.has(item.id)), ...SOURCE_TEMPLATES],
     agreements: agreements.map((row) => ({
       id: row.id,
       title: row.title,
@@ -224,14 +264,44 @@ export async function upsertAudit(event: AuditEvent) {
   });
 }
 
+export async function upsertTemplate(template: Template) {
+  if (SOURCE_TEMPLATES.some((item) => item.id === template.id)) return;
+  await rest("confirm_templates?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      id: template.id,
+      tenant_id: CONFIRM_TENANT_ID,
+      name: template.name,
+      category: template.category,
+      version: template.version,
+      status: template.status,
+      module: template.module,
+      source_file: template.sourceFile,
+      daily_rate_rands: template.dailyRateRands,
+      default_days: template.defaultDays,
+      pass_percent: template.passPercent,
+      mandatory_months: template.mandatoryMonths,
+      requires_witness: template.requiresWitness,
+      has_waiver: template.hasWaiver,
+      equipment_label: template.equipmentLabel,
+      content: template.content,
+      approved_at: template.approvedAt,
+      created_at: template.createdAt,
+    }),
+  });
+}
+
 export async function persistWorkspace(state: WorkspaceState) {
   if (!remoteEnabled()) return;
   await Promise.all([
     ...state.branches.map(upsertClinic),
     ...state.people.map(upsertPerson),
+    ...state.templates.map(upsertTemplate),
     ...state.agreements.map(upsertAgreement),
     ...state.signatures.map(upsertSignature),
     ...state.links.map(upsertLink),
     ...state.audit.slice(0, 40).map(upsertAudit),
   ]);
 }
+

@@ -8,16 +8,18 @@ export async function sha256Hex(value: string): Promise<string> {
 }
 
 export function randomId(prefix: string): string {
-  const id = globalThis.crypto?.randomUUID?.() ?? fallbackId();
+  let id = fallbackId();
+  try {
+    id = crypto.randomUUID();
+  } catch {
+    id = fallbackId();
+  }
   return `${prefix}-${id.slice(0, 8).toUpperCase()}`;
 }
 
 export function randomToken(): string {
   const bytes = new Uint8Array(32);
-  if (globalThis.crypto?.getRandomValues) crypto.getRandomValues(bytes);
-  else {
-    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
-  }
+  crypto.getRandomValues(bytes);
   return toHex(bytes);
 }
 
