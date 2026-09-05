@@ -343,7 +343,7 @@ export function Workspace() {
           <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Work</p>
           <NavButton current={view} id="overview" label="Home" count={stats.needsAction} onSelect={setView} />
           <NavButton current={view} id="agreements" label="Agreements" count={visibleAgreements.length} onSelect={setView} />
-          <NavButton current={view} id="templates" label="Source forms" count={approvedTemplates.length} onSelect={setView} />
+          {isManager && <NavButton current={view} id="templates" label="Source forms" count={approvedTemplates.length} onSelect={setView} />}
           {isManager && <NavButton current={view} id="people" label="Staff" count={store.people.length} onSelect={setView} />}
           <NavButton current={view} id="locations" label="Clinics" count={store.branches.length} onSelect={setView} />
           <p className="mt-7 mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Record</p>
@@ -421,7 +421,11 @@ export function Workspace() {
                     className="flex w-full flex-col gap-2 px-5 py-4 text-left hover:bg-ground sm:flex-row sm:items-center sm:justify-between"
                     onClick={() => {
                       setSelectedId(item.id);
-                      setView("agreements");
+                      const signer = item.snapshot.signers.find((entry) => entry.id === current.id);
+                      if (signer) {
+                        setActiveRole(signer.role);
+                        setTypedName(current.fullName);
+                      }
                     }}
                   >
                     <span className="min-w-0">
@@ -544,7 +548,7 @@ export function Workspace() {
           </>
         )}
 
-        {view === "templates" && (
+        {view === "templates" && isManager && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_360px]">
             <div className="grid gap-3 sm:grid-cols-2">
               {store.templates.map((template) => (
@@ -1143,14 +1147,14 @@ function AgreementQueue({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <div className="grid min-w-xl grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(100px,0.7fr)_72px] items-center gap-3 bg-ground px-5 py-2 text-[9px] font-extrabold tracking-[0.09em] text-muted uppercase">
+          <div className="grid min-w-xl grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)] items-center gap-3 bg-ground px-5 py-2 text-[9px] font-extrabold tracking-[0.09em] text-muted uppercase">
             <span>Agreement</span>
             <span>Status</span>
             <span>Signatures</span>
             <span />
           </div>
           {items.map((item) => (
-            <div key={item.id} className="grid min-w-xl grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(100px,0.7fr)_72px] items-center gap-3 border-t border-line px-5 py-4">
+            <div key={item.id} className="grid min-w-xl grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)] items-center gap-3 border-t border-line px-5 py-4">
               <div className="flex min-w-0 items-center gap-2.5">
                 <span className="grid h-10 w-8 shrink-0 place-items-center rounded-md border border-line bg-sage font-display text-sm font-bold text-accent">
                   <FileText className="size-3.5" />
@@ -1171,8 +1175,15 @@ function AgreementQueue({
               <span className="text-[10px] text-muted tabular-nums">
                 {state.signatures.filter((sig) => sig.agreementId === item.id && sig.outcome === "signed").length} of {item.requiredSignatures}
               </span>
-              <button type="button" className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent" onClick={() => onOpen(item.id)}>
-                Open
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-2 text-[11px] font-bold",
+                  item.status === "completed" ? "border border-line bg-paper text-accent" : "bg-accent text-paper",
+                )}
+                onClick={() => onOpen(item.id)}
+              >
+                {item.status === "completed" || item.status === "declined" ? "Open record" : "Open to sign"}
               </button>
             </div>
           ))}
@@ -1249,6 +1260,8 @@ function Detail({
   return (
     <div className="px-5 py-4">
       <div className="mb-3 flex flex-wrap justify-end gap-2 no-print">
+        {actor?.role === "manager" && (
+          <>
         <button
           type="button"
           className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted"
@@ -1276,6 +1289,8 @@ function Detail({
             Remind outstanding signers
           </button>
         )}
+          </>
+        )}
         <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted" onClick={() => window.print()}>
           <Printer className="size-3.5" />
           Print issued pack
@@ -1295,6 +1310,87 @@ function Detail({
         </b>
       </div>
       <Row label="Next step" value={nextStep(state, agreement)} />
+      {open && (
+        <div className="my-4 rounded-md border border-accent/20 bg-sage p-4 no-print">
+          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Type your name</p>
+          <p className="mt-1 mb-3 text-[12px] leading-relaxed text-status-green-fg">
+            Sign against the frozen snapshot. This is the kept copy if the print is lost.
+          </p>
+      <div className="grid gap-2">
+        {agreement.snapshot.signers.map((signer) => {
+          const signature = state.signatures.find((item) => item.agreementId === agreement.id && item.role === signer.role);
+          const link = state.links.find((item) => item.agreementId === agreement.id && item.role === signer.role);
+          return (
+            <article key={signer.role} className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-line bg-paper p-3">
+              <div>
+                <strong className="block text-sm">{signer.name}</strong>
+                <small className="mt-1 block text-[10px] text-muted">
+                  {roleLabel(signer.role)}
+                  {signature?.outcome === "signed"
+                    ? ` · signed ${shortTime(signature.signedAt)}`
+                    : signature?.outcome === "declined"
+                      ? " · declined"
+                      : " · outstanding"}
+                  {link ? ` · link ${link.status}` : ""}
+                </small>
+              </div>
+              {signature?.outcome !== "signed" && (actor?.role === "manager" || actor?.id === signer.id) && (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent"
+                    onClick={() => {
+                      setActiveRole(signer.role);
+                      setTypedName(signer.name);
+                    }}
+                  >
+                    {activeRole === signer.role ? "Selected" : "Select to sign"}
+                  </button>
+                  {actor?.role === "manager" && (
+                    <button type="button" className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent disabled:opacity-65" disabled={saving} onClick={() => onIssue(signer.role)}>
+                      Issue link
+                    </button>
+                  )}
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+      {issuedToken && (
+        <div className="my-3 rounded-md border border-line bg-ground p-3">
+          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">One-time signing token</p>
+          <code className="mt-1 block break-all text-[10px] text-status-green-fg">{issuedToken}</code>
+        </div>
+      )}
+      {activeRole && (
+        <form
+          className="mt-3 grid gap-2.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void onSign("sign");
+          }}
+        >
+          <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
+            Typed name
+            <input autoFocus value={typedName} onChange={(event) => setTypedName(event.target.value)} required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
+          </label>
+          <label className="grid grid-cols-[18px_1fr] items-start gap-2 text-[11px] font-medium text-status-green-fg">
+            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-0.5" />
+            <span>{consentCopy()}</span>
+          </label>
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
+            <button type="button" className="min-h-10 rounded-md border border-danger-line bg-danger-bg px-4 text-xs font-bold text-danger-fg disabled:opacity-65" disabled={saving} onClick={() => void onSign("decline")}>
+              Decline
+            </button>
+            <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper disabled:opacity-65" disabled={saving}>
+              {saving ? "Saving…" : "Record typed signature"}
+            </button>
+          </div>
+        </form>
+      )}
+        </div>
+      )}
       <Row label="Deemed cost" value={rands(agreement.costCents)} />
       <Row label="Attendance / dates" value={`${agreement.startsOn || "Not set"} → ${agreement.endsOn || "Not set"}`} />
       {agreement.snapshot.fields.days != null && <Row label="Course days" value={String(agreement.snapshot.fields.days)} />}
@@ -1309,11 +1405,10 @@ function Detail({
       {agreement.snapshot.fields.equipmentModel && <Row label="Equipment model" value={agreement.snapshot.fields.equipmentModel} />}
       {agreement.snapshot.fields.equipmentSerial && <Row label="Serial number" value={agreement.snapshot.fields.equipmentSerial} />}
       {agreement.snapshot.fields.additionalDescription && <Row label="Additional description" value={agreement.snapshot.fields.additionalDescription} />}
-      <Tabs defaultValue={open ? "sign" : "pack"} className="mt-4">
-        <TabsList className="no-print">
+      <Tabs defaultValue="pack" className="mt-4">
+        <TabsList className="no-print grid-cols-2">
           <TabsTrigger value="pack">Issued pack</TabsTrigger>
           <TabsTrigger value="wording">Frozen wording</TabsTrigger>
-          <TabsTrigger value="sign">Sign</TabsTrigger>
         </TabsList>
         <TabsContent value="pack">
       <article className="print-document my-4 rounded-md border border-line bg-paper p-5">
@@ -1341,94 +1436,6 @@ function Detail({
             <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Issued template wording</p>
             <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-status-green-fg">{agreement.snapshot.template.content}</p>
           </div>
-        </TabsContent>
-        <TabsContent value="sign">
-      <p className="rounded-md bg-sage px-3 py-3 text-[10px] leading-relaxed text-status-green-fg no-print">
-        Typed signatures prove workspace capture against the frozen snapshot. They are not OTP-verified identity.
-      </p>
-      <div className="my-3.5 grid gap-2">
-        {agreement.snapshot.signers.map((signer) => {
-          const signature = state.signatures.find((item) => item.agreementId === agreement.id && item.role === signer.role);
-          const link = state.links.find((item) => item.agreementId === agreement.id && item.role === signer.role);
-          return (
-            <article key={signer.role} className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-line bg-ground p-3">
-              <div>
-                <strong className="block text-sm">{signer.name}</strong>
-                <small className="mt-1 block text-[10px] text-muted capitalize">
-                  {signer.role}
-                  {signature?.outcome === "signed"
-                    ? ` · signed ${shortTime(signature.signedAt)}`
-                    : signature?.outcome === "declined"
-                      ? " · declined"
-                      : " · outstanding"}
-                  {link ? ` · link ${link.status}` : ""}
-                </small>
-              </div>
-              {open && signature?.outcome !== "signed" && (actor?.role === "manager" || actor?.id === signer.id) && (
-                <div className="flex flex-wrap gap-1.5 no-print">
-                  <button
-                    type="button"
-                    className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent"
-                    onClick={() => {
-                      setActiveRole(signer.role);
-                      setTypedName(signer.name);
-                    }}
-                  >
-                    {activeRole === signer.role ? "Selected" : "Select to sign"}
-                  </button>
-                  {actor?.role === "manager" && (
-                    <button type="button" className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent disabled:opacity-65" disabled={saving} onClick={() => onIssue(signer.role)}>
-                      Issue link
-                    </button>
-                  )}
-                </div>
-              )}
-            </article>
-          );
-        })}
-      </div>
-      {issuedToken && (
-        <div className="my-3 rounded-md border border-line bg-ground p-3">
-          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">One-time signing token</p>
-          <code className="mt-1 block break-all text-[10px] text-status-green-fg">{issuedToken}</code>
-          <p className="mt-1 text-[11px] text-muted">Shown once. Stored only as a SHA-256 hash.</p>
-        </div>
-      )}
-      {open && activeRole && (
-        <form
-          className="mt-2 grid gap-2.5 no-print"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void onSign("sign");
-          }}
-        >
-          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Capture {activeRole} signature</p>
-          <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
-            Typed name
-            <input value={typedName} onChange={(event) => setTypedName(event.target.value)} required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
-          </label>
-          <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
-            Signing token (optional)
-            <input value={token} onChange={(event) => setToken(event.target.value)} placeholder="Paste issued token if used" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
-          </label>
-          <label className="grid grid-cols-[18px_1fr] items-start gap-2 text-[11px] font-medium text-status-green-fg">
-            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-0.5" />
-            <span>{consentCopy()}</span>
-          </label>
-          <div className="flex flex-wrap justify-end gap-2 pt-1">
-            <button type="button" className="min-h-10 rounded-md border border-danger-line bg-danger-bg px-4 text-xs font-bold text-danger-fg disabled:opacity-65" disabled={saving} onClick={() => void onSign("decline")}>
-              Decline
-            </button>
-            <button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted" onClick={() => window.print()}>
-              <Printer className="size-3.5" />
-              Print snapshot
-            </button>
-            <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper disabled:opacity-65" disabled={saving}>
-              {saving ? "Saving…" : "Record typed signature"}
-            </button>
-          </div>
-        </form>
-      )}
         </TabsContent>
       </Tabs>
     </div>
