@@ -1,24 +1,53 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { can, canViewAgreement, requireManager } from "./access.ts";
-import type { Agreement } from "./types.ts";
+import { can, canViewAgreement, requireCapability, scopeOf } from "./access.ts";
+import type { Agreement, Person } from "./types.ts";
 
-test("only franchisee can issue and edit the directory", () => {
-  assert.equal(can("manager", "issue"), true);
-  assert.equal(can("employee", "issue"), false);
-  assert.equal(can("witness", "staff"), false);
-  assert.equal(can("employee", "templates"), false);
+const office = {
+  id: "person-amelia",
+  branchId: "branch-brooklyn",
+  fullName: "SkinPhD Head Office",
+  email: "amelia@pilot.local",
+  role: "manager",
+  status: "active",
+  pinHash: null,
+  createdAt: "",
+} as Person;
+
+const clinicManager = {
+  ...office,
+  id: "person-fran",
+  fullName: "Brooklyn Franchisee",
+  role: "manager",
+  scope: "clinic",
+} as Person;
+
+const employee = {
+  ...office,
+  id: "e1",
+  fullName: "Lerato Mokoena",
+  role: "employee",
+} as Person;
+
+test("head office can upload forms; clinic franchisee cannot", () => {
+  assert.equal(scopeOf(office), "organisation");
+  assert.equal(can(office, "templates"), true);
+  assert.equal(can(clinicManager, "templates"), false);
+  assert.equal(can(clinicManager, "issue", "branch-brooklyn"), true);
+  assert.equal(can(clinicManager, "issue", "branch-lynwood"), false);
+  assert.equal(can(employee, "issue"), false);
 });
 
-test("employees only see assigned packs", () => {
-  const agreement = { employeeId: "e1", managerId: "m1", witnessId: "w1" } as Agreement;
-  assert.equal(canViewAgreement("manager", "x", agreement), true);
-  assert.equal(canViewAgreement("employee", "e1", agreement), true);
-  assert.equal(canViewAgreement("employee", "other", agreement), false);
-  assert.equal(canViewAgreement("witness", "w1", agreement), true);
+test("clinic franchisee only sees packs for their clinic", () => {
+  const local = { employeeId: "e1", managerId: "m1", witnessId: "w1", branchId: "branch-brooklyn" } as Agreement;
+  const other = { ...local, branchId: "branch-lynwood" } as Agreement;
+  assert.equal(canViewAgreement(office, office.id, other), true);
+  assert.equal(canViewAgreement(clinicManager, clinicManager.id, local), true);
+  assert.equal(canViewAgreement(clinicManager, clinicManager.id, other), false);
+  assert.equal(canViewAgreement(employee, employee.id, local), true);
 });
 
-test("requireManager blocks employee writes", () => {
-  assert.doesNotThrow(() => requireManager("manager", "Issue"));
-  assert.throws(() => requireManager("employee", "Issue"));
+test("requireCapability blocks employee directory writes", () => {
+  assert.doesNotThrow(() => requireCapability(office, "staff", "Edit staff"));
+  assert.throws(() => requireCapability(employee, "staff", "Edit staff"));
 });

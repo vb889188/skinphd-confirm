@@ -12,10 +12,10 @@ import {
 } from "./rules";
 import type { Agreement, Role, Snapshot, WorkspaceState } from "./types";
 import { persistWorkspace, loadRemoteWorkspace, remoteEnabled, upsertSourceFile } from "./remote";
-import { requireManager } from "./access";
+import { requireCapability } from "./access";
 
-function actorRole(state: WorkspaceState): Role | undefined {
-  return state.people.find((person) => person.id === state.currentPersonId)?.role;
+function actor(state: WorkspaceState) {
+  return state.people.find((person) => person.id === state.currentPersonId);
 }
 
 export type CreateInput = {
@@ -165,7 +165,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         });
       },
       addPerson: async (input) => {
-        requireManager(actorRole(get()), "Add staff");
+        requireCapability(actor(get()), "directory_write", "Add staff", input.branchId);
         const fullName = input.fullName.trim();
         const email = input.email.trim().toLowerCase();
         const pin = input.pin.trim();
@@ -179,7 +179,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const now = new Date().toISOString();
         const pinHash = await sha256Hex(`${email}|${pin}`);
         set({
-          people: [...state.people, { id, branchId: input.branchId, fullName, email, role: input.role, status: "active", pinHash, createdAt: now }],
+          people: [...state.people, { id, branchId: input.branchId, fullName, email, role: input.role, status: "active", pinHash, scope: input.role === "manager" ? "clinic" : "self", createdAt: now }],
           audit: [
             { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person added", detail: `${fullName} was added as ${input.role}.`, createdAt: now },
             ...state.audit,
@@ -189,7 +189,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
       updatePerson: async (input) => {
-        requireManager(actorRole(get()), "Edit staff");
+        requireCapability(actor(get()), "directory_write", "Edit staff", input.branchId);
         const state = get();
         const person = state.people.find((item) => item.id === input.id);
         if (!person) throw new Error("Choose a person first");
@@ -215,10 +215,10 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
       },
       removePerson: (id) => {
-        requireManager(actorRole(get()), "Remove staff");
         const state = get();
         const person = state.people.find((item) => item.id === id);
         if (!person) throw new Error("Choose a person first");
+        requireCapability(actor(state), "directory_write", "Remove staff", person.branchId);
         if (person.id === state.currentPersonId) throw new Error("Sign out first before removing this identity");
         const linked = state.agreements.some(
           (item) => item.employeeId === id || item.managerId === id || item.witnessId === id,
@@ -244,7 +244,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
       },
       addTemplate: async (input) => {
-        requireManager(actorRole(get()), "Upload source forms");
+        requireCapability(actor(get()), "templates", "Upload source forms");
         const name = input.name.trim();
         const content = input.content.trim();
         const sourceFile = input.sourceFile.trim();
@@ -316,7 +316,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
       addBranch: (input) => {
-        requireManager(actorRole(get()), "Add clinics");
+        requireCapability(actor(get()), "clinics", "Add clinics");
         const name = input.name.trim();
         const code = input.code.trim().toUpperCase();
         if (!name || !code) throw new Error("Clinic name and code are required");
@@ -335,10 +335,10 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
       noteEmailSent: (agreementId, toEmail) => {
-        requireManager(actorRole(get()), "Email packs");
         const state = get();
         const agreement = state.agreements.find((item) => item.id === agreementId);
         if (!agreement) throw new Error("Choose an agreement first");
+        requireCapability(actor(state), "email", "Email packs", agreement.branchId);
         const now = new Date().toISOString();
         set({
           audit: [
@@ -349,10 +349,10 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
       },
       markReminded: (agreementId) => {
-        requireManager(actorRole(get()), "Send reminders");
         const state = get();
         const agreement = state.agreements.find((item) => item.id === agreementId);
         if (!agreement) throw new Error("Choose an agreement first");
+        requireCapability(actor(state), "remind", "Send reminders", agreement.branchId);
         const now = new Date().toISOString();
         set({
           agreements: state.agreements.map((item) => (item.id === agreementId ? { ...item, lastRemindedAt: now, updatedAt: now } : item)),
@@ -364,7 +364,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
       },
       createAgreement: async (input) => {
-        requireManager(actorRole(get()), "Issue agreements");
+        requireCapability(actor(get()), "issue", "Issue agreements", input.branchId);
         const errors = requiredFieldErrors(input);
         if (errors.length) throw new Error(errors[0]);
         const state = get();
@@ -462,10 +462,10 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
       issueLink: async (agreementId, role) => {
-        requireManager(actorRole(get()), "Issue signing links");
         const state = get();
         const agreement = state.agreements.find((item) => item.id === agreementId);
         if (!agreement) throw new Error("Agreement not found");
+        requireCapability(actor(state), "issue", "Issue signing links", agreement.branchId);
         if (!canSign(agreement.status)) throw new Error("Signing links cannot be issued for this agreement status");
         const signer = agreement.snapshot.signers.find((item) => item.role === role);
         if (!signer) throw new Error("That role is not required on this agreement");

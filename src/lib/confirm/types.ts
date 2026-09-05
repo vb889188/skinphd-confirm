@@ -13,6 +13,7 @@ export type SigningLinkStatus = "pending" | "consumed" | "declined" | "expired" 
 export type SignatureOutcome = "signed" | "declined";
 
 export type Branch = { id: string; name: string; code: string; createdAt: string };
+export type AccessScope = "organisation" | "clinic" | "self";
 export type Person = {
   id: string;
   branchId: string;
@@ -21,6 +22,7 @@ export type Person = {
   role: Role;
   status: PersonStatus;
   pinHash: string | null;
+  scope?: AccessScope;
   createdAt: string;
 };
 export type Template = {

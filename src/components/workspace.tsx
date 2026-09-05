@@ -186,7 +186,7 @@ export function Workspace() {
   const isManager = current?.role === "manager";
   const visibleAgreements = store.agreements.filter((item) => {
     if (!current) return false;
-    return canViewAgreement(current.role, current.id, item);
+    return canViewAgreement(current, current.id, item);
   });
 
   const stats = useMemo(() => {
@@ -357,11 +357,11 @@ export function Workspace() {
           <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Work</p>
           <NavButton current={view} id="overview" label="Home" count={stats.needsAction} onSelect={setView} />
           <NavButton current={view} id="agreements" label="Agreements" count={visibleAgreements.length} onSelect={setView} />
-          {can(current.role, "templates") && <NavButton current={view} id="templates" label="Source forms" count={approvedTemplates.length} onSelect={setView} />}
-          {can(current.role, "staff") && <NavButton current={view} id="people" label="Staff" count={store.people.length} onSelect={setView} />}
-          {can(current.role, "clinics") && <NavButton current={view} id="locations" label="Clinics" count={store.branches.length} onSelect={setView} />}
+          {can(current, "templates") && <NavButton current={view} id="templates" label="Source forms" count={approvedTemplates.length} onSelect={setView} />}
+          {can(current, "staff") && <NavButton current={view} id="people" label="Staff" count={store.people.length} onSelect={setView} />}
+          {can(current, "clinics") && <NavButton current={view} id="locations" label="Clinics" count={store.branches.length} onSelect={setView} />}
           <p className="mt-7 mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Record</p>
-          {can(current.role, "audit") && <NavButton current={view} id="audit" label="History" onSelect={setView} />}
+          {can(current, "audit") && <NavButton current={view} id="audit" label="History" onSelect={setView} />}
           <NavButton current={view} id="settings" label="Settings" onSelect={setView} />
         </nav>
         <div className="mt-auto hidden items-center gap-2.5 border-t border-white/10 px-2 pt-4 lg:grid lg:grid-cols-[38px_1fr]">
@@ -585,7 +585,7 @@ export function Workspace() {
           </>
         )}
 
-        {view === "templates" && can(current.role, "templates") && (
+        {view === "templates" && can(current, "templates") && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_360px]">
             <div className="grid gap-3 sm:grid-cols-2">
               {store.templates.map((template) => (
@@ -717,7 +717,7 @@ export function Workspace() {
           </div>
         )}
 
-        {view === "people" && can(current.role, "staff") && (
+        {view === "people" && can(current, "staff") && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_320px]">
             <div className="grid gap-3">
               <input
@@ -808,7 +808,7 @@ export function Workspace() {
           </div>
         )}
 
-        {view === "locations" && can(current.role, "clinics") && (
+        {view === "locations" && can(current, "clinics") && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.6fr)_300px]">
             <section className="overflow-hidden rounded-lg border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
@@ -849,7 +849,7 @@ export function Workspace() {
           </div>
         )}
 
-        {view === "audit" && can(current.role, "audit") && (
+        {view === "audit" && can(current, "audit") && (
           <section className="mx-auto max-w-7xl overflow-hidden rounded-lg border border-line bg-paper">
             <div className="border-b border-line px-5 py-4">
               <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Control</p>
@@ -927,7 +927,7 @@ export function Workspace() {
                   Use Export JSON after each training day. On the server also run scripts/backup-confirm.sh so Confirm tables have a dated copy. The signed snapshot in this workspace is the record if paper is misplaced.
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {can(current.role, "export") && (
+                  {can(current, "export") && (
                   <button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted" onClick={downloadExport}>
                     <Download className="size-3.5" />
                     Export JSON
@@ -1526,7 +1526,7 @@ function Detail({
       {agreement.snapshot.fields.mandatoryMonths != null && <Row label="Mandatory stay on form" value={`${agreement.snapshot.fields.mandatoryMonths} months`} />}
       {agreement.snapshot.fields.contractEndOn && <Row label="Contract end date" value={agreement.snapshot.fields.contractEndOn} />}
       {agreement.snapshot.fields.employeeTitle && <Row label="Position" value={agreement.snapshot.fields.employeeTitle} />}
-      {agreement.snapshot.fields.employeeIdNumber && <Row label="ID number" value={agreement.snapshot.fields.employeeIdNumber} />}
+      {agreement.snapshot.fields.employeeIdNumber && can(actor, "view_id_number") && <Row label="ID number" value={agreement.snapshot.fields.employeeIdNumber} />}
       {agreement.snapshot.fields.employeePhone && <Row label="Phone" value={agreement.snapshot.fields.employeePhone} />}
       {agreement.snapshot.fields.equipmentMake && <Row label="Equipment make" value={agreement.snapshot.fields.equipmentMake} />}
       {agreement.snapshot.fields.equipmentModel && <Row label="Equipment model" value={agreement.snapshot.fields.equipmentModel} />}
