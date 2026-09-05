@@ -1404,7 +1404,7 @@ function Detail({
 }) {
   const open = agreement.status === "awaiting_signatures" || agreement.status === "partially_signed";
   const actor = state.people.find((person) => person.id === state.currentPersonId);
-  const mail = buildEmployeeMail(state, agreement, typeof window === "undefined" ? "http://139.59.183.201:8080" : window.location.origin);
+  const mail = buildEmployeeMail(state, agreement, typeof window === "undefined" ? "https://confirm.relpdev.uk" : window.location.origin);
   const recordEmail = useWorkspace((store) => store.noteEmailSent);
   return (
     <div className="px-5 py-4">

@@ -8,6 +8,7 @@ services:
         VITE_CONFIRM_WORKSPACE_KEY: ${VITE_CONFIRM_WORKSPACE_KEY:-sph-confirm-7f3a9c2e-brooklyn}
         VITE_CONFIRM_MODE: production
     ports:
+      - "80:8080"
       - "8080:8080"
     environment:
       PORT: 8080

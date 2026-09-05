@@ -1,6 +1,6 @@
 # Automated deployment
 
-The live host is the DigitalOcean droplet at `139.59.183.201:8080`.
+The live host is https://confirm.relpdev.uk (Cloudflare → droplet 139.59.183.201).
 
 ## Droplet self-update
 
