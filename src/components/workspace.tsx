@@ -346,13 +346,13 @@ export function Workspace() {
 
   return (
     <TooltipProvider>
-    <main className="min-h-screen bg-ground text-ink lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
-      <aside className="flex flex-col bg-linear-to-b from-forest to-forest-dark px-4 py-6 text-sidebar-text lg:sticky lg:top-0 lg:h-screen">
-        <div className="mb-6 flex items-center gap-3 border-b border-white/10 px-2 pb-6">
-          <span className="grid size-9 place-items-center rounded-xl bg-sage font-display text-xl font-semibold text-forest">S</span>
+    <main className="min-h-screen bg-transparent text-ink lg:grid lg:grid-cols-[272px_minmax(0,1fr)]">
+      <aside className="flex flex-col bg-linear-to-b from-forest to-forest-dark px-4 py-7 text-sidebar-text shadow-[8px_0_40px_rgba(10,36,29,0.18)] lg:sticky lg:top-0 lg:h-screen">
+        <div className="mb-7 flex items-center gap-3 border-b border-white/10 px-2 pb-6">
+          <span className="grid size-11 place-items-center rounded-2xl bg-sage font-display text-2xl font-semibold text-forest shadow-inner">S</span>
           <span>
-            <strong className="block font-display text-base font-semibold text-paper">SkinPhD</strong>
-            <small className="mt-0.5 block text-[11px] tracking-[0.08em] text-sidebar-soft uppercase">Confirm</small>
+            <strong className="block font-display text-lg font-semibold tracking-tight text-paper">SkinPhD</strong>
+            <small className="mt-0.5 block text-[11px] tracking-[0.16em] text-sidebar-soft uppercase">Confirm</small>
           </span>
         </div>
         <nav aria-label="Primary navigation" className="flex gap-2 overflow-x-auto lg:block lg:overflow-visible">
@@ -383,8 +383,9 @@ export function Workspace() {
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{summaries[view]}</p>
           </div>
           <div className="flex items-center gap-2.5">
-            <span className="grid size-10 place-items-center rounded-[10px] border border-line bg-paper text-[11px] font-extrabold text-accent tabular-nums">
-              {stats.needsAction}
+            <span className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-paper px-3 text-[11px] font-bold text-muted shadow-sm">
+              <b className="grid size-6 place-items-center rounded-full bg-sage text-[10px] text-accent tabular-nums">{stats.needsAction}</b>
+              waiting
             </span>
             <button
               type="button"
@@ -396,7 +397,7 @@ export function Workspace() {
             {isManager && (
               <button
                 type="button"
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-accent px-4 text-xs font-bold text-paper shadow-sm hover:bg-accent-hover"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-accent px-4 text-xs font-bold text-paper shadow-sm hover:bg-accent-hover"
                 onClick={() => setShowCreate(true)}
               >
                 <Plus className="size-3.5" />
@@ -1305,8 +1306,8 @@ function NavButton({
     <button
       type="button"
       className={cn(
-        "mb-1 flex min-h-10 w-full items-center justify-between rounded-md px-3 text-left text-[13px] whitespace-nowrap",
-        current === id ? "bg-white/10 text-paper" : "text-sidebar-text hover:bg-white/10 hover:text-paper",
+        "mb-1 flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-[13px] whitespace-nowrap transition-colors",
+        current === id ? "bg-white/12 text-paper shadow-sm" : "text-sidebar-text hover:bg-white/8 hover:text-paper",
       )}
       onClick={() => onSelect(id)}
     >
@@ -1326,7 +1327,7 @@ function Stat({ icon, tone, label, value, note }: { icon: string; tone: "green" 
     slate: "bg-status-slate-bg text-status-slate-fg",
   }[tone];
   return (
-    <article className="min-h-32 rounded-lg border border-line bg-paper p-4">
+    <article className="min-h-32 rounded-2xl border border-line bg-paper p-5 shadow-[0_8px_24px_rgba(20,63,50,0.05)]">
       <span className={cn("grid size-7 place-items-center rounded-md text-xs font-extrabold", iconTone)}>{icon}</span>
       <p className="mt-4 mb-1 text-[11px] text-muted">{label}</p>
       <strong className="block font-display text-3xl font-medium tabular-nums">{value}</strong>
@@ -1686,17 +1687,32 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   return (
-    <main className="grid min-h-screen place-items-center bg-ground px-4 py-10 text-ink">
-      <section className="w-full max-w-md overflow-hidden rounded-lg border border-line bg-paper shadow-sm">
-        <div className="bg-linear-to-b from-forest to-forest-dark px-6 py-7 text-paper">
-          <p className="text-[10px] font-extrabold tracking-[0.14em] text-sage uppercase">SkinPhD Confirm</p>
-          <h1 className="mt-2 font-display text-3xl font-medium">Open the kept copy</h1>
-          <p className="mt-2 text-sm leading-relaxed text-sidebar-soft">
-            Signed employee packs live here so a misplaced print is not the only record.
+    <main className="grid min-h-screen lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="relative hidden overflow-hidden bg-linear-to-br from-forest to-forest-dark px-12 py-16 text-paper lg:flex lg:flex-col lg:justify-between">
+        <div>
+          <p className="text-[11px] font-extrabold tracking-[0.18em] text-sage uppercase">SkinPhD Confirm</p>
+          <h1 className="mt-8 max-w-lg font-display text-5xl leading-[1.1] font-medium">The signed pack stays here.</h1>
+          <p className="mt-5 max-w-md text-base leading-relaxed text-sidebar-soft">
+            Issue an approved form, collect three names, and keep the snapshot when a printed page goes missing.
+          </p>
+        </div>
+        <ol className="grid max-w-md gap-3 text-sm text-sidebar-soft">
+          <li>1. Head Office issues the pack</li>
+          <li>2. Employee, franchisee and witness type their names</li>
+          <li>3. Confirm stores the hash and history</li>
+        </ol>
+      </section>
+      <section className="grid place-items-center bg-ground px-4 py-10">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-paper shadow-[0_20px_50px_rgba(20,63,50,0.08)]">
+        <div className="border-b border-line px-6 py-6">
+          <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Sign in</p>
+          <h2 className="mt-2 font-display text-3xl font-medium">Open the kept copy</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            Use the work email and PIN issued for this workspace.
           </p>
         </div>
         <form
-          className="grid gap-3 p-5"
+          className="grid gap-3 p-6"
           onSubmit={(event) => {
             event.preventDefault();
             const values = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -1708,27 +1724,28 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
           }}
         >
           {error && <p className="rounded-md bg-danger-bg px-3 py-2 text-[11px] text-danger-fg">{error}</p>}
-          <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
+          <label className="grid gap-1.5 text-[10px] font-extrabold tracking-wide text-muted uppercase">
             Email
-            <input name="email" type="email" required autoComplete="username" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
+            <input name="email" type="email" required autoComplete="username" className="min-h-11 rounded-xl border border-line px-3 text-sm font-normal text-ink" />
           </label>
-          <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
+          <label className="grid gap-1.5 text-[10px] font-extrabold tracking-wide text-muted uppercase">
             PIN
-            <input name="pin" type="password" inputMode="numeric" required minLength={4} maxLength={8} autoComplete="current-password" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
+            <input name="pin" type="password" inputMode="numeric" required minLength={4} maxLength={8} autoComplete="current-password" className="min-h-11 rounded-xl border border-line px-3 text-sm font-normal text-ink" />
           </label>
-          <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper disabled:opacity-65" disabled={saving}>
+          <button className="mt-1 min-h-11 rounded-xl bg-accent text-sm font-bold text-paper shadow-sm hover:bg-accent-hover disabled:opacity-65" disabled={saving}>
             {saving ? "Signing in…" : "Sign in"}
           </button>
           {isProductionMode() ? (
-            <p className="text-[11px] leading-relaxed text-muted">
-              Sessions expire after 8 hours. Use the PIN issued by your franchisee.
+            <p className="text-[12px] leading-relaxed text-muted">
+              Sessions expire after 8 hours. Change the PIN after first use.
             </p>
           ) : (
-            <p className="text-[11px] leading-relaxed text-muted">
-              Pilot manager: amelia@pilot.local / 2468. Change every PIN before live staff use.
+            <p className="text-[12px] leading-relaxed text-muted">
+              Pilot: amelia@pilot.local / 2468. Change every PIN before live staff use.
             </p>
           )}
         </form>
+      </div>
       </section>
     </main>
   );

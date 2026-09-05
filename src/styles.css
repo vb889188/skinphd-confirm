@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  --color-forest: #143f32;
-  --color-forest-dark: #0d3025;
-  --color-ink: #17231f;
-  --color-muted: #6c7872;
-  --color-line: #dfe5e1;
+  --color-forest: #0f3329;
+  --color-forest-dark: #0a241d;
+  --color-ink: #14201c;
+  --color-muted: #66746e;
+  --color-line: #e2e8e4;
   --color-paper: #ffffff;
-  --color-ground: #f6f7f4;
-  --color-sage: #dce9e2;
-  --color-accent: #1e6a50;
-  --color-accent-hover: #155940;
-  --color-sidebar-text: #bfd2ca;
-  --color-sidebar-soft: #bad0c7;
-  --color-sidebar-label: #81a294;
-  --color-warn-bg: #fffbed;
-  --color-warn-fg: #685b2a;
-  --color-warn-line: #ded8ba;
+  --color-ground: #eef3ef;
+  --color-sage: #d7e6de;
+  --color-accent: #1b6b51;
+  --color-accent-hover: #145541;
+  --color-sidebar-text: #c5d8d0;
+  --color-sidebar-soft: #a9c4b9;
+  --color-sidebar-label: #7fa394;
+  --color-warn-bg: #fff8e8;
+  --color-warn-fg: #6d5c28;
+  --color-warn-line: #ead9a8;
   --color-danger-bg: #fff1f1;
   --color-danger-fg: #8e3338;
   --color-danger-line: #efc4c6;
@@ -34,14 +34,28 @@
   --color-status-slate-fg: #59665f;
   --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
-  --radius-lg: 0.8125rem;
-  --radius-md: 0.5625rem;
+  --radius-lg: 1rem;
+  --radius-md: 0.7rem;
 }
 
 @layer base {
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+  }
+
+  input,
+  select,
+  textarea {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  button:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--color-accent) 55%, white);
+    outline-offset: 2px;
   }
 }
 
@@ -50,7 +64,9 @@ body {
   min-height: 100vh;
   font-family: var(--font-sans);
   color: var(--color-ink);
-  background: var(--color-ground);
+  background:
+    radial-gradient(1200px 480px at 10% -10%, #dce8e2 0%, transparent 55%),
+    var(--color-ground);
 }
 
 @media print {
