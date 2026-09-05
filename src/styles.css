@@ -46,8 +46,9 @@
 
   input,
   select,
-  textarea {
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  textarea,
+  button {
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
   }
 
   input:focus-visible,
@@ -56,6 +57,10 @@
   button:focus-visible {
     outline: 2px solid color-mix(in oklab, var(--color-accent) 55%, white);
     outline-offset: 2px;
+  }
+
+  button:not(:disabled):active {
+    transform: scale(0.98);
   }
 }
 
@@ -67,6 +72,29 @@ body {
   background:
     radial-gradient(1200px 480px at 10% -10%, #dce8e2 0%, transparent 55%),
     var(--color-ground);
+}
+
+@keyframes confirm-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(27 107 81 / 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgb(27 107 81 / 0);
+  }
+}
+
+.live-dot {
+  animation: confirm-pulse 2.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot,
+  button {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 @media print {

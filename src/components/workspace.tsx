@@ -469,8 +469,8 @@ export function Workspace() {
           </div>
           <div className="flex items-center gap-2.5">
             <span className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-paper px-3 text-[11px] font-bold text-muted shadow-sm">
-              <b className="grid size-6 place-items-center rounded-full bg-sage text-[10px] text-accent tabular-nums">{stats.needsAction}</b>
-              waiting
+              <b className={cn("grid size-6 place-items-center rounded-full bg-sage text-[10px] text-accent tabular-nums", stats.needsAction > 0 && "live-dot")}>{stats.needsAction}</b>
+              {stats.needsAction ? "live" : "clear"}
             </span>
             <button
               type="button"
@@ -668,6 +668,10 @@ export function Workspace() {
                 <div className="border-b border-line px-5 py-4">
                   <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Live record</p>
                   <h2 className="font-display text-xl font-medium">Recent activity</h2>
+                  <p className="mt-1 flex items-center gap-2 text-[11px] text-status-green-fg">
+                    <span className="live-dot size-2 rounded-full bg-accent" />
+                    Updating with this workspace
+                  </p>
                 </div>
                 <div className="px-5">
                   {store.audit.slice(0, 8).map((item) => (
@@ -1441,7 +1445,7 @@ function Stat({ icon, tone, label, value, note }: { icon: string; tone: "green" 
     violet: "bg-status-violet-bg text-status-violet-fg",
   }[tone];
   return (
-    <article className="min-h-32 rounded-2xl border border-line bg-paper p-5 shadow-[0_8px_24px_rgba(20,63,50,0.05)]">
+    <article className="min-h-32 rounded-2xl border border-line bg-paper p-5 shadow-[0_8px_24px_rgba(20,63,50,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(20,63,50,0.08)]">
       <span className={cn("grid size-7 place-items-center rounded-md text-xs font-extrabold", iconTone)}>{icon}</span>
       <p className="mt-4 mb-1 text-[11px] text-muted">{label}</p>
       <strong className="block font-display text-3xl font-medium tabular-nums">{value}</strong>
