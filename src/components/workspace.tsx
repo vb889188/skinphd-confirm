@@ -14,6 +14,7 @@ import { can, canViewAgreement } from "@/lib/confirm/access";
 import { isProductionMode } from "@/lib/confirm/remote";
 import { buildEmployeeMail, buildReminderMail, buildSignedRecordMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
+import { haptic } from "@/lib/confirm/haptics";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -263,6 +264,7 @@ export function Workspace() {
         token: token || undefined,
       });
       const latest = useWorkspace.getState().agreements.find((item) => item.id === selected.id);
+      haptic(action === "decline" ? "warn" : latest?.status === "completed" ? "complete" : "success");
       if (action === "sign" && latest?.status === "completed") {
         const mail = buildSignedRecordMail(useWorkspace.getState(), latest, window.location.origin);
         if (mail.to) window.location.href = employeeMailHref(mail);
@@ -273,6 +275,7 @@ export function Workspace() {
       setIssuedToken("");
       setActiveRole("");
     } catch (err) {
+      haptic("warn");
       setError(err instanceof Error ? err.message : "Could not record the signature");
     } finally {
       setSaving(false);
