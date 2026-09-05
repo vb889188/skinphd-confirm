@@ -11,6 +11,7 @@ import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
 import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { isProductionMode } from "@/lib/confirm/remote";
+import { extractSourceDocument } from "@/lib/confirm/extract";
 import { cn } from "@/lib/utils";
 
 type View = "overview" | "agreements" | "templates" | "people" | "locations" | "audit" | "settings";
@@ -453,14 +454,28 @@ export function Workspace() {
                       const file = event.currentTarget.files?.[0];
                       const form = event.currentTarget.form;
                       if (!file || !form) return;
-                      const nameInput = form.elements.namedItem("sourceFile") as HTMLInputElement;
-                      const contentInput = form.elements.namedItem("content") as HTMLTextAreaElement;
-                      nameInput.value = file.name;
-                      if (file.type.startsWith("text/") || file.name.endsWith(".txt")) {
-                        void file.text().then((text) => {
-                          contentInput.value = text;
-                        });
-                      }
+                      const setValue = (name: string, value: string) => {
+                        const field = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+                        if (field) field.value = value;
+                      };
+                      setValue("sourceFile", file.name);
+                      void extractSourceDocument(file)
+                        .then((extracted) => {
+                          setValue("sourceFile", extracted.fileName);
+                          setValue("name", extracted.name);
+                          setValue("module", extracted.module);
+                          setValue("category", extracted.category);
+                          setValue("content", extracted.content);
+                          setValue("dailyRateRands", extracted.dailyRateRands ? String(extracted.dailyRateRands) : "");
+                          setValue("defaultDays", extracted.defaultDays ? String(extracted.defaultDays) : "");
+                          setValue("passPercent", extracted.passPercent ? String(extracted.passPercent) : "");
+                          setValue("mandatoryMonths", extracted.mandatoryMonths ? String(extracted.mandatoryMonths) : "");
+                          setValue("equipmentLabel", extracted.equipmentLabel ?? "");
+                          const waiver = form.elements.namedItem("hasWaiver") as HTMLInputElement | null;
+                          if (waiver) waiver.checked = extracted.hasWaiver;
+                          setError("");
+                        })
+                        .catch((err) => setError(err instanceof Error ? err.message : "Could not read that file"));
                     }}
                   />
                   <input name="sourceFile" required placeholder="Original file name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />

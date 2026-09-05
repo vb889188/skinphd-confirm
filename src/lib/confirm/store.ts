@@ -183,16 +183,18 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (!sourceFile) throw new Error("Keep the original file name");
         if (content.length < 80) throw new Error("Paste the source wording from the uploaded document. Do not invent clauses.");
         const state = get();
-        if (state.templates.some((item) => item.name.toLowerCase() === name.toLowerCase() && item.status === "approved")) {
-          throw new Error("An approved template with that name already exists");
-        }
+        const existing = state.templates.find((item) =>
+          item.status === "approved" &&
+          (item.name.toLowerCase() === name.toLowerCase() || item.sourceFile.toLowerCase() === sourceFile.toLowerCase()),
+        );
+        const version = existing ? String((Number(existing.version) || 1) + 1) + ".0" : "1.0";
         const id = randomId("TPL");
         const now = new Date().toISOString();
         const template = {
           id,
           name,
           category: input.category,
-          version: "1.0",
+          version,
           status: "approved" as const,
           module: input.module.trim() || name,
           sourceFile,
@@ -208,9 +210,21 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           createdAt: now,
         };
         set({
-          templates: [template, ...state.templates],
+          templates: [
+            template,
+            ...state.templates.map((item) => (existing && item.id === existing.id ? { ...item, status: "superseded" as const } : item)),
+          ],
           audit: [
-            { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Source document added", detail: `${name} was added from ${sourceFile}. Wording was stored as supplied.`, createdAt: now },
+            {
+              id: randomId("AUD"),
+              agreementId: null,
+              actor: ACTOR,
+              action: existing ? "Source document updated" : "Source document added",
+              detail: existing
+                ? `${name} v${existing.version} was superseded by v${version} from ${sourceFile}.`
+                : `${name} was added from ${sourceFile}. Wording was stored as supplied.`,
+              createdAt: now,
+            },
             ...state.audit,
           ],
         });
