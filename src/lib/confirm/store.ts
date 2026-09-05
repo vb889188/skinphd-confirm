@@ -43,6 +43,7 @@ export type CreateInput = {
 type Actions = {
   createAgreement: (input: CreateInput) => Promise<string>;
   issueLink: (agreementId: string, role: Role) => Promise<{ token: string; expiresAt: string }>;
+  issueSignCode: (agreementId: string, role: Role) => Promise<{ code: string; email: string; expiresAt: string }>;
   captureSignature: (input: {
     agreementId: string;
     role: Role;
@@ -581,6 +582,63 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
         return { token, expiresAt };
       },
+      issueSignCode: async (agreementId, role) => {
+        const state = get();
+        const agreement = state.agreements.find((item) => item.id === agreementId);
+        if (!agreement) throw new Error("Agreement not found");
+        if (!canSign(agreement.status)) throw new Error("A sign code cannot be issued for this status");
+        const signer = agreement.snapshot.signers.find((item) => item.role === role);
+        if (!signer) throw new Error("That role is not required on this agreement");
+        const current = actor(state);
+        if (!current) throw new Error("Sign in first");
+        if (current.id !== signer.id && current.role !== "manager") {
+          throw new Error("Only the assigned signer or Head Office can email this code");
+        }
+        const person = state.people.find((item) => item.id === signer.id);
+        if (!person?.email) throw new Error("That signer has no work email");
+        if (state.signatures.some((item) => item.agreementId === agreementId && item.role === role && item.outcome === "signed")) {
+          throw new Error("This role has already signed");
+        }
+        const now = new Date();
+        const code = String(100000 + Math.floor(Math.random() * 900000));
+        const tokenHash = await sha256Hex(code);
+        const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+        const links = state.links.map((link) =>
+          link.agreementId === agreementId && link.role === role && link.status === "pending"
+            ? { ...link, status: "revoked" as const }
+            : link,
+        );
+        set({
+          links: [
+            {
+              id: randomId("LNK"),
+              agreementId,
+              signerId: signer.id,
+              role,
+              tokenHash,
+              status: "pending",
+              expiresAt,
+              consumedAt: null,
+              createdBy: ACTOR,
+              createdAt: now.toISOString(),
+            },
+            ...links,
+          ],
+          audit: [
+            {
+              id: randomId("AUD"),
+              agreementId,
+              actor: ACTOR,
+              action: "Sign code emailed",
+              detail: `A 15-minute sign code was prepared for ${signer.name} (${role}).`,
+              createdAt: now.toISOString(),
+            },
+            ...state.audit,
+          ],
+        });
+        void persistWorkspace(get()).catch(() => undefined);
+        return { code, email: person.email, expiresAt };
+      },
       captureSignature: async (input) => {
         const state = get();
         const agreement = state.agreements.find((item) => item.id === input.agreementId);
@@ -595,6 +653,9 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const now = new Date().toISOString();
         let linkId: string | null = null;
         let links = state.links;
+        if (input.action === "sign") {
+          if (!input.token?.trim()) throw new Error("Enter the 6-digit code emailed for this signature");
+        }
         if (input.token) {
           const tokenHash = await sha256Hex(input.token);
           const link = links.find((item) => item.tokenHash === tokenHash);

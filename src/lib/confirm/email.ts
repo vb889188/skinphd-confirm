@@ -45,6 +45,27 @@ export function buildWelcomeMail(input: {
   };
 }
 
+export function buildSignCodeMail(input: { fullName: string; email: string; title: string; code: string; siteUrl: string }): EmployeeMail {
+  return {
+    to: input.email,
+    subject: `SkinPhD Confirm sign code — ${input.title}`,
+    body: [
+      `Hello ${input.fullName},`,
+      "",
+      "Use this 6-digit code to record your typed signature.",
+      "",
+      `Code: ${input.code}`,
+      "This code expires in 15 minutes.",
+      "",
+      input.siteUrl,
+      "",
+      "If you did not expect this pack, tell SkinPhD Head Office. The code is not a completed signature.",
+      "",
+      "SkinPhD Confirm",
+    ].join("\n"),
+  };
+}
+
 export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
   const employee = state.people.find((person) => person.id === agreement.employeeId);
   const manager = state.people.find((person) => person.id === agreement.managerId);
@@ -66,26 +87,13 @@ export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, s
     `- Employee: ${employee?.fullName ?? "Not set"}`,
     `- Franchisee: ${manager?.fullName ?? "Not set"}`,
     `- Witness: ${witness?.fullName ?? "Not assigned"}`,
-    `- Position: ${agreement.snapshot.fields.employeeTitle || "Not set"}`,
-    `- Phone: ${agreement.snapshot.fields.employeePhone || "Not set"}`,
-    `- Attendance: ${agreement.startsOn || "Not set"}`,
-    `- Completion: ${agreement.endsOn || "Not set"}`,
-    `- Course days: ${agreement.snapshot.fields.days ?? "Not set"}`,
-    `- Source daily rate: ${agreement.snapshot.fields.dailyRateRands ? `R${agreement.snapshot.fields.dailyRateRands}` : "Not set"}`,
     `- Deemed cost: R${(agreement.costCents / 100).toLocaleString("en-ZA")}`,
-    `- Mandatory months: ${agreement.snapshot.fields.mandatoryMonths ?? "Not set"}`,
-    `- Pass mark: ${agreement.snapshot.fields.passPercent ? `${agreement.snapshot.fields.passPercent}%` : "Not set"}`,
-    `- Waiver addendum: ${agreement.snapshot.template.hasWaiver ? "Included on source form" : "Not on this source form"}`,
     `- Snapshot: ${agreement.snapshotHash}`,
     "",
     "Open the workspace to sign with your typed name:",
     siteUrl,
     "",
     "This email records issued fields only. It does not confirm competence, treatment authorisation, or a payroll deduction.",
-    "",
-    "Issued wording excerpt:",
-    agreement.snapshot.template.content.slice(0, 1600),
-    agreement.snapshot.template.content.length > 1600 ? "\n[Full wording is in the workspace snapshot.]" : "",
     "",
     "SkinPhD Confirm",
   ].join("\n");
@@ -109,7 +117,6 @@ export function buildReminderMail(state: WorkspaceState, agreement: Agreement, s
       `Outstanding: ${outstanding.map((item) => item.role).join(", ") || "none"}`,
       `Snapshot: ${agreement.snapshotHash}`,
       "",
-      "Sign in the workspace so the signed record is stored. Printed copies can be misplaced.",
       siteUrl,
       "",
       "SkinPhD Confirm",
@@ -130,10 +137,8 @@ export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreemen
       `Title: ${agreement.title}`,
       `Employee: ${employee?.fullName ?? "Not set"}`,
       `Franchisee: ${manager?.fullName ?? "Not set"}`,
-      `Status: completed`,
       `Snapshot: ${agreement.snapshotHash}`,
       "",
-      "Keep this email with the workspace record. A printed copy is optional and can be lost.",
       siteUrl,
       "",
       "SkinPhD Confirm",

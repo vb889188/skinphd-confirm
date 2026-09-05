@@ -12,7 +12,7 @@ import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { can, canViewAgreement } from "@/lib/confirm/access";
 import { isProductionMode } from "@/lib/confirm/remote";
-import { buildEmployeeMail, buildReminderMail, buildSignedRecordMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
+import { buildEmployeeMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { haptic } from "@/lib/confirm/haptics";
 import { Progress } from "@/components/ui/progress";
@@ -285,6 +285,32 @@ export function Workspace() {
     } catch (err) {
       haptic("warn");
       setError(err instanceof Error ? err.message : "Could not record the signature");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onIssueCode(role: Role) {
+    if (!selected) return;
+    setSaving(true);
+    setError("");
+    try {
+      const result = await store.issueSignCode(selected.id, role);
+      setActiveRole(role);
+      setToken("");
+      setNotice(`Sign code prepared for ${result.email}. Send the mail, then enter the 6-digit code.`);
+      const signer = selected.snapshot.signers.find((item) => item.role === role);
+      window.location.href = employeeMailHref(
+        buildSignCodeMail({
+          fullName: signer?.name ?? "",
+          email: result.email,
+          title: selected.title,
+          code: result.code,
+          siteUrl: window.location.origin,
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not email the sign code");
     } finally {
       setSaving(false);
     }
@@ -1286,6 +1312,7 @@ export function Workspace() {
             setToken={setToken}
             setConsent={setConsent}
             onIssue={onIssue}
+            onIssueCode={onIssueCode}
             onSign={onSign}
           />
         </Modal>
@@ -1483,6 +1510,7 @@ function Detail({
   setToken,
   setConsent,
   onIssue,
+  onIssueCode,
   onSign,
 }: {
   state: WorkspaceState;
@@ -1493,12 +1521,13 @@ function Detail({
   consent: boolean;
   issuedToken: string;
   saving: boolean;
-  setActiveRole: (role: Role) => void;
+  setActiveRole: (role: Role | "") => void;
   setTypedName: (value: string) => void;
   setToken: (value: string) => void;
   setConsent: (value: boolean) => void;
-  onIssue: (role: Role) => void;
-  onSign: (action: "sign" | "decline") => void;
+  onIssue: (role: Role) => Promise<void>;
+  onIssueCode: (role: Role) => Promise<void>;
+  onSign: (action: "sign" | "decline") => Promise<void>;
 }) {
   const open = agreement.status === "awaiting_signatures" || agreement.status === "partially_signed";
   const actor = state.people.find((person) => person.id === state.currentPersonId);
@@ -1593,7 +1622,10 @@ function Detail({
                   >
                     {activeRole === signer.role ? "Selected" : "Select to sign"}
                   </button>
-                  {actor?.role === "manager" && (
+                    <button type="button" className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent disabled:opacity-65" disabled={saving} onClick={() => void onIssueCode(signer.role)}>
+                      Email sign code
+                    </button>
+                    {actor?.role === "manager" && (
                     <button type="button" className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10px] font-bold text-accent disabled:opacity-65" disabled={saving} onClick={() => onIssue(signer.role)}>
                       Issue link
                     </button>
@@ -1618,6 +1650,10 @@ function Detail({
             void onSign("sign");
           }}
         >
+          <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
+            Email code
+            <input value={token} onChange={(event) => setToken(event.target.value)} required inputMode="numeric" minLength={6} maxLength={6} placeholder="6-digit code" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal tracking-[0.3em] text-ink" />
+          </label>
           <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
             Typed name
             <input autoFocus value={typedName} onChange={(event) => setTypedName(event.target.value)} required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
