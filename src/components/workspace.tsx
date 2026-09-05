@@ -532,8 +532,10 @@ export function Workspace() {
             <section className="mx-auto mb-4 grid max-w-7xl grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Agreement summary">
               <Stat icon="↗" tone="green" label="Completed agreements" value={stats.completed} note="Locked with signature evidence" />
               <Stat icon="!" tone="amber" label="Needs your action" value={stats.needsAction} note="Draft or partially signed" />
-              <Stat icon="→" tone="blue" label="Awaiting signatures" value={stats.awaiting} note="Employee, manager or witness" />
-              <Stat icon="✓" tone="slate" label="Approved source templates" value={stats.templates} note="Allocated from supplied SkinPhD forms" />
+              <Stat icon="→" tone="blue" label="Awaiting signatures" value={stats.awaiting} note="Employee, franchisee or witness" />
+              {can(current, "templates") && (
+                <Stat icon="✓" tone="slate" label="Approved source templates" value={stats.templates} note="Allocated from supplied SkinPhD forms" />
+              )}
             </section>
             <div className="mx-auto mb-3.5 flex max-w-7xl flex-wrap gap-2 no-print">
               <input
@@ -555,6 +557,7 @@ export function Workspace() {
                   ))}
                 </SelectContent>
               </Select>
+              {can(current, "clinics") && (
               <Select value={clinicFilter} onValueChange={setClinicFilter}>
                 <SelectTrigger aria-label="Filter by SkinPhD branch">
                   <SelectValue placeholder="All SkinPhD branches" />
@@ -567,6 +570,8 @@ export function Workspace() {
                   ))}
                 </SelectContent>
               </Select>
+              )}
+              {can(current, "templates") && (
               <Select value={templateFilter} onValueChange={setTemplateFilter}>
                 <SelectTrigger aria-label="Filter by source form">
                   <SelectValue placeholder="All source forms" />
@@ -579,8 +584,9 @@ export function Workspace() {
                   ))}
                 </SelectContent>
               </Select>
+              )}
             </div>
-            <div className="mx-auto grid max-w-7xl gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(280px,0.75fr)]">
+            <div className={cn("mx-auto grid max-w-7xl gap-4", can(current, "audit") && "xl:grid-cols-[minmax(0,1.85fr)_minmax(280px,0.75fr)]")}>
               <AgreementQueue
                 state={store}
                 items={filtered}
@@ -596,6 +602,7 @@ export function Workspace() {
                 }}
                 onCreate={() => setShowCreate(true)}
               />
+              {can(current, "audit") && (
               <aside className="overflow-hidden rounded-lg border border-line bg-paper">
                 <div className="border-b border-line px-5 py-4">
                   <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Live record</p>
@@ -627,6 +634,7 @@ export function Workspace() {
                   </p>
                 </div>
               </aside>
+              )}
             </div>
           </>
         )}
