@@ -24,7 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-type View = "overview" | "agreements" | "templates" | "people" | "locations" | "audit" | "settings";
+type View = "overview" | "agreements" | "templates" | "people" | "locations" | "clients" | "audit" | "settings";
 
 function nextStep(state: WorkspaceState, agreement: Agreement) {
   if (agreement.status === "completed") return "Finished. Print or email the pack.";
@@ -423,6 +423,7 @@ export function Workspace() {
     templates: "Source forms",
     people: "Staff directory",
     locations: "SkinPhD branches",
+    clients: "Client consent",
     audit: "What changed",
     settings: "Workspace settings",
   };
@@ -432,6 +433,7 @@ export function Workspace() {
     templates: "Approved SkinPhD wording. Upload stores the original file with the text.",
     people: "Employees, franchisees and witnesses who can appear on an agreement.",
     locations: "SkinPhD branch names and codes used on issued packs.",
+    clients: "Locked. Confirm does not record client treatment consent.",
     audit: "Issue, sign, reminder and update actions.",
     settings: "PIN reset, export of records, and what this system will not decide.",
   };
@@ -465,6 +467,7 @@ export function Workspace() {
           {can(current, "templates") && <NavButton current={view} id="templates" label="Source forms" count={approvedTemplates.length} onSelect={setView} />}
           {can(current, "staff") && <NavButton current={view} id="people" label="Staff" count={store.people.length} onSelect={setView} />}
           {can(current, "clinics") && <NavButton current={view} id="locations" label="SkinPhD branches" count={store.branches.length} onSelect={setView} />}
+          {isManager && <NavButton current={view} id="clients" label="Client consent" onSelect={setView} />}
           <p className="mt-7 mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Record</p>
           {can(current, "audit") && <NavButton current={view} id="audit" label="History" onSelect={setView} />}
           <NavButton current={view} id="settings" label="Settings" onSelect={setView} />
@@ -910,7 +913,7 @@ export function Workspace() {
                   <select name="category" required className="min-h-10 rounded-md border border-line px-2.5 text-sm">
                     <option value="training">Training cost agreement</option>
                     <option value="equipment">Equipment cost agreement</option>
-                    <option value="internal_waiver">Internal waiver addendum</option>
+                    <option value="internal_waiver">Employee waiver addendum</option>
                   </select>
                   <input name="dailyRateRands" type="number" min={0} placeholder="Daily rate if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
                   <input name="defaultDays" type="number" min={0} placeholder="Days if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
@@ -1102,6 +1105,28 @@ export function Workspace() {
               </div>
             </form>
           </div>
+        )}
+
+        {view === "clients" && isManager && (
+          <section className="mx-auto max-w-3xl overflow-hidden rounded-3xl border border-line bg-paper">
+            <div className="border-b border-line px-5 py-4">
+              <p className="text-[10px] font-extrabold tracking-[0.16em] text-accent uppercase">Locked</p>
+              <h2 className="font-display text-xl font-medium">Client consultation and consent</h2>
+            </div>
+            <div className="grid gap-3 px-5 py-5 text-[13px] leading-relaxed text-muted">
+              <p>Confirm stores employee training and equipment packs only.</p>
+              <p>There is no client sign flow. Do not use an employee PIN, a franchisee sign code, or an internal staff waiver as client treatment consent.</p>
+              <p>Employee waiver addenda (Dermaplaning, Algae, Step 4) stay on the staff file. They are not a client face or a treatment record.</p>
+              <p className="text-ink">SkinPhD must still supply approved client forms before this screen can collect a signature.</p>
+              <ul className="list-disc pl-5">
+                <li>Consultation / screening form</li>
+                <li>Treatment-specific consent</li>
+                <li>Aftercare, if required</li>
+                <li>Who may sign for a minor</li>
+              </ul>
+              <p>Until those arrive, keep client paper in the clinic file. Do not invent wording here.</p>
+            </div>
+          </section>
         )}
 
         {view === "audit" && can(current, "audit") && (
