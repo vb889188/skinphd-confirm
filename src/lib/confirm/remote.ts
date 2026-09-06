@@ -391,4 +391,11 @@ export async function upsertEmployeeRecord(file: EmployeeRecord & { contentBase6
   });
 }
 
+export async function fetchEmployeeRecordFile(id: string) {
+  const rows = await rest<Array<{ file_name: string; mime_type: string; content_base64: string }>>(
+    `confirm_employee_records?id=eq.${encodeURIComponent(id)}&select=file_name,mime_type,content_base64`,
+  );
+  return rows[0] ?? null;
+}
+
 

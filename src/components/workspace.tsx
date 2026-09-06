@@ -11,7 +11,7 @@ import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
 import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { can, canViewAgreement } from "@/lib/confirm/access";
-import { isProductionMode } from "@/lib/confirm/remote";
+import { fetchEmployeeRecordFile, isProductionMode } from "@/lib/confirm/remote";
 import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { haptic } from "@/lib/confirm/haptics";
@@ -172,6 +172,7 @@ export function Workspace() {
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [archivePersonId, setArchivePersonId] = useState<string | null>(null);
+  const [profilePersonId, setProfilePersonId] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<Role | "">("");
   const [typedName, setTypedName] = useState("");
   const [token, setToken] = useState("");
@@ -931,15 +932,22 @@ export function Workspace() {
                 })
                 .map((person) => (
                 <article key={person.id} className="rounded-lg border border-line bg-paper p-5">
-                  <strong className="block text-sm">{person.fullName}</strong>
+                  <button type="button" className="text-left" onClick={() => setProfilePersonId(person.id)}>
+                    <strong className="block text-sm">{person.fullName}</strong>
+                  </button>
                   <small className="mt-1.5 block text-[11px] text-muted capitalize">
                     {roleLabel(person.role)} · {branchLabel(store, person.branchId)} · {person.status}
                   </small>
                   <small className="mt-1 block text-[11px] text-muted">{person.email}</small>
                   <p className="mt-2 text-[11px] text-muted">
-                    {(store.records ?? []).filter((item) => item.personId === person.id).length} stored paper pack(s)
+                    {store.agreements.filter((item) => item.employeeId === person.id && item.status === "completed").length} completed Confirm pack(s)
+                    {" · "}
+                    {(store.records ?? []).filter((item) => item.personId === person.id).length} paper pack(s)
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-[11px] font-bold text-paper" onClick={() => setProfilePersonId(person.id)}>
+                      Open profile
+                    </button>
                     <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setArchivePersonId(person.id)}>
                       Upload completed pack
                     </button>
@@ -1371,6 +1379,87 @@ export function Workspace() {
               <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper">Save details</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {profilePersonId && (
+        <Modal
+          onClose={() => setProfilePersonId(null)}
+          title={store.people.find((person) => person.id === profilePersonId)?.fullName ?? "Employee"}
+          eyebrow="Employee file"
+        >
+          <div className="grid gap-4 px-5 py-5">
+            <p className="text-[12px] text-muted">
+              {store.people.find((person) => person.id === profilePersonId)?.email}
+              {" · "}
+              {branchLabel(store, store.people.find((person) => person.id === profilePersonId)?.branchId ?? "")}
+            </p>
+            <section>
+              <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Completed Confirm packs</p>
+              <div className="mt-2 grid gap-2">
+                {store.agreements.filter((item) => item.employeeId === profilePersonId && item.status === "completed").map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="rounded-xl border border-line bg-ground px-3 py-3 text-left"
+                    onClick={() => {
+                      setProfilePersonId(null);
+                      setSelectedId(item.id);
+                      setView("agreements");
+                    }}
+                  >
+                    <strong className="block text-sm">{packTitle(item.title)}</strong>
+                    <small className="text-[11px] text-muted">{item.snapshotHash.slice(0, 16)} · {shortTime(item.updatedAt)}</small>
+                  </button>
+                ))}
+                {store.agreements.filter((item) => item.employeeId === profilePersonId && item.status === "completed").length === 0 && (
+                  <p className="text-[12px] text-muted">No typed-signature packs completed in Confirm yet.</p>
+                )}
+              </div>
+            </section>
+            <section>
+              <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Paper packs stored on this file</p>
+              <div className="mt-2 grid gap-2">
+                {(store.records ?? []).filter((item) => item.personId === profilePersonId).map((item) => (
+                  <article key={item.id} className="rounded-xl border border-line bg-ground px-3 py-3">
+                    <strong className="block text-sm">{item.fileName}</strong>
+                    <small className="block text-[11px] text-muted">{item.note} · {shortTime(item.createdAt)}</small>
+                    <button
+                      type="button"
+                      className="mt-2 text-[11px] font-bold text-accent"
+                      onClick={() => {
+                        void fetchEmployeeRecordFile(item.id).then((file) => {
+                          if (!file) return;
+                          const bytes = Uint8Array.from(atob(file.content_base64), (char) => char.charCodeAt(0));
+                          const url = URL.createObjectURL(new Blob([bytes], { type: file.mime_type || "application/octet-stream" }));
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = file.file_name;
+                          link.click();
+                        });
+                      }}
+                    >
+                      Open stored file
+                    </button>
+                  </article>
+                ))}
+                {(store.records ?? []).filter((item) => item.personId === profilePersonId).length === 0 && (
+                  <p className="text-[12px] text-muted">No paper PDF or photo stored yet.</p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="mt-3 rounded-md bg-accent px-3 py-2 text-[11px] font-bold text-paper"
+                onClick={() => {
+                  const id = profilePersonId;
+                  setProfilePersonId(null);
+                  setArchivePersonId(id);
+                }}
+              >
+                Upload another completed pack
+              </button>
+            </section>
+          </div>
         </Modal>
       )}
 
