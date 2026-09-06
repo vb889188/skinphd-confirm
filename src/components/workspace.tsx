@@ -177,6 +177,7 @@ export function Workspace() {
   const [consent, setConsent] = useState(false);
   const [issuedToken, setIssuedToken] = useState("");
   const [notice, setNotice] = useState("");
+  const [deskFilter, setDeskFilter] = useState<"all" | "today" | "employee" | "franchisee" | "witness" | "remind">("all");
   const [draftTemplateId, setDraftTemplateId] = useState("");
 
   useEffect(() => {
@@ -533,21 +534,73 @@ export function Workspace() {
         {view === "overview" && (
           <div className="mx-auto grid max-w-7xl gap-4">
             {isManager && (
-              <section className="grid grid-cols-2 gap-3 lg:grid-cols-5" aria-label="Head Office desk">
-                <Stat icon="+" tone="slate" label="Issued today" value={stats.issuedToday} note="Frozen packs created today" />
-                <Stat icon="E" tone="amber" label="Waiting on employee" value={stats.waitingEmployee} note="Employee name not recorded" />
-                <Stat icon="F" tone="blue" label="Waiting on franchisee" value={stats.waitingFranchisee} note="Franchisee name not recorded" />
-                <Stat icon="W" tone="violet" label="Waiting on witness" value={stats.waitingWitness} note="Witness still outstanding" />
-                <Stat icon="!" tone="green" label="Reminders due" value={stats.remindersDue} note="Open packs with no reminder in 3 days" />
+              <section className="overflow-hidden rounded-2xl border border-line bg-paper p-4" aria-label="Head Office desk">
+                <div className="mb-3 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Who is next</p>
+                    <p className="mt-1 text-sm text-muted">Tap a count to show only those packs.</p>
+                  </div>
+                  {deskFilter !== "all" && (
+                    <button type="button" className="text-[11px] font-bold text-accent" onClick={() => setDeskFilter("all")}>
+                      Show all waiting
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                  {[
+                    ["today", stats.issuedToday, "Issued today", "Created today"],
+                    ["employee", stats.waitingEmployee, "Employee", "Name not stored yet"],
+                    ["franchisee", stats.waitingFranchisee, "Franchisee", "Name not stored yet"],
+                    ["witness", stats.waitingWitness, "Witness", "Name not stored yet"],
+                    ["remind", stats.remindersDue, "Remind", "No nudge in 3 days"],
+                  ].map(([id, value, label, hint]) => (
+                    <button
+                      key={String(id)}
+                      type="button"
+                      onClick={() => setDeskFilter(id as typeof deskFilter)}
+                      className={cn(
+                        "rounded-xl border px-3 py-3 text-left transition",
+                        deskFilter === id ? "border-accent bg-sage" : "border-line bg-ground hover:border-accent/40",
+                      )}
+                    >
+                      <strong className="block font-display text-2xl font-medium tabular-nums">{value}</strong>
+                      <span className="mt-1 block text-[12px] font-bold text-ink">{label}</span>
+                      <span className="mt-0.5 block text-[11px] text-muted">{hint}</span>
+                    </button>
+                  ))}
+                </div>
               </section>
             )}
             <section className="overflow-hidden rounded-lg border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Open these first</p>
-                <h2 className="font-display text-xl font-medium">Waiting on a signature</h2>
+                <h2 className="font-display text-xl font-medium">
+                  {deskFilter === "employee"
+                    ? "Waiting on the employee"
+                    : deskFilter === "franchisee"
+                      ? "Waiting on the franchisee"
+                      : deskFilter === "witness"
+                        ? "Waiting on the witness"
+                        : deskFilter === "today"
+                          ? "Issued today"
+                          : deskFilter === "remind"
+                            ? "Need a reminder"
+                            : "Waiting on a signature"}
+                </h2>
               </div>
               <div className="divide-y divide-line">
-                {visibleAgreements.filter((item) => item.status === "awaiting_signatures" || item.status === "partially_signed").map((item) => (
+                {visibleAgreements.filter((item) => {
+                  const open = item.status === "awaiting_signatures" || item.status === "partially_signed";
+                  const signed = (role: Role) => store.signatures.some((entry) => entry.agreementId === item.id && entry.role === role && entry.outcome === "signed");
+                  const today = new Date().toISOString().slice(0, 10);
+                  if (deskFilter === "today") return item.createdAt.slice(0, 10) === today;
+                  if (!open) return false;
+                  if (deskFilter === "employee") return !signed("employee");
+                  if (deskFilter === "franchisee") return !signed("manager");
+                  if (deskFilter === "witness") return Boolean(item.witnessId) && !signed("witness");
+                  if (deskFilter === "remind") return !item.lastRemindedAt || Date.now() - new Date(item.lastRemindedAt).getTime() > 3 * 24 * 60 * 60 * 1000;
+                  return true;
+                }).map((item) => (
                   <button
                     key={item.id}
                     type="button"
