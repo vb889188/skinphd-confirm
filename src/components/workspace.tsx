@@ -456,10 +456,10 @@ export function Workspace() {
     <main className="min-h-screen bg-transparent text-ink lg:grid lg:grid-cols-[272px_minmax(0,1fr)]">
       <aside className="flex flex-col bg-linear-to-b from-forest to-forest-dark px-4 py-7 text-sidebar-text shadow-[8px_0_40px_rgba(10,36,29,0.18)] lg:sticky lg:top-0 lg:h-screen">
         <div className="mb-7 flex items-center gap-3 border-b border-white/10 px-2 pb-6">
-          <span className="grid size-11 place-items-center rounded-2xl bg-sage font-display text-2xl font-semibold text-forest shadow-inner">S</span>
+          <img src="/skinphd-mark.svg" alt="" className="size-10" />
           <span>
-            <strong className="block font-display text-lg font-semibold tracking-tight text-paper">SkinPhD</strong>
-            <small className="mt-0.5 block text-[11px] tracking-[0.16em] text-sidebar-soft uppercase">Confirm</small>
+            <strong className="block font-display text-lg font-semibold tracking-tight text-paper">Confirm</strong>
+            <small className="mt-0.5 block text-[11px] tracking-[0.16em] text-sidebar-soft uppercase">Employee records</small>
           </span>
         </div>
         <nav aria-label="Primary navigation" className="flex gap-2 overflow-x-auto lg:block lg:overflow-visible">
@@ -2137,19 +2137,26 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
       <section className="relative hidden overflow-hidden bg-linear-to-br from-forest to-forest-dark px-12 py-16 text-paper lg:flex lg:flex-col lg:justify-between">
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-gold/25 blur-[100px]"
+          className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-paper/5 blur-[100px]"
         />
+        <div className="mb-10 flex items-center gap-3">
+          <img src="/skinphd-mark.svg" alt="" className="size-11" />
+          <span>
+            <strong className="block font-display text-2xl font-medium tracking-tight text-paper">SkinPhD</strong>
+            <small className="block text-[11px] tracking-[0.16em] text-sidebar-soft uppercase">Confirm</small>
+          </span>
+        </div>
         <div className="relative">
-          <p className="text-[11px] font-extrabold tracking-[0.18em] text-sage uppercase">SkinPhD Confirm</p>
-          <h1 className="mt-8 max-w-lg font-display text-5xl leading-[1.1] font-medium">The signed pack stays here.</h1>
+          <p className="text-[11px] font-extrabold tracking-[0.18em] text-sage uppercase">Employee records</p>
+          <h1 className="mt-6 max-w-lg font-display text-5xl leading-[1.1] font-medium">SkinPhD Confirm</h1>
           <p className="mt-5 max-w-md text-base leading-relaxed text-sidebar-soft">
-            Issue an approved form, collect the required names, and keep the snapshot when a printed page goes missing.
+            Approved training and equipment packs, frozen wording, and the signed copy when paper is missing.
           </p>
         </div>
         <ol className="relative grid max-w-md gap-4">
           {steps.map((step, index) => (
             <li key={step} className="flex items-center gap-3 text-sm text-sidebar-soft">
-              <span className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 bg-white/5 font-display text-xs font-semibold text-gold">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full border border-sage/40 bg-white/5 font-display text-xs font-semibold text-sage">
                 {index + 1}
               </span>
               {step}
@@ -2160,11 +2167,17 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
       <section className="grid place-items-center bg-ground px-4 py-10">
       <Card radius="tile" elevation="lg" className="w-full max-w-md">
         <div className="border-b border-line px-6 py-6">
-          <span className="mb-3 grid size-9 place-items-center rounded-full bg-gold-soft font-display text-sm font-semibold text-gold-fg shadow-glow">S</span>
-          <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Sign in</p>
-          <h2 className="mt-2 font-display text-3xl font-medium">Open the kept copy</h2>
+          <div className="mb-4 flex items-center gap-3">
+            <img src="/skinphd-mark.svg" alt="" className="size-10" />
+            <span>
+              <strong className="block font-display text-lg font-medium text-ink">SkinPhD</strong>
+              <small className="block text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Confirm</small>
+            </span>
+          </div>
+          <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Staff sign-in</p>
+          <h2 className="mt-2 font-display text-3xl font-medium">Open your workspace</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            Use the work email and PIN issued for this workspace.
+            Use the work email and PIN issued by Head Office.
           </p>
         </div>
         <form
