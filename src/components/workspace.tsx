@@ -2129,7 +2129,7 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
   const [saving, setSaving] = useState(false);
   const steps = [
     "Head Office issues the pack",
-    "Employee, franchisee and witness type their names",
+    "The assigned people type their names",
     "Confirm stores the hash and history",
   ];
   return (
@@ -2143,7 +2143,7 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
           <p className="text-[11px] font-extrabold tracking-[0.18em] text-sage uppercase">SkinPhD Confirm</p>
           <h1 className="mt-8 max-w-lg font-display text-5xl leading-[1.1] font-medium">The signed pack stays here.</h1>
           <p className="mt-5 max-w-md text-base leading-relaxed text-sidebar-soft">
-            Issue an approved form, collect three names, and keep the snapshot when a printed page goes missing.
+            Issue an approved form, collect the required names, and keep the snapshot when a printed page goes missing.
           </p>
         </div>
         <ol className="relative grid max-w-md gap-4">
