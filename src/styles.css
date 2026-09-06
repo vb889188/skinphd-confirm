@@ -33,10 +33,19 @@
   --color-status-red-fg: #963e43;
   --color-status-slate-bg: #edf0ef;
   --color-status-slate-fg: #59665f;
+  --color-gold: #b8863a;
+  --color-gold-hover: #9c6f2c;
+  --color-gold-soft: #f6ead0;
+  --color-gold-fg: #7a5420;
   --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --radius-lg: 1rem;
   --radius-md: 0.7rem;
+  --shadow-xs: 0 1px 2px rgba(15, 51, 41, 0.06);
+  --shadow-sm: 0 2px 8px rgba(15, 51, 41, 0.06), 0 1px 2px rgba(15, 51, 41, 0.05);
+  --shadow-md: 0 10px 30px rgba(15, 51, 41, 0.08), 0 2px 8px rgba(15, 51, 41, 0.05);
+  --shadow-lg: 0 24px 60px rgba(15, 51, 41, 0.12), 0 4px 16px rgba(15, 51, 41, 0.06);
+  --shadow-glow: 0 0 0 1px rgba(184, 134, 58, 0.18), 0 12px 32px rgba(184, 134, 58, 0.14);
 }
 
 @layer base {

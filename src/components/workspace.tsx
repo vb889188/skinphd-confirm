@@ -17,6 +17,8 @@ import { extractSourceDocument } from "@/lib/confirm/extract";
 import { haptic } from "@/lib/confirm/haptics";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectIcon, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -493,22 +495,14 @@ export function Workspace() {
               <b className={cn("grid size-6 place-items-center rounded-full bg-sage text-[10px] text-accent tabular-nums", stats.needsAction > 0 && "live-dot")}>{stats.needsAction}</b>
               {stats.needsAction ? "live" : "clear"}
             </span>
-            <button
-              type="button"
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted hover:bg-ground hover:text-ink"
-              onClick={() => store.signOut()}
-            >
+            <Button variant="secondary" onClick={() => store.signOut()}>
               Sign out
-            </button>
+            </Button>
             {isManager && (
-              <button
-                type="button"
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-accent px-4 text-xs font-bold text-paper shadow-sm hover:bg-accent-hover"
-                onClick={() => setShowCreate(true)}
-              >
+              <Button onClick={() => setShowCreate(true)}>
                 <Plus className="size-3.5" />
                 Issue agreement
-              </button>
+              </Button>
             )}
           </div>
         </header>
@@ -519,9 +513,9 @@ export function Workspace() {
           <p className="m-0">
             <strong>Employee agreement workspace</strong> · Client consultation and consent remain locked until approved forms are supplied.
           </p>
-          <button type="button" className="ml-auto shrink-0 font-bold no-print" onClick={() => setShowBoundary(true)}>
+          <Button variant="ghost" size="sm" className="ml-auto shrink-0 no-print" onClick={() => setShowBoundary(true)}>
             View launch boundary
-          </button>
+          </Button>
         </div>
         )}
 
@@ -533,7 +527,7 @@ export function Workspace() {
         {view === "overview" && (
           <div className="mx-auto grid max-w-7xl gap-4">
             {isManager && (
-              <section className="overflow-hidden rounded-3xl border border-white/70 bg-paper/90 p-5 shadow-[0_20px_50px_rgba(15,51,41,0.06)] backdrop-blur" aria-label="Head Office desk">
+              <section className="overflow-hidden rounded-3xl border border-white/70 bg-paper/90 p-5 shadow-md backdrop-blur" aria-label="Head Office desk">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-extrabold tracking-[0.16em] text-accent uppercase">Desk</p>
@@ -563,7 +557,9 @@ export function Workspace() {
                           ? "bg-forest text-paper shadow-lg"
                           : Number(value) === 0
                             ? "bg-ground text-muted"
-                            : "bg-sage text-ink hover:bg-forest hover:text-paper",
+                            : id === "remind"
+                              ? "bg-gold-soft text-gold-fg hover:bg-forest hover:text-paper"
+                              : "bg-sage text-ink hover:bg-forest hover:text-paper",
                       )}
                     >
                       <strong className="block font-display text-3xl font-medium tabular-nums leading-none">{value}</strong>
@@ -573,7 +569,7 @@ export function Workspace() {
                 </div>
               </section>
             )}
-            <section className="overflow-hidden rounded-3xl border border-white/70 bg-paper/90 shadow-[0_20px_50px_rgba(15,51,41,0.06)]">
+            <section className="overflow-hidden rounded-3xl border border-white/70 bg-paper/90 shadow-md">
               <div className="border-b border-line/70 px-6 py-5">
                 <p className="text-[10px] font-extrabold tracking-[0.16em] text-accent uppercase">Queue</p>
                 <h2 className="font-display text-xl font-medium">
@@ -798,13 +794,14 @@ export function Workspace() {
                   <b className={cn("mt-3 inline-flex rounded-full px-2 py-1 text-[9px] font-extrabold", toneClass[template.status === "approved" ? "green" : "slate"])}>
                     {template.status}
                   </b>
-                  <button type="button" className="mt-3 block rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground" onClick={() => setEditingTemplateId(template.id)}>
+                  <Button size="sm" variant="secondary" className="mt-3 w-full justify-start" onClick={() => setEditingTemplateId(template.id)}>
                     View / edit wording
-                  </button>
+                  </Button>
                   {template.sourceFileId && (
-                    <button
-                      type="button"
-                      className="mt-2 block rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground"
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="mt-2 w-full justify-start"
                       onClick={() => {
                         void fetchSourceFile(template.sourceFileId!).then((file) => {
                           if (!file) return;
@@ -818,7 +815,7 @@ export function Workspace() {
                       }}
                     >
                       Download original file
-                    </button>
+                    </Button>
                   )}
                 </article>
               ))}
@@ -925,7 +922,7 @@ export function Workspace() {
                     Source file includes a waiver addendum
                   </label>
                   <textarea name="content" required rows={10} placeholder="Paste the exact source wording here" className="rounded-md border border-line px-2.5 py-2 text-sm" />
-                  <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper hover:bg-accent-hover">Save source template</button>
+                  <Button type="submit">Save source template</Button>
                 </div>
               </form>
             )}
@@ -950,7 +947,7 @@ export function Workspace() {
                   return !peopleQuery || haystack.includes(peopleQuery.toLowerCase());
                 })
                 .map((person) => (
-                <article key={person.id} className="rounded-3xl border border-line bg-paper p-5">
+                <Card radius="section" elevation="sm" padding="md" className="transition hover:-translate-y-0.5 hover:shadow-md">
                   <button type="button" className="text-left" onClick={() => setProfilePersonId(person.id)}>
                     <strong className="block text-sm">{person.fullName}</strong>
                   </button>
@@ -964,18 +961,18 @@ export function Workspace() {
                     {(store.records ?? []).filter((item) => item.personId === person.id).length} paper pack(s)
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-[11px] font-bold text-paper hover:bg-accent-hover" onClick={() => setProfilePersonId(person.id)}>
+                    <Button size="sm" onClick={() => setProfilePersonId(person.id)}>
                       Open profile
-                    </button>
-                    <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground" onClick={() => setArchivePersonId(person.id)}>
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => setArchivePersonId(person.id)}>
                       Upload completed pack
-                    </button>
-                    <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground" onClick={() => setEditingPersonId(person.id)}>
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => setEditingPersonId(person.id)}>
                       Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground"
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
                       onClick={() => {
                         void store.issueTemporaryPin(person.id).then((pin) => {
                           window.location.href = employeeMailHref(
@@ -992,10 +989,10 @@ export function Workspace() {
                       }}
                     >
                       Email new PIN
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-md border border-danger-line bg-danger-bg px-3 py-1.5 text-[11px] font-bold text-danger-fg"
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
                       onClick={() => {
                         try {
                           store.removePerson(person.id);
@@ -1006,9 +1003,9 @@ export function Workspace() {
                       }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
-                </article>
+                </Card>
               ))}
               </div>
             </div>
@@ -1060,7 +1057,7 @@ export function Workspace() {
                     <option key={branch.id} value={branch.id}>{branch.name}</option>
                   ))}
                 </select>
-                <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper hover:bg-accent-hover">Add person</button>
+                <Button type="submit">Add person</Button>
               </div>
             </form>
           </div>
@@ -1101,7 +1098,7 @@ export function Workspace() {
               <div className="grid gap-2.5">
                 <input name="name" required placeholder="SkinPhD branch name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
                 <input name="code" required placeholder="SKIN0000" className="min-h-10 rounded-md border border-line px-2.5 text-sm uppercase" />
-                <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper hover:bg-accent-hover">Add SkinPhD branch</button>
+                <Button type="submit">Add SkinPhD branch</Button>
               </div>
             </form>
           </div>
@@ -1196,7 +1193,7 @@ export function Workspace() {
                 >
                   <input name="currentPin" type="password" required placeholder="Current PIN" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
                   <input name="nextPin" type="password" required placeholder="New PIN" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper hover:bg-accent-hover">Change PIN</button>
+                  <Button type="submit">Change PIN</Button>
                 </form>
                 <div className="mt-4 rounded-md bg-ground px-3 py-3 text-[12px] leading-relaxed text-muted">
                   <strong className="block text-ink">PIN issue and reset</strong>
@@ -1208,15 +1205,14 @@ export function Workspace() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {can(current, "export") && (
-                  <button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted hover:bg-ground hover:text-ink" onClick={downloadExport}>
+                  <Button variant="secondary" onClick={downloadExport}>
                     <Download className="size-3.5" />
                     Export JSON
-                  </button>
+                  </Button>
                   )}
                   {!isProductionMode() && (
-                    <button
-                      type="button"
-                      className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-danger-line bg-danger-bg px-4 text-xs font-bold text-danger-fg"
+                    <Button
+                      variant="danger"
                       onClick={() => {
                         store.resetWorkspace();
                         setSelectedId(null);
@@ -1225,7 +1221,7 @@ export function Workspace() {
                     >
                       <RotateCcw className="size-3.5" />
                       Reset seed data
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -1365,12 +1361,12 @@ export function Workspace() {
               </label>
             </div>
             <footer className="flex justify-end gap-2 border-t border-line px-5 py-4">
-              <button type="button" className="min-h-10 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted" onClick={() => setShowCreate(false)}>
+              <Button variant="secondary" onClick={() => setShowCreate(false)}>
                 Cancel
-              </button>
-              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover disabled:opacity-65" disabled={saving}>
+              </Button>
+              <Button type="submit" disabled={saving}>
                 {saving ? "Creating…" : "Freeze and issue agreement"}
-              </button>
+              </Button>
             </footer>
           </form>
         </Modal>
@@ -1434,10 +1430,10 @@ export function Workspace() {
               If this person is named on an agreement, Delete deactivates them so the signed record stays intact.
             </p>
             <div className="flex justify-end gap-2">
-              <button type="button" className="min-h-10 rounded-md border border-line px-4 text-xs font-bold text-muted" onClick={() => setEditingPersonId(null)}>
+              <Button variant="secondary" onClick={() => setEditingPersonId(null)}>
                 Cancel
-              </button>
-              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover">Save details</button>
+              </Button>
+              <Button type="submit">Save details</Button>
             </div>
           </form>
         </Modal>
@@ -1485,9 +1481,10 @@ export function Workspace() {
                   <article key={item.id} className="rounded-xl border border-line bg-ground px-3 py-3">
                     <strong className="block text-sm">{item.fileName}</strong>
                     <small className="block text-[11px] text-muted">{item.note} · {shortTime(item.createdAt)}</small>
-                    <button
-                      type="button"
-                      className="mt-2 text-[11px] font-bold text-accent"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 px-0"
                       onClick={() => {
                         void fetchEmployeeRecordFile(item.id).then((file) => {
                           if (!file) return;
@@ -1501,16 +1498,16 @@ export function Workspace() {
                       }}
                     >
                       Open stored file
-                    </button>
+                    </Button>
                   </article>
                 ))}
                 {(store.records ?? []).filter((item) => item.personId === profilePersonId).length === 0 && (
                   <p className="text-[12px] text-muted">No paper PDF or photo stored yet.</p>
                 )}
               </div>
-              <button
-                type="button"
-                className="mt-3 rounded-md bg-accent px-3 py-2 text-[11px] font-bold text-paper hover:bg-accent-hover"
+              <Button
+                size="sm"
+                className="mt-3"
                 onClick={() => {
                   const id = profilePersonId;
                   setProfilePersonId(null);
@@ -1518,7 +1515,7 @@ export function Workspace() {
                 }}
               >
                 Upload another completed pack
-              </button>
+              </Button>
             </section>
           </div>
         </Modal>
@@ -1594,10 +1591,10 @@ export function Workspace() {
               ))}
             </ul>
             <div className="flex justify-end gap-2">
-              <button type="button" className="min-h-10 rounded-md border border-line px-4 text-xs font-bold text-muted" onClick={() => setArchivePersonId(null)}>
+              <Button variant="secondary" onClick={() => setArchivePersonId(null)}>
                 Close
-              </button>
-              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover">Store file</button>
+              </Button>
+              <Button type="submit">Store file</Button>
             </div>
           </form>
         </Modal>
@@ -1665,10 +1662,10 @@ export function Workspace() {
             </label>
             <textarea name="content" required rows={16} defaultValue={editingTemplate.content} className="rounded-md border border-line px-2.5 py-2 text-sm" />
             <div className="flex justify-end gap-2">
-              <button type="button" className="min-h-10 rounded-md border border-line px-4 text-xs font-bold text-muted" onClick={() => setEditingTemplateId(null)}>
+              <Button variant="secondary" onClick={() => setEditingTemplateId(null)}>
                 Close
-              </button>
-              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover">Save wording</button>
+              </Button>
+              <Button type="submit">Save wording</Button>
             </div>
           </form>
         </Modal>
@@ -1751,7 +1748,7 @@ function Stat({ icon, tone, label, value, note }: { icon: string; tone: "green" 
     violet: "bg-status-violet-bg text-status-violet-fg",
   }[tone];
   return (
-    <article className="min-h-32 rounded-2xl border border-line bg-paper p-5 shadow-[0_8px_24px_rgba(20,63,50,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(20,63,50,0.08)]">
+    <article className="min-h-32 rounded-2xl border border-line bg-paper p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <span className={cn("grid size-7 place-items-center rounded-md text-xs font-extrabold", iconTone)}>{icon}</span>
       <p className="mt-4 mb-1 text-[11px] text-muted">{label}</p>
       <strong className="block font-display text-3xl font-medium tabular-nums">{value}</strong>
@@ -1781,9 +1778,9 @@ function AgreementQueue({
           <h2 className="font-display text-xl font-medium">Who still needs to act</h2>
         </div>
         {canCreate && (
-          <button type="button" className="text-[11px] font-bold text-accent no-print" onClick={onCreate}>
+          <Button variant="ghost" size="sm" className="no-print" onClick={onCreate}>
             Create new →
-          </button>
+          </Button>
         )}
       </div>
       {items.length === 0 ? (
@@ -1794,9 +1791,9 @@ function AgreementQueue({
             {canCreate ? "Create the first agreement from an allocated SkinPhD source form." : "No agreements are assigned to this identity yet."}
           </p>
           {canCreate && (
-            <button type="button" className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover" onClick={onCreate}>
+            <Button onClick={onCreate}>
               Create first agreement
-            </button>
+            </Button>
           )}
         </div>
       ) : (
@@ -1829,18 +1826,13 @@ function AgreementQueue({
               <span className="text-[10px] text-muted tabular-nums">
                 {state.signatures.filter((sig) => sig.agreementId === item.id && sig.outcome === "signed").length} of {item.requiredSignatures}
               </span>
-              <button
-                type="button"
-                className={cn(
-                  "rounded-md px-3 py-2 text-[11px] font-bold",
-                  item.status === "completed"
-                    ? "border border-line bg-paper text-accent hover:border-accent hover:bg-ground"
-                    : "bg-accent text-paper hover:bg-accent-hover",
-                )}
+              <Button
+                size="sm"
+                variant={item.status === "completed" ? "secondary" : "primary"}
                 onClick={() => onOpen(item.id)}
               >
                 {item.status === "completed" || item.status === "declined" ? "Open record" : "Open to sign"}
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -1933,9 +1925,9 @@ function Detail({
       <div className="mb-3 flex flex-wrap justify-end gap-2 no-print">
         {actor?.role === "manager" && (
           <>
-        <button
-          type="button"
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted hover:bg-ground hover:text-ink"
+        <Button
+          size="sm"
+          variant="secondary"
           onClick={() => {
             void useWorkspace
               .getState()
@@ -1954,11 +1946,11 @@ function Detail({
           }}
         >
           Email employee pack
-        </button>
+        </Button>
         {open && (
-          <button
-            type="button"
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted hover:bg-ground hover:text-ink"
+          <Button
+            size="sm"
+            variant="secondary"
             onClick={() => {
               const reminder = buildReminderMail(state, agreement, window.location.origin);
               if (!reminder.to) return;
@@ -1968,14 +1960,14 @@ function Detail({
             }}
           >
             Remind outstanding signers
-          </button>
+          </Button>
         )}
           </>
         )}
-        <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted hover:bg-ground hover:text-ink" onClick={() => window.print()}>
+        <Button size="sm" variant="secondary" onClick={() => window.print()}>
           <Printer className="size-3.5" />
           Print issued pack
-        </button>
+        </Button>
       </div>
       <ProgressTrack state={state} agreement={agreement} />
       {error && <p className="mb-3 rounded-md bg-danger-bg px-3 py-2 text-[12px] text-danger-fg">{error}</p>}
@@ -2028,9 +2020,9 @@ function Detail({
           <p className="text-[11px] font-bold text-ink">
             Record {roleLabel(signingRole)} signature
           </p>
-          <button
-            type="button"
-            className="min-h-10 rounded-md border border-line bg-paper text-xs font-bold text-accent disabled:opacity-65"
+          <Button
+            variant="secondary"
+            className="w-full"
             disabled={saving}
             onClick={() => {
               if (!activeRole && signingRole) setActiveRole(signingRole);
@@ -2038,7 +2030,7 @@ function Detail({
             }}
           >
             Email 6-digit code to this signer
-          </button>
+          </Button>
           {actor?.role === "manager" && issuedToken && (
             <div className="rounded-md border border-line bg-paper px-3 py-3">
               <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Head Office sign code</p>
@@ -2059,12 +2051,12 @@ function Detail({
             <span>{consentCopy()}</span>
           </label>
           <div className="sticky bottom-0 z-10 -mx-4 mt-2 flex flex-wrap justify-end gap-2 border-t border-line bg-sage/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-1">
-            <button type="button" className="min-h-11 rounded-md border border-danger-line bg-danger-bg px-4 text-xs font-bold text-danger-fg disabled:opacity-65" disabled={saving} onClick={() => void onSign("decline")}>
+            <Button variant="danger" size="lg" disabled={saving} onClick={() => void onSign("decline")}>
               Decline
-            </button>
-            <button className="min-h-11 min-w-40 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover disabled:opacity-65" disabled={saving}>
+            </Button>
+            <Button type="submit" size="lg" className="min-w-40" disabled={saving}>
               {saving ? "Saving…" : "Record typed signature"}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -2135,25 +2127,40 @@ function Row({ label, value }: { label: string; value: string }) {
 function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => Promise<void> }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const steps = [
+    "Head Office issues the pack",
+    "Employee, franchisee and witness type their names",
+    "Confirm stores the hash and history",
+  ];
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.1fr_0.9fr]">
       <section className="relative hidden overflow-hidden bg-linear-to-br from-forest to-forest-dark px-12 py-16 text-paper lg:flex lg:flex-col lg:justify-between">
-        <div>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-gold/25 blur-[100px]"
+        />
+        <div className="relative">
           <p className="text-[11px] font-extrabold tracking-[0.18em] text-sage uppercase">SkinPhD Confirm</p>
           <h1 className="mt-8 max-w-lg font-display text-5xl leading-[1.1] font-medium">The signed pack stays here.</h1>
           <p className="mt-5 max-w-md text-base leading-relaxed text-sidebar-soft">
             Issue an approved form, collect three names, and keep the snapshot when a printed page goes missing.
           </p>
         </div>
-        <ol className="grid max-w-md gap-3 text-sm text-sidebar-soft">
-          <li>1. Head Office issues the pack</li>
-          <li>2. Employee, franchisee and witness type their names</li>
-          <li>3. Confirm stores the hash and history</li>
+        <ol className="relative grid max-w-md gap-4">
+          {steps.map((step, index) => (
+            <li key={step} className="flex items-center gap-3 text-sm text-sidebar-soft">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 bg-white/5 font-display text-xs font-semibold text-gold">
+                {index + 1}
+              </span>
+              {step}
+            </li>
+          ))}
         </ol>
       </section>
       <section className="grid place-items-center bg-ground px-4 py-10">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-paper shadow-[0_20px_50px_rgba(20,63,50,0.08)]">
+      <Card radius="tile" elevation="lg" className="w-full max-w-md">
         <div className="border-b border-line px-6 py-6">
+          <span className="mb-3 grid size-9 place-items-center rounded-full bg-gold-soft text-sm font-display font-semibold text-gold-fg">S</span>
           <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Sign in</p>
           <h2 className="mt-2 font-display text-3xl font-medium">Open the kept copy</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -2175,15 +2182,15 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
           {error && <p className="rounded-md bg-danger-bg px-3 py-2 text-[11px] text-danger-fg">{error}</p>}
           <label className="grid gap-1.5 text-[10px] font-extrabold tracking-wide text-muted uppercase">
             Email
-            <input name="email" type="email" required autoComplete="username" className="min-h-11 rounded-xl border border-line px-3 text-sm font-normal text-ink" />
+            <input name="email" type="email" required autoComplete="username" className="min-h-11 rounded-md border border-line px-3 text-sm font-normal text-ink" />
           </label>
           <label className="grid gap-1.5 text-[10px] font-extrabold tracking-wide text-muted uppercase">
             PIN
-            <input name="pin" type="password" inputMode="numeric" required minLength={4} maxLength={8} autoComplete="current-password" className="min-h-11 rounded-xl border border-line px-3 text-sm font-normal text-ink" />
+            <input name="pin" type="password" inputMode="numeric" required minLength={4} maxLength={8} autoComplete="current-password" className="min-h-11 rounded-md border border-line px-3 text-sm font-normal text-ink" />
           </label>
-          <button className="mt-1 min-h-11 rounded-xl bg-accent text-sm font-bold text-paper shadow-sm hover:bg-accent-hover disabled:opacity-65" disabled={saving}>
+          <Button type="submit" size="lg" className="mt-1 w-full" disabled={saving}>
             {saving ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
           {isProductionMode() ? (
             <p className="text-[12px] leading-relaxed text-muted">
               Sessions expire after 8 hours. Change the PIN after first use.
@@ -2194,7 +2201,7 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
             </p>
           )}
         </form>
-      </div>
+      </Card>
       </section>
     </main>
   );
