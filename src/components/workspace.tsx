@@ -183,6 +183,7 @@ export function Workspace() {
   const [issuedToken, setIssuedToken] = useState("");
   const [deskFilter, setDeskFilter] = useState<"all" | "today" | "employee" | "franchisee" | "witness" | "remind">("all");
   const [draftTemplateId, setDraftTemplateId] = useState("");
+  const [issuedPin, setIssuedPin] = useState<{ name: string; email: string; pin: string } | null>(null);
 
   useEffect(() => {
     store.expireSessionIfNeeded();
@@ -972,6 +973,8 @@ export function Workspace() {
                       variant="secondary"
                       onClick={() => {
                         void store.issueTemporaryPin(person.id).then((pin) => {
+                          setIssuedPin({ name: person.fullName, email: person.email, pin });
+                          toast.success(`Temporary PIN ready for ${person.fullName}.`);
                           window.location.href = employeeMailHref(
                             buildWelcomeMail({
                               fullName: person.fullName,
@@ -1193,8 +1196,11 @@ export function Workspace() {
                   <Button type="submit">Change PIN</Button>
                 </form>
                 <div className="mt-4 rounded-md bg-ground px-3 py-3 text-[12px] leading-relaxed text-muted">
-                  <strong className="block text-ink">PIN issue and reset</strong>
-                  Head Office creates the person in Staff with a 4–8 digit PIN and tells that person privately. The person signs in and changes the PIN immediately. If a PIN is lost, Head Office issues a new one here. Do not put PINs in the agreement email.
+                  <strong className="block text-ink">PIN reset</strong>
+                  1. Staff → Email new PIN. The old PIN stops immediately.<br />
+                  2. Head Office sees the new number on screen and sends the mail.<br />
+                  3. That person signs in with the new PIN and changes it here.<br />
+                  Confirm stores a hash only. Head Office cannot look up an old PIN.
                 </div>
                 <div className="mt-3 rounded-md bg-ground px-3 py-3 text-[12px] leading-relaxed text-muted">
                   <strong className="block text-ink">Backup</strong>
@@ -1231,6 +1237,18 @@ export function Workspace() {
           <span>Private employee agreement workspace</span>
         </footer>
       </section>
+
+      {issuedPin && (
+        <Modal onClose={() => setIssuedPin(null)} title={issuedPin.name} eyebrow="Temporary PIN">
+          <div className="grid gap-3 px-5 py-5">
+            <p className="text-[13px] leading-relaxed text-muted">
+              The previous PIN for {issuedPin.email} no longer works. Send this number privately. Confirm will not show it again.
+            </p>
+            <p className="font-display text-4xl font-medium tracking-[0.2em] text-ink">{issuedPin.pin}</p>
+            <Button onClick={() => setIssuedPin(null)}>I have sent it</Button>
+          </div>
+        </Modal>
+      )}
 
       {showCreate && (
         <Modal onClose={() => setShowCreate(false)} title="Create an agreement" eyebrow="Controlled issue flow">
