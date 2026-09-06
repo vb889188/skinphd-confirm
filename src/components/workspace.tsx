@@ -2160,7 +2160,7 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
       <section className="grid place-items-center bg-ground px-4 py-10">
       <Card radius="tile" elevation="lg" className="w-full max-w-md">
         <div className="border-b border-line px-6 py-6">
-          <span className="mb-3 grid size-9 place-items-center rounded-full bg-gold-soft text-sm font-display font-semibold text-gold-fg">S</span>
+          <span className="mb-3 grid size-9 place-items-center rounded-full bg-gold-soft font-display text-sm font-semibold text-gold-fg shadow-glow">S</span>
           <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Sign in</p>
           <h2 className="mt-2 font-display text-3xl font-medium">Open the kept copy</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted">
