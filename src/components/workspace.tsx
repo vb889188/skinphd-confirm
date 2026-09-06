@@ -171,6 +171,7 @@ export function Workspace() {
   const [peopleQuery, setPeopleQuery] = useState("");
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [archivePersonId, setArchivePersonId] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<Role | "">("");
   const [typedName, setTypedName] = useState("");
   const [token, setToken] = useState("");
@@ -934,7 +935,13 @@ export function Workspace() {
                     {roleLabel(person.role)} · {branchLabel(store, person.branchId)} · {person.status}
                   </small>
                   <small className="mt-1 block text-[11px] text-muted">{person.email}</small>
-                  <div className="mt-3 flex gap-2">
+                  <p className="mt-2 text-[11px] text-muted">
+                    {(store.records ?? []).filter((item) => item.personId === person.id).length} stored paper pack(s)
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setArchivePersonId(person.id)}>
+                      Upload completed pack
+                    </button>
                     <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setEditingPersonId(person.id)}>
                       Edit
                     </button>
@@ -1361,6 +1368,85 @@ export function Workspace() {
                 Cancel
               </button>
               <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper">Save details</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {archivePersonId && (
+        <Modal
+          onClose={() => setArchivePersonId(null)}
+          title={store.people.find((person) => person.id === archivePersonId)?.fullName ?? "Staff"}
+          eyebrow="Completed paper pack"
+        >
+          <form
+            className="grid gap-2.5 px-5 py-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = event.currentTarget;
+              const values = Object.fromEntries(new FormData(form).entries());
+              void store
+                .addEmployeeRecord({
+                  personId: archivePersonId,
+                  fileName: String(values.fileName),
+                  mimeType: String(values.mimeType || "application/octet-stream"),
+                  byteSize: Number(values.byteSize || 0),
+                  contentBase64: String(values.fileBase64),
+                  note: String(values.note || ""),
+                })
+                .then(() => {
+                  setArchivePersonId(null);
+                  setNotice("Completed pack stored against this employee. This is paper evidence, not a Confirm typed signature.");
+                })
+                .catch((err) => setError(err instanceof Error ? err.message : "Could not store the file"));
+            }}
+          >
+            <p className="text-[12px] leading-relaxed text-muted">
+              Upload a PDF or photo of a pack that is already signed on paper. Confirm stores the file and a hash. It does not treat this as a new typed signature.
+            </p>
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.heic"
+              required
+              className="min-h-10 rounded-md border border-line px-2.5 py-2 text-sm"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                const form = event.currentTarget.form;
+                if (!file || !form) return;
+                if (file.size > 6_000_000) {
+                  setError("Keep completed files under 6 MB");
+                  return;
+                }
+                const setValue = (name: string, value: string) => {
+                  const field = form.elements.namedItem(name) as HTMLInputElement | null;
+                  if (field) field.value = value;
+                };
+                setValue("fileName", file.name);
+                setValue("mimeType", file.type || "application/octet-stream");
+                setValue("byteSize", String(file.size));
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const result = String(reader.result || "");
+                  setValue("fileBase64", result.includes(",") ? result.split(",")[1] : result);
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+            <input type="hidden" name="fileName" />
+            <input type="hidden" name="mimeType" />
+            <input type="hidden" name="byteSize" />
+            <input type="hidden" name="fileBase64" />
+            <textarea name="note" rows={3} placeholder="What this paper pack is (course, date, branch)" className="rounded-md border border-line px-2.5 py-2 text-sm" />
+            <ul className="grid gap-1 text-[11px] text-muted">
+              {(store.records ?? []).filter((item) => item.personId === archivePersonId).map((item) => (
+                <li key={item.id}>{item.fileName} · {shortTime(item.createdAt)}</li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="min-h-10 rounded-md border border-line px-4 text-xs font-bold text-muted" onClick={() => setArchivePersonId(null)}>
+                Close
+              </button>
+              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper">Store file</button>
             </div>
           </form>
         </Modal>

@@ -127,6 +127,16 @@ export type AuditEvent = {
   detail: string;
   createdAt: string;
 };
+export type EmployeeRecord = {
+  id: string;
+  personId: string;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  sha256: string;
+  note: string;
+  createdAt: string;
+};
 export type WorkspaceState = {
   currentPersonId: string | null;
   sessionStartedAt: string | null;
@@ -137,4 +147,5 @@ export type WorkspaceState = {
   signatures: Signature[];
   links: SigningLink[];
   audit: AuditEvent[];
+  records: EmployeeRecord[];
 };

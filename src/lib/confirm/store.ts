@@ -10,8 +10,8 @@ import {
   requiredFieldErrors,
   requiredSignatureCount,
 } from "./rules";
-import type { Agreement, Role, Snapshot, WorkspaceState } from "./types";
-import { persistWorkspace, loadRemoteWorkspace, remoteEnabled, setRemoteActor, upsertSourceFile } from "./remote";
+import type { Agreement, EmployeeRecord, Role, Snapshot, WorkspaceState } from "./types";
+import { persistWorkspace, loadRemoteWorkspace, remoteEnabled, setRemoteActor, upsertEmployeeRecord, upsertSourceFile } from "./remote";
 import { requireCapability } from "./access";
 
 function actor(state: WorkspaceState) {
@@ -99,6 +99,14 @@ type Actions = {
   }) => void;
   noteEmailSent: (agreementId: string, toEmail: string) => void;
   markReminded: (agreementId: string) => void;
+  addEmployeeRecord: (input: {
+    personId: string;
+    fileName: string;
+    mimeType: string;
+    byteSize: number;
+    contentBase64: string;
+    note: string;
+  }) => Promise<string>;
 };
 
 export const useWorkspace = create<WorkspaceState & Actions>()(
@@ -199,6 +207,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             signatures: remote.signatures,
             links: remote.links,
             audit: remote.audit.length ? remote.audit : state.audit,
+            records: remote.records ?? state.records ?? [],
           });
         } catch {
           /* keep local cache if the project is unreachable */
@@ -820,7 +829,43 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         void persistWorkspace(get()).catch(() => undefined);
         return status;
       },
+      addEmployeeRecord: async (input) => {
+        requireCapability(actor(get()), "staff", "Store a completed paper pack");
+        if (input.byteSize > 6_000_000) throw new Error("Keep completed files under 6 MB");
+        const person = get().people.find((item) => item.id === input.personId);
+        if (!person) throw new Error("Choose a staff record first");
+        const now = new Date().toISOString();
+        const digest = await sha256Hex(input.contentBase64);
+        const id = randomId("REC");
+        const record = {
+          id,
+          personId: input.personId,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          byteSize: input.byteSize,
+          sha256: digest,
+          note: input.note.trim() || "Completed paper pack uploaded as stored evidence.",
+          createdAt: now,
+        };
+        set({
+          records: [record, ...get().records],
+          audit: [
+            {
+              id: randomId("AUD"),
+              agreementId: null,
+              actor: ACTOR,
+              action: "Completed pack uploaded",
+              detail: `${input.fileName} was stored against ${person.fullName}. This is paper evidence, not a Confirm typed signature.`,
+              createdAt: now,
+            },
+            ...get().audit,
+          ],
+        });
+        void upsertEmployeeRecord({ ...record, contentBase64: input.contentBase64 }).catch(() => undefined);
+        void persistWorkspace(get()).catch(() => undefined);
+        return id;
+      },
     }),
-    { name: "skinphd-confirm.workspace.v8" },
+    { name: "skinphd-confirm.workspace.v9" },
   ),
 );

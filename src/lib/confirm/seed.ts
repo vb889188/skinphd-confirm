@@ -33,6 +33,7 @@ export function createSeed(): WorkspaceState {
     agreements: [],
     signatures: [],
     links: [],
+    records: [],
     audit: [
       {
         id: "audit-seed",
