@@ -576,9 +576,9 @@ export function Workspace() {
                 </div>
               </section>
             )}
-            <section className="overflow-hidden rounded-lg border border-line bg-paper">
-              <div className="border-b border-line px-5 py-4">
-                <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Open these first</p>
+            <section className="overflow-hidden rounded-3xl border border-white/70 bg-paper/90 shadow-[0_20px_50px_rgba(15,51,41,0.06)]">
+              <div className="border-b border-line/70 px-6 py-5">
+                <p className="text-[10px] font-extrabold tracking-[0.16em] text-accent uppercase">Queue</p>
                 <h2 className="font-display text-xl font-medium">
                   {deskFilter === "employee"
                     ? "Waiting on the employee"
@@ -609,7 +609,7 @@ export function Workspace() {
                   <button
                     key={item.id}
                     type="button"
-                    className="flex w-full flex-col gap-2 px-5 py-4 text-left hover:bg-ground sm:flex-row sm:items-center sm:justify-between"
+                    className="flex w-full flex-col gap-2 px-6 py-4 text-left transition hover:bg-sage/60 sm:flex-row sm:items-center sm:justify-between"
                     onClick={() => {
                       setSelectedId(item.id);
                       setView("agreements");
@@ -626,7 +626,7 @@ export function Workspace() {
                     </span>
                     <span className="flex items-center gap-3">
                       <ProgressTrack state={store} agreement={item} compact />
-                      <span className="rounded-md bg-accent px-3 py-2 text-[11px] font-bold text-paper">Open to sign</span>
+                      <span className="rounded-full bg-forest px-4 py-2 text-[11px] font-bold text-paper">Open</span>
                     </span>
                   </button>
                 ))}
@@ -638,7 +638,7 @@ export function Workspace() {
               </div>
             </section>
             {isManager && (
-            <section className="overflow-hidden rounded-lg border border-line bg-paper">
+            <section className="overflow-hidden rounded-3xl border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Why this exists</p>
                 <h2 className="font-display text-xl font-medium">Paper can go missing. This copy stays.</h2>
@@ -737,7 +737,7 @@ export function Workspace() {
                 onCreate={() => setShowCreate(true)}
               />
               {current.role === "manager" && can(current, "audit") && (
-              <aside className="overflow-hidden rounded-lg border border-line bg-paper">
+              <aside className="overflow-hidden rounded-3xl border border-line bg-paper">
                 <div className="border-b border-line px-5 py-4">
                   <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Live record</p>
                   <h2 className="font-display text-xl font-medium">Recent activity</h2>
@@ -781,7 +781,7 @@ export function Workspace() {
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_360px]">
             <div className="grid gap-3 sm:grid-cols-2">
               {store.templates.map((template) => (
-                <article key={template.id} className="rounded-lg border border-line bg-paper p-5">
+                <article key={template.id} className="rounded-3xl border border-line bg-paper p-5">
                   <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">
                     {template.category} · v{template.version}
                     {template.hasWaiver ? " · waiver addendum" : ""}
@@ -809,7 +809,7 @@ export function Workspace() {
             </div>
             {current.role === "manager" && (
               <form
-                className="h-fit rounded-lg border border-line bg-paper p-5"
+                className="h-fit rounded-3xl border border-line bg-paper p-5"
                 onSubmit={(event) => {
                   event.preventDefault();
                   const form = event.currentTarget;
@@ -934,7 +934,7 @@ export function Workspace() {
                   return !peopleQuery || haystack.includes(peopleQuery.toLowerCase());
                 })
                 .map((person) => (
-                <article key={person.id} className="rounded-lg border border-line bg-paper p-5">
+                <article key={person.id} className="rounded-3xl border border-line bg-paper p-5">
                   <button type="button" className="text-left" onClick={() => setProfilePersonId(person.id)}>
                     <strong className="block text-sm">{person.fullName}</strong>
                   </button>
@@ -977,7 +977,7 @@ export function Workspace() {
               </div>
             </div>
             <form
-              className="h-fit rounded-lg border border-line bg-paper p-5"
+              className="h-fit rounded-3xl border border-line bg-paper p-5"
               onSubmit={(event) => {
                 event.preventDefault();
                 const form = event.currentTarget;
@@ -1032,7 +1032,7 @@ export function Workspace() {
 
         {view === "locations" && can(current, "clinics") && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.6fr)_300px]">
-            <section className="overflow-hidden rounded-lg border border-line bg-paper">
+            <section className="overflow-hidden rounded-3xl border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">SkinPhD branch directory</p>
                 <h2 className="font-display text-xl font-medium">SkinPhD branches</h2>
@@ -1047,7 +1047,7 @@ export function Workspace() {
               </div>
             </section>
             <form
-              className="h-fit rounded-lg border border-line bg-paper p-5"
+              className="h-fit rounded-3xl border border-line bg-paper p-5"
               onSubmit={(event) => {
                 event.preventDefault();
                 const values = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -1072,7 +1072,7 @@ export function Workspace() {
         )}
 
         {view === "audit" && can(current, "audit") && (
-          <section className="mx-auto max-w-7xl overflow-hidden rounded-lg border border-line bg-paper">
+          <section className="mx-auto max-w-7xl overflow-hidden rounded-3xl border border-line bg-paper">
             <div className="border-b border-line px-5 py-4">
               <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Control</p>
               <h2 className="font-display text-xl font-medium">Full audit history</h2>
@@ -1099,7 +1099,7 @@ export function Workspace() {
 
         {view === "settings" && (
           <div className="mx-auto grid max-w-3xl gap-4">
-            <section className="overflow-hidden rounded-lg border border-line bg-paper">
+            <section className="overflow-hidden rounded-3xl border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Make this workable</p>
                 <h2 className="font-display text-xl font-medium">Pilot path</h2>
@@ -1112,7 +1112,7 @@ export function Workspace() {
                 <li className="py-3">5. Client consultation and treatment consent stay locked until those forms are supplied separately.</li>
               </ol>
             </section>
-            <section className="overflow-hidden rounded-lg border border-line bg-paper">
+            <section className="overflow-hidden rounded-3xl border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Production controls</p>
                 <h2 className="font-display text-xl font-medium">PIN and records</h2>
@@ -1717,7 +1717,7 @@ function AgreementQueue({
   onCreate: () => void;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-line bg-paper">
+    <section className="overflow-hidden rounded-3xl border border-line bg-paper">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
           <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Records</p>

@@ -70,7 +70,8 @@ body {
   font-family: var(--font-sans);
   color: var(--color-ink);
   background:
-    radial-gradient(1200px 480px at 10% -10%, #dce8e2 0%, transparent 55%),
+    radial-gradient(900px 420px at 8% -8%, #d7e6de 0%, transparent 50%),
+    radial-gradient(700px 360px at 100% 0%, #e7eee9 0%, transparent 46%),
     var(--color-ground);
 }
 
