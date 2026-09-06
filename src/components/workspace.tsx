@@ -650,13 +650,20 @@ export function Workspace() {
 
         {view === "agreements" && (
           <>
-            <section className="mx-auto mb-4 grid max-w-7xl grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Agreement summary">
-              <Stat icon="↗" tone="green" label="Completed agreements" value={stats.completed} note="Locked with signature evidence" />
-              <Stat icon="!" tone="amber" label="Needs your action" value={stats.needsAction} note="Draft or partially signed" />
-              <Stat icon="→" tone="blue" label="Awaiting signatures" value={stats.awaiting} note="Employee, franchisee or witness" />
-              {can(current, "templates") && (
-                <Stat icon="✓" tone="slate" label="Approved source templates" value={stats.templates} note="Allocated from supplied SkinPhD forms" />
-              )}
+            <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-md border border-line bg-paper" aria-label="Agreement summary">
+              <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-4 sm:divide-y-0">
+                {[
+                  [stats.completed, "Completed"],
+                  [stats.needsAction, "Needs action"],
+                  [stats.awaiting, "Awaiting names"],
+                  [stats.templates, "Source forms"],
+                ].map(([value, label]) => (
+                  <div key={String(label)} className="px-4 py-4">
+                    <strong className="block font-display text-2xl font-medium tabular-nums">{value}</strong>
+                    <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</span>
+                  </div>
+                ))}
+              </div>
             </section>
             <div className="mx-auto mb-3.5 flex max-w-7xl flex-wrap gap-2 no-print">
               <input
@@ -724,14 +731,10 @@ export function Workspace() {
                 onCreate={() => setShowCreate(true)}
               />
               {current.role === "manager" && can(current, "audit") && (
-              <aside className="overflow-hidden rounded-3xl border border-line bg-paper">
+              <aside className="overflow-hidden rounded-md border border-line bg-paper">
                 <div className="border-b border-line px-5 py-4">
-                  <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Live record</p>
+                  <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Audit</p>
                   <h2 className="font-display text-xl font-medium">Recent activity</h2>
-                  <p className="mt-1 flex items-center gap-2 text-[11px] text-status-green-fg">
-                    <span className="live-dot size-2 rounded-full bg-accent" />
-                    Updating with this workspace
-                  </p>
                 </div>
                 <div className="px-5">
                   {store.audit.slice(0, 8).map((item) => (
@@ -1765,11 +1768,11 @@ function AgreementQueue({
   onCreate: () => void;
 }) {
   return (
-    <section className="overflow-hidden rounded-3xl border border-line bg-paper">
+    <section className="overflow-hidden rounded-md border border-line bg-paper">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
-          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Records</p>
-          <h2 className="font-display text-xl font-medium">Who still needs to act</h2>
+          <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Records</p>
+          <h2 className="font-display text-xl font-medium">Issued packs</h2>
         </div>
         {canCreate && (
           <Button variant="ghost" size="sm" className="no-print" onClick={onCreate}>
