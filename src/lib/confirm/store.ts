@@ -13,7 +13,7 @@ import {
 import type { Agreement, EmployeeRecord, Role, Snapshot, WorkspaceState } from "./types";
 import { persistWorkspace, loadRemoteWorkspace, remoteEnabled, setRemoteActor, upsertEmployeeRecord, upsertSourceFile } from "./remote";
 import { requireCapability } from "./access";
-import { extractIndexText } from "./index-text";
+import { recognizeDocument } from "./ocr";
 
 function actor(state: WorkspaceState) {
   return state.people.find((person) => person.id === state.currentPersonId);
@@ -846,7 +846,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           byteSize: input.byteSize,
           sha256: digest,
           note: input.note.trim() || "Completed paper pack uploaded as stored evidence.",
-          extractedText: extractIndexText({
+          extractedText: await recognizeDocument({
             fileName: input.fileName,
             note: input.note,
             mimeType: input.mimeType,
