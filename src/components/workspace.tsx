@@ -15,6 +15,7 @@ import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode } from "@/li
 import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { haptic } from "@/lib/confirm/haptics";
+import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -178,7 +179,6 @@ export function Workspace() {
   const [token, setToken] = useState("");
   const [consent, setConsent] = useState(false);
   const [issuedToken, setIssuedToken] = useState("");
-  const [notice, setNotice] = useState("");
   const [deskFilter, setDeskFilter] = useState<"all" | "today" | "employee" | "franchisee" | "witness" | "remind">("all");
   const [draftTemplateId, setDraftTemplateId] = useState("");
 
@@ -282,7 +282,7 @@ export function Workspace() {
           "_self",
         );
       }
-      setNotice("Pack issued. Tell the franchisee and send the employee the pack email.");
+      toast.success("Pack issued. Tell the franchisee and send the employee the pack email.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the agreement");
     } finally {
@@ -310,7 +310,7 @@ export function Workspace() {
       });
       const latest = useWorkspace.getState().agreements.find((item) => item.id === selected.id);
       haptic(action === "decline" ? "warn" : latest?.status === "completed" ? "complete" : "success");
-      setNotice(
+      toast.success(
         action === "decline"
           ? "Decline recorded."
           : latest?.status === "completed"
@@ -342,7 +342,7 @@ export function Workspace() {
           );
         }
       }
-      setTypedName(current?.fullName ?? "");
+      setTypedName("");
       setToken("");
       setConsent(false);
       setIssuedToken("");
@@ -364,7 +364,7 @@ export function Workspace() {
       setActiveRole(role);
       setToken(result.code);
       setIssuedToken(result.code);
-      setNotice(`Sign code ${result.code} prepared for ${result.email}.`);
+      toast.success(`Sign code ${result.code} prepared for ${result.email}.`);
       const signer = selected.snapshot.signers.find((item) => item.role === role);
       window.location.href = employeeMailHref(
         buildSignCodeMail({
@@ -492,7 +492,7 @@ export function Workspace() {
             </span>
             <button
               type="button"
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted hover:bg-ground hover:text-ink"
               onClick={() => store.signOut()}
             >
               Sign out
@@ -527,12 +527,6 @@ export function Workspace() {
             {error}
           </div>
         )}
-        {notice && (
-          <div className="mx-auto mb-4 max-w-7xl rounded-[10px] border border-status-green-bg bg-status-green-bg px-3 py-2.5 text-[12px] font-medium text-status-green-fg" role="status">
-            {notice}
-          </div>
-        )}
-
         {view === "overview" && (
           <div className="mx-auto grid max-w-7xl gap-4">
             {isManager && (
@@ -548,7 +542,7 @@ export function Workspace() {
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                   {[
                     ["today", stats.issuedToday, "Issued today"],
                     ["employee", stats.waitingEmployee, "Employee"],
@@ -616,7 +610,7 @@ export function Workspace() {
                       const signer = item.snapshot.signers.find((entry) => entry.id === current.id);
                       if (signer) {
                         setActiveRole(signer.role);
-                        setTypedName(current.fullName);
+                        setTypedName(signer.name);
                       }
                     }}
                   >
@@ -731,7 +725,7 @@ export function Workspace() {
                   const signer = agreement?.snapshot.signers.find((item) => item.id === current.id);
                   if (signer) {
                     setActiveRole(signer.role);
-                    setTypedName(current.fullName);
+                    setTypedName(signer.name);
                   }
                 }}
                 onCreate={() => setShowCreate(true)}
@@ -801,13 +795,13 @@ export function Workspace() {
                   <b className={cn("mt-3 inline-flex rounded-full px-2 py-1 text-[9px] font-extrabold", toneClass[template.status === "approved" ? "green" : "slate"])}>
                     {template.status}
                   </b>
-                  <button type="button" className="mt-3 block rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setEditingTemplateId(template.id)}>
+                  <button type="button" className="mt-3 block rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground" onClick={() => setEditingTemplateId(template.id)}>
                     View / edit wording
                   </button>
                   {template.sourceFileId && (
                     <button
                       type="button"
-                      className="mt-2 block rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent"
+                      className="mt-2 block rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground"
                       onClick={() => {
                         void fetchSourceFile(template.sourceFileId!).then((file) => {
                           if (!file) return;
@@ -928,7 +922,7 @@ export function Workspace() {
                     Source file includes a waiver addendum
                   </label>
                   <textarea name="content" required rows={10} placeholder="Paste the exact source wording here" className="rounded-md border border-line px-2.5 py-2 text-sm" />
-                  <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper">Save source template</button>
+                  <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper hover:bg-accent-hover">Save source template</button>
                 </div>
               </form>
             )}
@@ -967,18 +961,18 @@ export function Workspace() {
                     {(store.records ?? []).filter((item) => item.personId === person.id).length} paper pack(s)
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-[11px] font-bold text-paper" onClick={() => setProfilePersonId(person.id)}>
+                    <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-[11px] font-bold text-paper hover:bg-accent-hover" onClick={() => setProfilePersonId(person.id)}>
                       Open profile
                     </button>
-                    <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setArchivePersonId(person.id)}>
+                    <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground" onClick={() => setArchivePersonId(person.id)}>
                       Upload completed pack
                     </button>
-                    <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setEditingPersonId(person.id)}>
+                    <button type="button" className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground" onClick={() => setEditingPersonId(person.id)}>
                       Edit
                     </button>
                     <button
                       type="button"
-                      className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent"
+                      className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent hover:border-accent hover:bg-ground"
                       onClick={() => {
                         void store.issueTemporaryPin(person.id).then((pin) => {
                           window.location.href = employeeMailHref(
@@ -1063,7 +1057,7 @@ export function Workspace() {
                     <option key={branch.id} value={branch.id}>{branch.name}</option>
                   ))}
                 </select>
-                <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper">Add person</button>
+                <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper hover:bg-accent-hover">Add person</button>
               </div>
             </form>
           </div>
@@ -1104,7 +1098,7 @@ export function Workspace() {
               <div className="grid gap-2.5">
                 <input name="name" required placeholder="SkinPhD branch name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
                 <input name="code" required placeholder="SKIN0000" className="min-h-10 rounded-md border border-line px-2.5 text-sm uppercase" />
-                <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper">Add SkinPhD branch</button>
+                <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper hover:bg-accent-hover">Add SkinPhD branch</button>
               </div>
             </form>
           </div>
@@ -1177,7 +1171,7 @@ export function Workspace() {
                 >
                   <input name="currentPin" type="password" required placeholder="Current PIN" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
                   <input name="nextPin" type="password" required placeholder="New PIN" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper">Change PIN</button>
+                  <button className="min-h-10 rounded-md bg-accent text-xs font-bold text-paper hover:bg-accent-hover">Change PIN</button>
                 </form>
                 <div className="mt-4 rounded-md bg-ground px-3 py-3 text-[12px] leading-relaxed text-muted">
                   <strong className="block text-ink">PIN issue and reset</strong>
@@ -1189,7 +1183,7 @@ export function Workspace() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {can(current, "export") && (
-                  <button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted" onClick={downloadExport}>
+                  <button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted hover:bg-ground hover:text-ink" onClick={downloadExport}>
                     <Download className="size-3.5" />
                     Export JSON
                   </button>
@@ -1349,7 +1343,7 @@ export function Workspace() {
               <button type="button" className="min-h-10 rounded-md border border-line bg-paper px-4 text-xs font-bold text-muted" onClick={() => setShowCreate(false)}>
                 Cancel
               </button>
-              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper disabled:opacity-65" disabled={saving}>
+              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover disabled:opacity-65" disabled={saving}>
                 {saving ? "Creating…" : "Freeze and issue agreement"}
               </button>
             </footer>
@@ -1418,7 +1412,7 @@ export function Workspace() {
               <button type="button" className="min-h-10 rounded-md border border-line px-4 text-xs font-bold text-muted" onClick={() => setEditingPersonId(null)}>
                 Cancel
               </button>
-              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper">Save details</button>
+              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover">Save details</button>
             </div>
           </form>
         </Modal>
@@ -1491,7 +1485,7 @@ export function Workspace() {
               </div>
               <button
                 type="button"
-                className="mt-3 rounded-md bg-accent px-3 py-2 text-[11px] font-bold text-paper"
+                className="mt-3 rounded-md bg-accent px-3 py-2 text-[11px] font-bold text-paper hover:bg-accent-hover"
                 onClick={() => {
                   const id = profilePersonId;
                   setProfilePersonId(null);
@@ -1528,7 +1522,7 @@ export function Workspace() {
                 })
                 .then(() => {
                   setArchivePersonId(null);
-                  setNotice("Completed pack stored against this employee. This is paper evidence, not a Confirm typed signature.");
+                  toast.success("Completed pack stored against this employee. This is paper evidence, not a Confirm typed signature.");
                 })
                 .catch((err) => setError(err instanceof Error ? err.message : "Could not store the file"));
             }}
@@ -1578,7 +1572,7 @@ export function Workspace() {
               <button type="button" className="min-h-10 rounded-md border border-line px-4 text-xs font-bold text-muted" onClick={() => setArchivePersonId(null)}>
                 Close
               </button>
-              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper">Store file</button>
+              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover">Store file</button>
             </div>
           </form>
         </Modal>
@@ -1649,7 +1643,7 @@ export function Workspace() {
               <button type="button" className="min-h-10 rounded-md border border-line px-4 text-xs font-bold text-muted" onClick={() => setEditingTemplateId(null)}>
                 Close
               </button>
-              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper">Save wording</button>
+              <button className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover">Save wording</button>
             </div>
           </form>
         </Modal>
@@ -1674,7 +1668,6 @@ export function Workspace() {
             onIssueCode={onIssueCode}
             onSign={onSign}
             error={error}
-            notice={notice}
           />
         </Modal>
       )}
@@ -1776,7 +1769,7 @@ function AgreementQueue({
             {canCreate ? "Create the first agreement from an allocated SkinPhD source form." : "No agreements are assigned to this identity yet."}
           </p>
           {canCreate && (
-            <button type="button" className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper" onClick={onCreate}>
+            <button type="button" className="min-h-10 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover" onClick={onCreate}>
               Create first agreement
             </button>
           )}
@@ -1790,7 +1783,7 @@ function AgreementQueue({
             <span />
           </div>
           {items.map((item) => (
-            <div key={item.id} className="grid min-w-xl grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)] items-center gap-3 border-t border-line px-5 py-4">
+            <div key={item.id} className="grid min-w-xl grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)] items-center gap-3 border-t border-line px-5 py-4 transition-colors hover:bg-sage/40">
               <div className="flex min-w-0 items-center gap-2.5">
                 <span className="grid h-10 w-8 shrink-0 place-items-center rounded-md border border-line bg-sage font-display text-sm font-bold text-accent">
                   <FileText className="size-3.5" />
@@ -1815,7 +1808,9 @@ function AgreementQueue({
                 type="button"
                 className={cn(
                   "rounded-md px-3 py-2 text-[11px] font-bold",
-                  item.status === "completed" ? "border border-line bg-paper text-accent" : "bg-accent text-paper",
+                  item.status === "completed"
+                    ? "border border-line bg-paper text-accent hover:border-accent hover:bg-ground"
+                    : "bg-accent text-paper hover:bg-accent-hover",
                 )}
                 onClick={() => onOpen(item.id)}
               >
@@ -1875,7 +1870,6 @@ function Detail({
   onIssueCode,
   onSign,
   error,
-  notice,
 }: {
   state: WorkspaceState;
   agreement: Agreement;
@@ -1893,7 +1887,6 @@ function Detail({
   onIssueCode: (role: Role) => Promise<void>;
   onSign: (action: "sign" | "decline") => Promise<void>;
   error: string;
-  notice: string;
 }) {
   const open = agreement.status === "awaiting_signatures" || agreement.status === "partially_signed";
   const actor = state.people.find((person) => person.id === state.currentPersonId);
@@ -1917,7 +1910,7 @@ function Detail({
           <>
         <button
           type="button"
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted"
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted hover:bg-ground hover:text-ink"
           onClick={() => {
             void useWorkspace
               .getState()
@@ -1940,7 +1933,7 @@ function Detail({
         {open && (
           <button
             type="button"
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted hover:bg-ground hover:text-ink"
             onClick={() => {
               const reminder = buildReminderMail(state, agreement, window.location.origin);
               if (!reminder.to) return;
@@ -1954,14 +1947,13 @@ function Detail({
         )}
           </>
         )}
-        <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted" onClick={() => window.print()}>
+        <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted hover:bg-ground hover:text-ink" onClick={() => window.print()}>
           <Printer className="size-3.5" />
           Print issued pack
         </button>
       </div>
       <ProgressTrack state={state} agreement={agreement} />
       {error && <p className="mb-3 rounded-md bg-danger-bg px-3 py-2 text-[12px] text-danger-fg">{error}</p>}
-      {notice && <p className="mb-3 rounded-md bg-status-green-bg px-3 py-2 text-[12px] text-status-green-fg">{notice}</p>}
       <Row label="Employee" value={personName(state, agreement.employeeId)} />
       <Row label="Franchisee" value={personName(state, agreement.managerId)} />
       <Row label="SkinPhD branch" value={branchLabel(state, agreement.branchId)} />
@@ -2037,15 +2029,15 @@ function Detail({
             Typed name
             <input autoFocus value={typedName} onChange={(event) => setTypedName(event.target.value)} required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
           </label>
-          <label className="grid grid-cols-[18px_1fr] items-start gap-2 text-[11px] font-medium text-status-green-fg">
-            <Checkbox checked={consent} onCheckedChange={setConsent} />
+          <label htmlFor="consent-checkbox" className="grid grid-cols-[20px_1fr] items-start gap-2 py-1 text-[11px] font-medium text-status-green-fg">
+            <Checkbox id="consent-checkbox" checked={consent} onCheckedChange={setConsent} />
             <span>{consentCopy()}</span>
           </label>
           <div className="sticky bottom-0 z-10 -mx-4 mt-2 flex flex-wrap justify-end gap-2 border-t border-line bg-sage/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-1">
             <button type="button" className="min-h-11 rounded-md border border-danger-line bg-danger-bg px-4 text-xs font-bold text-danger-fg disabled:opacity-65" disabled={saving} onClick={() => void onSign("decline")}>
               Decline
             </button>
-            <button className="min-h-11 min-w-40 rounded-md bg-accent px-4 text-xs font-bold text-paper disabled:opacity-65" disabled={saving}>
+            <button className="min-h-11 min-w-40 rounded-md bg-accent px-4 text-xs font-bold text-paper hover:bg-accent-hover disabled:opacity-65" disabled={saving}>
               {saving ? "Saving…" : "Record typed signature"}
             </button>
           </div>

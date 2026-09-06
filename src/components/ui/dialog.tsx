@@ -15,7 +15,15 @@ export const DialogPortal = Portal;
 export const DialogClose = Close;
 
 export function DialogOverlay({ className, ...props }: ComponentProps<typeof OverlayPrimitive>) {
-  return <OverlayPrimitive className={cn("fixed inset-0 z-20 bg-forest-dark/60 backdrop-blur-sm", className)} {...props} />;
+  return (
+    <OverlayPrimitive
+      className={cn(
+        "fixed inset-0 z-20 bg-forest-dark/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=closed]:duration-150 data-[state=open]:duration-200",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function DialogContent({ className, children, ...props }: ComponentProps<typeof ContentPrimitive>) {
@@ -25,6 +33,7 @@ export function DialogContent({ className, children, ...props }: ComponentProps<
       <ContentPrimitive
         className={cn(
           "fixed top-1/2 left-1/2 z-30 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-xl bg-paper shadow-2xl",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=closed]:duration-150 data-[state=open]:duration-200",
           className,
         )}
         {...props}
@@ -36,7 +45,7 @@ export function DialogContent({ className, children, ...props }: ComponentProps<
 }
 
 export function DialogHeader({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("sticky top-0 z-10 flex items-center justify-between border-b border-line bg-paper/95 px-5 py-4", className)} {...props} />;
+  return <div className={cn("sticky top-0 z-10 flex items-center justify-between border-b border-line bg-paper px-5 py-4", className)} {...props} />;
 }
 
 export function DialogTitle({ className, ...props }: ComponentProps<typeof TitlePrimitive>) {

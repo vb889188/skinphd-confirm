@@ -1,10 +1,11 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @theme {
   --color-forest: #0f3329;
   --color-forest-dark: #0a241d;
   --color-ink: #14201c;
-  --color-muted: #66746e;
+  --color-muted: #5a6862;
   --color-line: #e2e8e4;
   --color-paper: #ffffff;
   --color-ground: #eef3ef;
