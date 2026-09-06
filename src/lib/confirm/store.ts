@@ -123,9 +123,11 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
       signInWithPin: async (email, pin) => {
         const normalized = email.trim().toLowerCase();
         const person = get().people.find((item) => item.email === normalized && item.status === "active");
-        if (!person || !person.pinHash) throw new Error("Check the email and PIN");
+        if (!person || !person.pinHash) throw new Error("No active staff record for that email.");
         const hash = await sha256Hex(`${person.email}|${pin.trim()}`);
-        if (hash !== person.pinHash) throw new Error("Check the email and PIN");
+        if (hash !== person.pinHash) {
+          throw new Error("That PIN does not match. If Head Office emailed a temporary PIN, the old number no longer works.");
+        }
         set({ currentPersonId: person.id, sessionStartedAt: new Date().toISOString() });
         setRemoteActor(person);
         if (remoteEnabled()) {
