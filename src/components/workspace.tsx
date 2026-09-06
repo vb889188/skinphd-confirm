@@ -11,7 +11,7 @@ import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
 import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { can, canViewAgreement } from "@/lib/confirm/access";
-import { fetchEmployeeRecordFile, isProductionMode } from "@/lib/confirm/remote";
+import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode } from "@/lib/confirm/remote";
 import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { haptic } from "@/lib/confirm/haptics";
@@ -804,6 +804,25 @@ export function Workspace() {
                   <button type="button" className="mt-3 block rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setEditingTemplateId(template.id)}>
                     View / edit wording
                   </button>
+                  {template.sourceFileId && (
+                    <button
+                      type="button"
+                      className="mt-2 block rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent"
+                      onClick={() => {
+                        void fetchSourceFile(template.sourceFileId!).then((file) => {
+                          if (!file) return;
+                          const bytes = Uint8Array.from(atob(file.content_base64), (char) => char.charCodeAt(0));
+                          const url = URL.createObjectURL(new Blob([bytes], { type: file.mime_type || "application/octet-stream" }));
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = file.file_name;
+                          link.click();
+                        });
+                      }}
+                    >
+                      Download original file
+                    </button>
+                  )}
                 </article>
               ))}
             </div>
@@ -959,6 +978,26 @@ export function Workspace() {
                     </button>
                     <button
                       type="button"
+                      className="rounded-md border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-accent"
+                      onClick={() => {
+                        void store.issueTemporaryPin(person.id).then((pin) => {
+                          window.location.href = employeeMailHref(
+                            buildWelcomeMail({
+                              fullName: person.fullName,
+                              email: person.email,
+                              role: person.role,
+                              clinic: branchLabel(store, person.branchId),
+                              pin,
+                              siteUrl: window.location.origin,
+                            }),
+                          );
+                        });
+                      }}
+                    >
+                      Email new PIN
+                    </button>
+                    <button
+                      type="button"
                       className="rounded-md border border-danger-line bg-danger-bg px-3 py-1.5 text-[11px] font-bold text-danger-fg"
                       onClick={() => {
                         try {
@@ -1107,7 +1146,7 @@ export function Workspace() {
               <ol className="grid gap-0 px-5 py-2 text-[12px] leading-relaxed">
                 <li className="border-b border-line py-3">1. Add the remaining clinics and the real franchisee, employee and witness names in People and Locations.</li>
                 <li className="border-b border-line py-3">2. Issue one training form and one equipment form, sign all three roles, then print the frozen snapshot.</li>
-                <li className="border-b border-line py-3">3. SkinPhD legal must confirm the source wording, the 80%/90% inconsistencies, and whether payroll-deduction sentences may stay as recorded text only.</li>
+                <li className="border-b border-line py-3">3. Forgotten PIN: Staff → Email new PIN. The old PIN stops. Written steps are in PIN.md.</li>
                 <li className="border-b border-line py-3">4. Before live staff use: private hosting, named logins, and an approved signing method. Do not put live ID numbers into this browser pilot.</li>
                 <li className="py-3">5. Client consultation and treatment consent stay locked until those forms are supplied separately.</li>
               </ol>
