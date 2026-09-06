@@ -135,6 +135,7 @@ export type EmployeeRecord = {
   byteSize: number;
   sha256: string;
   note: string;
+  extractedText: string;
   createdAt: string;
 };
 export type WorkspaceState = {

@@ -106,8 +106,8 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
     rest<PayloadRow[]>("confirm_signing_links?select=*"),
     rest<PayloadRow[]>("confirm_audit?select=*&order=created_at.desc"),
     rest<TemplateRow[]>("confirm_templates?select=*"),
-    rest<{ id: string; person_id: string; file_name: string; mime_type: string; byte_size: number; sha256: string; note: string; created_at: string }[]>(
-      "confirm_employee_records?select=id,person_id,file_name,mime_type,byte_size,sha256,note,created_at&order=created_at.desc",
+    rest<{ id: string; person_id: string; file_name: string; mime_type: string; byte_size: number; sha256: string; note: string; extracted_text?: string; created_at: string }[]>(
+      "confirm_employee_records?select=id,person_id,file_name,mime_type,byte_size,sha256,note,extracted_text,created_at&order=created_at.desc",
     ),
   ]);
 
@@ -187,6 +187,7 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
       byteSize: row.byte_size,
       sha256: row.sha256,
       note: row.note,
+      extractedText: row.extracted_text ?? "",
       createdAt: row.created_at,
     })),
   };
@@ -383,6 +384,7 @@ export async function upsertEmployeeRecord(file: EmployeeRecord & { contentBase6
       byte_size: file.byteSize,
       sha256: file.sha256,
       note: file.note,
+      extracted_text: file.extractedText,
       content_base64: file.contentBase64,
       created_at: file.createdAt,
     }),

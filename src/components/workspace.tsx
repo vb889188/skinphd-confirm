@@ -918,14 +918,15 @@ export function Workspace() {
               <input
                 value={peopleQuery}
                 onChange={(event) => setPeopleQuery(event.target.value)}
-                placeholder="Search name, email, role or SkinPhD branch"
+                placeholder="Search staff or indexed paper packs"
                 aria-label="Search staff"
                 className="min-h-10 rounded-md border border-line bg-paper px-3 text-sm"
               />
               <div className="grid gap-3 sm:grid-cols-2">
               {store.people
                 .filter((person) => {
-                  const haystack = `${person.fullName} ${person.email} ${person.role} ${branchLabel(store, person.branchId)}`.toLowerCase();
+                  const files = (store.records ?? []).filter((item) => item.personId === person.id);
+                  const haystack = `${person.fullName} ${person.email} ${person.role} ${branchLabel(store, person.branchId)} ${files.map((item) => `${item.fileName} ${item.note} ${item.extractedText}`).join(" ")}`.toLowerCase();
                   return !peopleQuery || haystack.includes(peopleQuery.toLowerCase());
                 })
                 .map((person) => (
