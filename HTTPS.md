@@ -10,25 +10,36 @@ Cloudflare → relpdev.uk → DNS
 |---|---|---|---|
 | A | confirm | 139.59.183.201 | Proxied (orange cloud) |
 
-Do not use a grey-cloud record if you want the Cloudflare padlock.
+Delete any AAAA for `confirm`.
 
-## SSL/TLS (padlock first)
-SSL/TLS → Overview → **Flexible**
+## Option A — Flexible (hostname only)
+Do not change SSL/TLS Overview for the whole zone.
 
-Visitor ↔ Cloudflare is HTTPS.  
-Cloudflare ↔ droplet is HTTP on port 80.
+Rules → Configuration Rules → hostname `confirm.relpdev.uk` → SSL **Flexible**.
 
-That matches the current container. Use this until an origin certificate is installed.
+Visitor ↔ Cloudflare is HTTPS. Cloudflare ↔ droplet is HTTP on port 80.
 
-## If you still see 503
-1. Droplet: `curl -I http://127.0.0.1:80` and `curl -I http://127.0.0.1:8080` must return 200.
-2. DigitalOcean firewall and `ufw allow 80/tcp`.
-3. Cloudflare → Rules → Origin Rules: hostname `confirm.relpdev.uk` → destination port `80`.
-4. SSL mode must not be **Full (strict)** while the origin has no certificate.
+## Option B — Origin Certificate + Full (strict) for Confirm
+1. Cloudflare → SSL/TLS → **Origin Server** → Create certificate.
+2. Hostnames: `confirm.relpdev.uk`
+3. Leave Cloudflare as the CA. Create.
+4. Copy **Origin Certificate** to the droplet as `/etc/ssl/cloudflare/origin.pem`
+5. Copy **Private Key** to `/etc/ssl/cloudflare/origin.key`
+6. On the droplet:
 
-## Full (strict) later
-1. Cloudflare → SSL/TLS → Origin Server → Create certificate for `confirm.relpdev.uk`.
-2. Put nginx or Caddy in front of Docker on 443 with that origin cert.
-3. Switch SSL mode to **Full (strict)**.
+```bash
+sudo mkdir -p /etc/ssl/cloudflare
+sudo chmod 600 /etc/ssl/cloudflare/origin.key
+sudo apt-get update && sudo apt-get install -y nginx
+sudo cp /opt/skinphd-confirm/deploy/origin-nginx.conf /etc/nginx/sites-available/confirm
+sudo ln -sf /etc/nginx/sites-available/confirm /etc/nginx/sites-enabled/confirm
+sudo nginx -t && sudo systemctl reload nginx
+sudo ufw allow 443/tcp
+```
 
-Do not turn on **Full (strict)** on HTTP-only Docker. That is what caused 503 before.
+7. Configuration Rule for `confirm.relpdev.uk` → SSL **Full (strict)**  
+   or leave zone Full (strict) if that is already the default.
+
+Cloudflare then talks to the droplet on **443** with a cert Cloudflare trusts. The browser padlock is Cloudflare’s public cert, not this origin file.
+
+Do not commit `origin.pem` or `origin.key` to Git.
