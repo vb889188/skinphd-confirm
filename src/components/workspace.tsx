@@ -420,7 +420,7 @@ export function Workspace() {
   }
 
   const headings: Record<View, string> = {
-    overview: stats.needsAction ? "Waiting on a signature" : "Records are up to date",
+    overview: stats.needsAction ? "Outstanding signatures" : "Records are current",
     agreements: "Agreements",
     templates: "Source forms",
     people: "Staff directory",
@@ -430,7 +430,7 @@ export function Workspace() {
     settings: "Workspace settings",
   };
   const summaries: Record<View, string> = {
-    overview: "Confirm keeps the signed pack when paper is missing. Open a waiting record and type the next name.",
+    overview: "Open a pack to record the next official name. Confirm keeps the frozen copy.",
     agreements: "Each row is a frozen pack. Open it to sign or to retrieve the stored copy.",
     templates: "Approved SkinPhD wording. Upload stores the original file with the text.",
     people: "Employees, franchisees and witnesses who can appear on an agreement.",
@@ -491,9 +491,9 @@ export function Workspace() {
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{summaries[view]}</p>
           </div>
           <div className="flex items-center gap-2.5">
-            <span className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-paper px-3 text-[11px] font-bold text-muted shadow-sm">
-              <b className={cn("grid size-6 place-items-center rounded-full bg-sage text-[10px] text-accent tabular-nums", stats.needsAction > 0 && "live-dot")}>{stats.needsAction}</b>
-              {stats.needsAction ? "live" : "clear"}
+            <span className="inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted">
+              <b className="tabular-nums text-ink">{stats.needsAction}</b>
+              outstanding
             </span>
             <Button variant="secondary" onClick={() => store.signOut()}>
               Sign out
@@ -527,51 +527,45 @@ export function Workspace() {
         {view === "overview" && (
           <div className="mx-auto grid max-w-7xl gap-4">
             {isManager && (
-              <section className="overflow-hidden rounded-3xl border border-white/70 bg-paper/90 p-5 shadow-md backdrop-blur" aria-label="Head Office desk">
-                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <section className="overflow-hidden rounded-md border border-line bg-paper" aria-label="Head Office desk">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
                   <div>
-                    <p className="text-[10px] font-extrabold tracking-[0.16em] text-accent uppercase">Desk</p>
-                    <h2 className="mt-1 font-display text-2xl font-medium">Who signs next</h2>
+                    <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Signature queue</p>
+                    <h2 className="font-display text-xl font-medium">Who signs next</h2>
                   </div>
                   {deskFilter !== "all" && (
-                    <button type="button" className="rounded-full border border-line px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setDeskFilter("all")}>
-                      Clear filter
-                    </button>
+                    <Button variant="secondary" size="sm" onClick={() => setDeskFilter("all")}>
+                      Show all
+                    </Button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-5 sm:divide-y-0">
                   {[
                     ["today", stats.issuedToday, "Issued today"],
                     ["employee", stats.waitingEmployee, "Employee"],
                     ["franchisee", stats.waitingFranchisee, "Franchisee"],
                     ["witness", stats.waitingWitness, "Witness"],
-                    ["remind", stats.remindersDue, "Remind"],
+                    ["remind", stats.remindersDue, "Reminders"],
                   ].map(([id, value, label]) => (
                     <button
                       key={String(id)}
                       type="button"
                       onClick={() => setDeskFilter(id as typeof deskFilter)}
                       className={cn(
-                        "rounded-2xl px-4 py-4 text-left transition",
-                        deskFilter === id
-                          ? "bg-forest text-paper shadow-lg"
-                          : Number(value) === 0
-                            ? "bg-ground text-muted"
-                            : id === "remind"
-                              ? "bg-gold-soft text-gold-fg hover:bg-forest hover:text-paper"
-                              : "bg-sage text-ink hover:bg-forest hover:text-paper",
+                        "px-4 py-4 text-left",
+                        deskFilter === id ? "bg-forest text-paper" : "bg-paper text-ink hover:bg-ground",
                       )}
                     >
-                      <strong className="block font-display text-3xl font-medium tabular-nums leading-none">{value}</strong>
-                      <span className="mt-2 block text-[12px] font-semibold">{label}</span>
+                      <strong className="block font-display text-2xl font-medium tabular-nums leading-none">{value}</strong>
+                      <span className="mt-2 block text-[11px] font-semibold uppercase tracking-[0.08em]">{label}</span>
                     </button>
                   ))}
                 </div>
               </section>
             )}
-            <section className="overflow-hidden rounded-3xl border border-white/70 bg-paper/90 shadow-md">
-              <div className="border-b border-line/70 px-6 py-5">
-                <p className="text-[10px] font-extrabold tracking-[0.16em] text-accent uppercase">Queue</p>
+            <section className="overflow-hidden rounded-md border border-line bg-paper">
+              <div className="border-b border-line px-5 py-4">
+                <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Queue</p>
                 <h2 className="font-display text-xl font-medium">
                   {deskFilter === "employee"
                     ? "Waiting on the employee"
