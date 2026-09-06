@@ -536,38 +536,41 @@ export function Workspace() {
         {view === "overview" && (
           <div className="mx-auto grid max-w-7xl gap-4">
             {isManager && (
-              <section className="overflow-hidden rounded-2xl border border-line bg-paper p-4" aria-label="Head Office desk">
-                <div className="mb-3 flex items-end justify-between gap-3">
+              <section className="overflow-hidden rounded-3xl border border-white/70 bg-paper/90 p-5 shadow-[0_20px_50px_rgba(15,51,41,0.06)] backdrop-blur" aria-label="Head Office desk">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Who is next</p>
-                    <p className="mt-1 text-sm text-muted">Tap a count to show only those packs.</p>
+                    <p className="text-[10px] font-extrabold tracking-[0.16em] text-accent uppercase">Desk</p>
+                    <h2 className="mt-1 font-display text-2xl font-medium">Who signs next</h2>
                   </div>
                   {deskFilter !== "all" && (
-                    <button type="button" className="text-[11px] font-bold text-accent" onClick={() => setDeskFilter("all")}>
-                      Show all waiting
+                    <button type="button" className="rounded-full border border-line px-3 py-1.5 text-[11px] font-bold text-accent" onClick={() => setDeskFilter("all")}>
+                      Clear filter
                     </button>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {[
-                    ["today", stats.issuedToday, "Issued today", "Created today"],
-                    ["employee", stats.waitingEmployee, "Employee", "Name not stored yet"],
-                    ["franchisee", stats.waitingFranchisee, "Franchisee", "Name not stored yet"],
-                    ["witness", stats.waitingWitness, "Witness", "Name not stored yet"],
-                    ["remind", stats.remindersDue, "Remind", "No nudge in 3 days"],
-                  ].map(([id, value, label, hint]) => (
+                    ["today", stats.issuedToday, "Issued today"],
+                    ["employee", stats.waitingEmployee, "Employee"],
+                    ["franchisee", stats.waitingFranchisee, "Franchisee"],
+                    ["witness", stats.waitingWitness, "Witness"],
+                    ["remind", stats.remindersDue, "Remind"],
+                  ].map(([id, value, label]) => (
                     <button
                       key={String(id)}
                       type="button"
                       onClick={() => setDeskFilter(id as typeof deskFilter)}
                       className={cn(
-                        "rounded-xl border px-3 py-3 text-left transition",
-                        deskFilter === id ? "border-accent bg-sage" : "border-line bg-ground hover:border-accent/40",
+                        "rounded-2xl px-4 py-4 text-left transition",
+                        deskFilter === id
+                          ? "bg-forest text-paper shadow-lg"
+                          : Number(value) === 0
+                            ? "bg-ground text-muted"
+                            : "bg-sage text-ink hover:bg-forest hover:text-paper",
                       )}
                     >
-                      <strong className="block font-display text-2xl font-medium tabular-nums">{value}</strong>
-                      <span className="mt-1 block text-[12px] font-bold text-ink">{label}</span>
-                      <span className="mt-0.5 block text-[11px] text-muted">{hint}</span>
+                      <strong className="block font-display text-3xl font-medium tabular-nums leading-none">{value}</strong>
+                      <span className="mt-2 block text-[12px] font-semibold">{label}</span>
                     </button>
                   ))}
                 </div>
