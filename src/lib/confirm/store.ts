@@ -253,6 +253,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const pin = input.pin.trim();
         if (!fullName) throw new Error("Name is required");
         if (!email) throw new Error("Email is required");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid work email");
         if (!/^\d{4,8}$/.test(pin)) throw new Error("Choose a 4 to 8 digit PIN");
         const state = get();
         if (!state.branches.some((branch) => branch.id === input.branchId)) throw new Error("Choose a SkinPhD branch");
@@ -280,6 +281,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const email = input.email.trim().toLowerCase();
         if (!fullName) throw new Error("Name is required");
         if (!email) throw new Error("Email is required");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid work email");
         if (state.people.some((item) => item.id !== input.id && item.email === email)) throw new Error("That email is already in the directory");
         if (!state.branches.some((branch) => branch.id === input.branchId)) throw new Error("Choose a SkinPhD branch");
         const pin = input.pin?.trim();

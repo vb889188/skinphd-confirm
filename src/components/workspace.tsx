@@ -1049,9 +1049,15 @@ export function Workspace() {
               onSubmit={(event) => {
                 event.preventDefault();
                 const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+                const email = String(values.email).trim().toLowerCase();
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                  setError("Enter a valid work email before sending.");
+                  return;
+                }
+                setError("");
                 setPendingPerson({
                   fullName: String(values.fullName).trim(),
-                  email: String(values.email).trim(),
+                  email,
                   role: String(values.role) as Role,
                   branchId: String(values.branchId),
                   pin: String(values.pin).trim(),
