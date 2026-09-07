@@ -70,6 +70,12 @@
     outline-offset: 2px;
   }
 
+  button,
+  [role="button"],
+  select {
+    touch-action: manipulation;
+  }
+
   button:not(:disabled):active {
     transform: scale(0.98);
   }
@@ -142,6 +148,16 @@ body {
   .confirm-card { border-radius: 14px; }
   input, select, textarea { font-size: 16px; } /* prevents iOS zoom while preserving dense desktop type */
   .confirm-main { overflow-x: clip; }
+  .confirm-main .confirm-card,
+  .confirm-main section,
+  .confirm-main article {
+    max-width: 100%;
+  }
+  .confirm-main table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
   .confirm-main .confirm-kicker { font-size: 11px; }
   .confirm-main [class*="text-\[9px\]"], .confirm-main [class*="text-\[10px\]"] { font-size: 11px; }
   details > summary::-webkit-details-marker { display: none; }

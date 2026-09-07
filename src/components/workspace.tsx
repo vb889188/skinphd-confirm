@@ -4,6 +4,7 @@ import {
   Check,
   CircleCheck,
   Clock3,
+  Copy,
   FileText,
   Plus,
   Printer,
@@ -17,7 +18,7 @@ import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
 import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { can, canViewAgreement } from "@/lib/confirm/access";
-import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode } from "@/lib/confirm/remote";
+import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode, remoteEnabled } from "@/lib/confirm/remote";
 import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail } from "@/lib/confirm/email";
 import { deliverMail } from "@/lib/confirm/send-mail";
 import { extractSourceDocument } from "@/lib/confirm/extract";
@@ -46,6 +47,25 @@ function nextStep(state: WorkspaceState, agreement: Agreement) {
   if (!signed.has("manager")) return "Next: the franchisee signs.";
   if (agreement.witnessId && !signed.has("witness")) return "Next: the witness signs.";
   return "Signatures still outstanding.";
+}
+
+function waitingDuration(createdAt: string) {
+  const hours = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 3_600_000));
+  if (hours < 24) return `${Math.max(1, hours)}h waiting`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h waiting`;
+}
+
+function signingGuidance(state: WorkspaceState, agreement: Agreement, issuedToken: string, activeRole?: Role | "") {
+  if (agreement.status === "completed") return "Completed · signed record is kept";
+  if (agreement.status === "declined" || agreement.status === "superseded") return "Closed · no further signatures";
+  const next = agreement.snapshot.signers.find((signer) => !state.signatures.some((item) => item.agreementId === agreement.id && item.role === signer.role && item.outcome === "signed"));
+  if (!next) return "Ready to record";
+  if (issuedToken && activeRole === next.role) return `Code ready · ${roleLabel(next.role)} can record now`;
+  const hasPendingAccess = state.links.some((link) => link.agreementId === agreement.id && link.role === next.role && link.status === "pending");
+  return hasPendingAccess
+    ? `Ready to sign · ${roleLabel(next.role)} has signing access`
+    : `Recommended next signer · ${roleLabel(next.role)} · code not sent`;
 }
 
 function roleLabel(role: string) {
@@ -167,6 +187,7 @@ const toneClass: Record<string, string> = {
 
 export function Workspace() {
   const store = useWorkspace();
+  const { expireSessionIfNeeded, hydrateRemote } = store;
   const current = store.people.find((person) => person.id === store.currentPersonId) ?? null;
   const [view, setView] = useState<View>("overview");
   const [error, setError] = useState("");
@@ -189,9 +210,9 @@ export function Workspace() {
   const [token, setToken] = useState("");
   const [consent, setConsent] = useState(false);
   const [issuedToken, setIssuedToken] = useState("");
-  const [deskFilter, setDeskFilter] = useState<"all" | "today" | "employee" | "franchisee" | "witness" | "remind">("all");
+  const [deskFilter, setDeskFilter] = useState<"all" | "today" | "employee" | "franchisee" | "witness" | "remind" | "completed">("all");
   const [draftTemplateId, setDraftTemplateId] = useState("");
-  const [issuedPin, setIssuedPin] = useState<{ name: string; email: string; pin: string } | null>(null);
+  const [issuedPin, setIssuedPin] = useState<{ personId: string; name: string; email: string; pin: string } | null>(null);
   const [pendingPerson, setPendingPerson] = useState<{
     fullName: string;
     email: string;
@@ -203,11 +224,20 @@ export function Workspace() {
   const [revealedPins, setRevealedPins] = useState<Record<string, string>>({});
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [profileTab, setProfileTab] = useState("overview");
+  const [connectionStatus, setConnectionStatus] = useState<"checking" | "local" | "remote" | "unavailable">(
+    remoteEnabled() ? "checking" : "local",
+  );
 
   useEffect(() => {
-    store.expireSessionIfNeeded();
-    void store.hydrateRemote();
-  }, [store]);
+    expireSessionIfNeeded();
+    void hydrateRemote().then(setConnectionStatus);
+  }, [expireSessionIfNeeded, hydrateRemote]);
+
+  useEffect(() => {
+    setToken("");
+    setIssuedToken("");
+    setConsent(false);
+  }, [selectedId]);
 
   useEffect(() => {
     if (current?.role === "manager") void store.ensurePilotPack();
@@ -255,6 +285,40 @@ export function Workspace() {
       (!templateFilter || item.templateId === templateFilter)
     );
   });
+
+  const dashboardItems = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return visibleAgreements
+      .filter((item) => {
+        const open = item.status === "awaiting_signatures" || item.status === "partially_signed";
+        const signed = (role: Role) =>
+          store.signatures.some((entry) => entry.agreementId === item.id && entry.role === role && entry.outcome === "signed");
+        if (deskFilter === "completed") return item.status === "completed";
+        if (deskFilter === "today") return item.createdAt.slice(0, 10) === today;
+        if (!open) return false;
+        if (deskFilter === "employee") return !signed("employee");
+        if (deskFilter === "franchisee") return !signed("manager");
+        if (deskFilter === "witness") return Boolean(item.witnessId) && !signed("witness");
+        if (deskFilter === "remind") {
+          return !item.lastRemindedAt || Date.now() - new Date(item.lastRemindedAt).getTime() > 3 * 24 * 60 * 60 * 1000;
+        }
+        return true;
+      })
+      .sort((a, b) =>
+        deskFilter === "completed"
+          ? new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+  }, [deskFilter, store.signatures, visibleAgreements]);
+
+  const recentCompleted = useMemo(
+    () =>
+      visibleAgreements
+        .filter((item) => item.status === "completed")
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 3),
+    [visibleAgreements],
+  );
 
   async function onCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -447,6 +511,41 @@ export function Workspace() {
     URL.revokeObjectURL(url);
   }
 
+  function openAgreement(item: Agreement) {
+    setSelectedId(item.id);
+    setView("agreements");
+    const signer = item.snapshot.signers.find((entry) => entry.id === current?.id);
+    if (signer) {
+      setActiveRole(signer.role);
+      setTypedName(signer.name);
+    }
+  }
+
+  async function remindAgreement(item: Agreement) {
+    setError("");
+    try {
+      const reminder = buildReminderMail(store, item, window.location.origin);
+      if (!reminder.to) throw new Error("No outstanding signer email is available for this pack.");
+      store.noteEmailSent(item.id, reminder.to);
+      store.markReminded(item.id);
+      const sent = await deliverMail(reminder);
+      toast.success(sent === "sent" ? "Reminder emailed." : "Finish the reminder in your mail app.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not prepare the reminder.");
+    }
+  }
+
+  function closeIssuedPin() {
+    if (issuedPin) {
+      setRevealedPins((currentPins) => {
+        const nextPins = { ...currentPins };
+        delete nextPins[issuedPin.personId];
+        return nextPins;
+      });
+    }
+    setIssuedPin(null);
+  }
+
   const headings: Record<View, string> = {
     overview: stats.needsAction ? "Outstanding signatures" : "Records are current",
     agreements: "Agreements",
@@ -605,6 +704,8 @@ export function Workspace() {
                 label="Open packs"
                 value={stats.needsAction}
                 note="Waiting on at least one signer"
+                active={deskFilter === "all"}
+                onClick={() => setDeskFilter("all")}
               />
               <Stat
                 icon={<UserRound className="size-4" />}
@@ -612,6 +713,8 @@ export function Workspace() {
                 label="Waiting on staff"
                 value={stats.waitingEmployee}
                 note="Employee signature is next"
+                active={deskFilter === "employee"}
+                onClick={() => setDeskFilter("employee")}
               />
               <Stat
                 icon={<BellRing className="size-4" />}
@@ -619,6 +722,8 @@ export function Workspace() {
                 label="Reminders due"
                 value={stats.remindersDue}
                 note="No reminder in the last 3 days"
+                active={deskFilter === "remind"}
+                onClick={() => setDeskFilter("remind")}
               />
               <Stat
                 icon={<CircleCheck className="size-4" />}
@@ -626,6 +731,8 @@ export function Workspace() {
                 label="Completed"
                 value={stats.completed}
                 note="Frozen signed records retained"
+                active={deskFilter === "completed"}
+                onClick={() => setDeskFilter("completed" as typeof deskFilter)}
               />
             </section>
             {isManager && (
@@ -679,37 +786,18 @@ export function Workspace() {
                           ? "Issued today"
                           : deskFilter === "remind"
                             ? "Need a reminder"
+                            : deskFilter === "completed"
+                              ? "Recently completed"
                             : "Waiting on a signature"}
                 </h2>
               </div>
               <div className="divide-y divide-line">
-                {visibleAgreements.filter((item) => {
-                  const open = item.status === "awaiting_signatures" || item.status === "partially_signed";
-                  const signed = (role: Role) => store.signatures.some((entry) => entry.agreementId === item.id && entry.role === role && entry.outcome === "signed");
-                  const today = new Date().toISOString().slice(0, 10);
-                  if (deskFilter === "today") return item.createdAt.slice(0, 10) === today;
-                  if (!open) return false;
-                  if (deskFilter === "employee") return !signed("employee");
-                  if (deskFilter === "franchisee") return !signed("manager");
-                  if (deskFilter === "witness") return Boolean(item.witnessId) && !signed("witness");
-                  if (deskFilter === "remind") return !item.lastRemindedAt || Date.now() - new Date(item.lastRemindedAt).getTime() > 3 * 24 * 60 * 60 * 1000;
-                  return true;
-                }).map((item) => (
-                  <button
+                {dashboardItems.map((item) => (
+                  <article
                     key={item.id}
-                    type="button"
-                    className="group flex w-full flex-col items-stretch gap-3 px-4 py-4 text-left transition hover:bg-ground sm:flex-row sm:items-center sm:justify-between sm:px-6"
-                    onClick={() => {
-                      setSelectedId(item.id);
-                      setView("agreements");
-                      const signer = item.snapshot.signers.find((entry) => entry.id === current.id);
-                      if (signer) {
-                        setActiveRole(signer.role);
-                        setTypedName(signer.name);
-                      }
-                    }}
+                    className="group flex w-full flex-col items-stretch gap-3 px-4 py-4 transition hover:bg-ground sm:flex-row sm:items-center sm:justify-between sm:px-6"
                   >
-                    <span className="flex min-w-0 items-center gap-3">
+                    <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => openAgreement(item)}>
                       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-sage text-[11px] font-extrabold text-forest">
                         {initials(personName(store, item.employeeId))}
                       </span>
@@ -717,23 +805,51 @@ export function Workspace() {
                       <strong className="block text-sm">{personName(store, item.employeeId)}</strong>
                       <span className="mt-0.5 block text-[12px] text-ink">{packTitle(item.title)}</span>
                       <small className="mt-1 block text-[11px] text-muted">
-                        {nextStep(store, item)} · {branchLabel(store, item.branchId)}
+                        {item.status === "completed" ? `Completed ${shortTime(item.updatedAt)}` : `${nextStep(store, item)} · ${waitingDuration(item.createdAt)}`} · {branchLabel(store, item.branchId)}
                       </small>
-                    </span>
-                    </span>
+                      </span>
+                    </button>
                     <span className="flex items-center justify-between gap-3 sm:justify-end">
                       <ProgressTrack state={store} agreement={item} compact />
-                      <span className="rounded-full bg-forest px-4 py-2 text-[11px] font-bold text-paper transition group-hover:bg-accent">Open</span>
+                      {item.status !== "completed" && can(current, "remind", item.branchId) && (
+                        <Button size="sm" variant="secondary" onClick={() => void remindAgreement(item)}>
+                          <BellRing className="size-3.5" />
+                          Remind
+                        </Button>
+                      )}
+                      <Button size="sm" onClick={() => openAgreement(item)}>Open</Button>
                     </span>
-                  </button>
+                  </article>
                 ))}
-                {visibleAgreements.every((item) => item.status !== "awaiting_signatures" && item.status !== "partially_signed") && (
+                {dashboardItems.length === 0 && (
                   <p className="px-5 py-8 text-[13px] leading-relaxed text-muted">
-                    Nothing is waiting. {isManager ? "Issue an agreement to start a record." : "When Head Office assigns a pack, it will show here."}
+                    {deskFilter === "completed" ? "No completed packs to show yet." : "Nothing is waiting. "}{deskFilter !== "completed" && (isManager ? "Issue an agreement to start a record." : "When Head Office assigns a pack, it will show here.")}
                   </p>
                 )}
               </div>
             </section>
+            {deskFilter !== "completed" && recentCompleted.length > 0 && (
+              <section className="confirm-card overflow-hidden rounded-xl border border-line bg-paper" aria-labelledby="recent-completed-title">
+                <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+                  <div>
+                    <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Kept records</p>
+                    <h2 id="recent-completed-title" className="font-display text-lg font-medium">Recently completed</h2>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => setDeskFilter("completed")}>View all</Button>
+                </div>
+                <div className="divide-y divide-line">
+                  {recentCompleted.map((item) => (
+                    <button key={item.id} type="button" className="flex min-h-12 w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-ground" onClick={() => openAgreement(item)}>
+                      <span className="min-w-0">
+                        <strong className="block truncate text-[12px]">{personName(store, item.employeeId)} · {packTitle(item.title)}</strong>
+                        <small className="text-[11px] text-muted">Completed {shortTime(item.updatedAt)}</small>
+                      </span>
+                      <span className="shrink-0 text-[11px] font-bold text-accent">Open record</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
             {isManager && (
             <section className="confirm-card overflow-hidden rounded-2xl border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
@@ -1107,7 +1223,7 @@ export function Workspace() {
                             setStaffMenuId(null);
                             void store.issueTemporaryPin(person.id).then(async (pin) => {
                               setRevealedPins((current) => ({ ...current, [person.id]: pin }));
-                              setIssuedPin({ name: person.fullName, email: person.email, pin });
+                              setIssuedPin({ personId: person.id, name: person.fullName, email: person.email, pin });
                               const sent = await deliverMail(buildWelcomeMail({ fullName: person.fullName, email: person.email, role: person.role, clinic: branchLabel(store, person.branchId), pin, siteUrl: window.location.origin }));
                               toast.success(sent === "sent" ? `PIN emailed to ${person.email}.` : `Temporary PIN ready for ${person.fullName}.`);
                             });
@@ -1166,20 +1282,29 @@ export function Workspace() {
               <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Add to directory</p>
               <h2 className="mb-3 font-display text-xl font-medium">New person</h2>
               <div className="grid gap-2.5">
-                <label className="grid gap-1 text-[11px] font-bold text-muted">Full name<input name="fullName" required placeholder="Full name" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" /></label>
-                <label className="grid gap-1 text-[11px] font-bold text-muted">Work email<input name="email" required type="email" placeholder="Work email" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" /></label>
-                <label className="grid gap-1 text-[11px] font-bold text-muted">Temporary PIN<input name="pin" required inputMode="numeric" minLength={4} maxLength={8} placeholder="4–8 digit PIN" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" /></label>
-                <label className="grid gap-1 text-[11px] font-bold text-muted">Role<select name="role" required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink">
+                <fieldset className="grid gap-2 rounded-lg border border-line bg-ground/40 p-3">
+                  <legend className="px-1 text-[10px] font-extrabold tracking-[0.12em] text-accent uppercase">Identity</legend>
+                  <label className="grid gap-1 text-[11px] font-bold text-muted">Full name <span className="text-danger-fg">*</span><input name="fullName" required autoComplete="name" placeholder="e.g. Lerato Mokoena" className="min-h-11 rounded-md border border-line bg-paper px-2.5 text-sm font-normal text-ink" /></label>
+                  <label className="grid gap-1 text-[11px] font-bold text-muted">Work email <span className="text-danger-fg">*</span><input name="email" required type="email" autoComplete="email" placeholder="name@skinphd.co.za" className="min-h-11 rounded-md border border-line bg-paper px-2.5 text-sm font-normal text-ink" /></label>
+                </fieldset>
+                <fieldset className="grid gap-2 rounded-lg border border-line bg-ground/40 p-3">
+                  <legend className="px-1 text-[10px] font-extrabold tracking-[0.12em] text-accent uppercase">Access</legend>
+                  <label className="grid gap-1 text-[11px] font-bold text-muted">Temporary PIN <span className="text-danger-fg">*</span><input name="pin" required inputMode="numeric" pattern="[0-9]{4,8}" minLength={4} maxLength={8} autoComplete="off" placeholder="4–8 digits" className="min-h-11 rounded-md border border-line bg-paper px-2.5 text-sm font-normal text-ink" /><small className="font-normal text-muted">Keep this private. A new PIN can replace it later.</small></label>
+                  <label className="grid gap-1 text-[11px] font-bold text-muted">Role <span className="text-danger-fg">*</span><select name="role" required className="min-h-11 rounded-md border border-line bg-paper px-2.5 text-sm font-normal text-ink">
                   <option value="employee">Employee / applicant</option>
                   <option value="manager">Franchisee / manager</option>
                   <option value="witness">Witness</option>
                 </select></label>
-                <label className="grid gap-1 text-[11px] font-bold text-muted">SkinPhD branch<select name="branchId" required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink">
+                </fieldset>
+                <fieldset className="grid gap-2 rounded-lg border border-line bg-ground/40 p-3">
+                  <legend className="px-1 text-[10px] font-extrabold tracking-[0.12em] text-accent uppercase">Assignment</legend>
+                  <label className="grid gap-1 text-[11px] font-bold text-muted">SkinPhD branch <span className="text-danger-fg">*</span><select name="branchId" required className="min-h-11 rounded-md border border-line bg-paper px-2.5 text-sm font-normal text-ink">
                   {store.branches.map((branch) => (
                     <option key={branch.id} value={branch.id}>{branch.name}</option>
                   ))}
                 </select></label>
-                <Button type="submit">Add person</Button>
+                </fieldset>
+                <Button type="submit" className="mt-1">Add person</Button>
               </div>
             </form>
           </div>
@@ -1356,7 +1481,15 @@ export function Workspace() {
 
         <footer className="mx-auto mt-5 flex max-w-7xl justify-between text-[9px] text-muted">
           <span>SkinPhD Confirm</span>
-          <span>Private employee agreement workspace</span>
+          <span>
+            {connectionStatus === "checking"
+              ? "Checking cloud records…"
+              : connectionStatus === "remote"
+                ? "Cloud records loaded"
+                : connectionStatus === "unavailable"
+                  ? "Cloud unavailable · using local records"
+                  : "Local workspace"}
+          </span>
         </footer>
       </section>
 
@@ -1382,6 +1515,7 @@ export function Workspace() {
                     try {
                       const id = await store.addPerson(draft);
                       setRevealedPins((current) => ({ ...current, [id]: draft.pin }));
+                      setIssuedPin({ personId: id, name: draft.fullName, email: draft.email, pin: draft.pin });
                       const sent = await deliverMail(
                         buildWelcomeMail({
                           fullName: draft.fullName,
@@ -1409,13 +1543,33 @@ export function Workspace() {
       )}
 
       {issuedPin && (
-        <Modal onClose={() => setIssuedPin(null)} title={issuedPin.name} eyebrow="Temporary PIN">
+        <Modal onClose={closeIssuedPin} title={issuedPin.name} eyebrow="Temporary PIN">
           <div className="grid gap-3 px-5 py-5">
             <p className="text-[13px] leading-relaxed text-muted">
               The previous PIN for {issuedPin.email} no longer works. Send this number privately. Confirm will not show it again.
             </p>
-            <p className="font-display text-4xl font-medium tracking-[0.2em] text-ink">{issuedPin.pin}</p>
-            <Button onClick={() => setIssuedPin(null)}>I have sent it</Button>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-ground px-4 py-3">
+              <p className="font-display text-4xl font-medium tracking-[0.2em] text-ink">{issuedPin.pin}</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Copy temporary PIN"
+                onClick={() => {
+                  if (!navigator.clipboard) {
+                    toast.error("Copy is unavailable in this browser. Select the PIN and copy it manually.");
+                    return;
+                  }
+                  void navigator.clipboard
+                    .writeText(issuedPin.pin)
+                    .then(() => toast.success("Temporary PIN copied. Share it privately."))
+                    .catch(() => toast.error("Could not copy the PIN. Select it and copy it manually."));
+                }}
+              >
+                <Copy className="size-3.5" /> Copy
+              </Button>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted">Share the PIN through a private channel. Do not place it in a shared note or email thread. It is temporary UI state and cannot be recovered here.</p>
+            <Button onClick={closeIssuedPin}>I have sent it</Button>
           </div>
         </Modal>
       )}
@@ -1996,7 +2150,7 @@ function NavButton({
   );
 }
 
-function Stat({ icon, tone, label, value, note }: { icon: ReactNode; tone: "green" | "amber" | "blue" | "slate" | "violet"; label: string; value: number; note: string }) {
+function Stat({ icon, tone, label, value, note, onClick, active }: { icon: ReactNode; tone: "green" | "amber" | "blue" | "slate" | "violet"; label: string; value: number; note: string; onClick?: () => void; active?: boolean }) {
   const iconTone = {
     green: "bg-status-green-bg text-status-green-fg",
     amber: "bg-status-amber-bg text-status-amber-fg",
@@ -2005,7 +2159,13 @@ function Stat({ icon, tone, label, value, note }: { icon: ReactNode; tone: "gree
     violet: "bg-status-violet-bg text-status-violet-fg",
   }[tone];
   return (
-    <article className="confirm-card confirm-stat min-h-32 rounded-2xl border border-line bg-paper p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5">
+    <article
+      className={cn("confirm-card confirm-stat min-h-32 rounded-2xl border border-line bg-paper p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5", onClick && "cursor-pointer", active && "border-accent bg-sage/50 ring-1 ring-accent/20")}
+      onClick={onClick}
+      onKeyDown={(event) => { if (onClick && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onClick(); } }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div className="flex items-start justify-between gap-3">
         <span className={cn("grid size-8 place-items-center rounded-lg", iconTone)}>{icon}</span>
         <strong className="font-display text-3xl font-medium tabular-nums">{value}</strong>
@@ -2268,7 +2428,7 @@ function Detail({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="confirm-kicker text-[9px] text-muted uppercase">Current status</p>
-            <p className="mt-1 text-sm font-semibold text-ink">{nextStep(state, agreement)}</p>
+            <p className="mt-1 text-sm font-semibold text-ink">{signingGuidance(state, agreement, issuedToken, activeRole)}</p>
           </div>
           <b className={cn("inline-flex rounded-full px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.06em]", toneClass[STATUS_TONE[agreement.status]])}>
             {STATUS_LABEL[agreement.status]}
@@ -2301,7 +2461,7 @@ function Detail({
             </span>
             <div>
               <p className="confirm-kicker text-[9px] text-muted uppercase">Controlled signing</p>
-              <p className="mt-0.5 text-[12px] font-semibold text-status-green-fg">{nextStep(state, agreement)}</p>
+              <p className="mt-0.5 text-[12px] font-semibold text-status-green-fg">{signingGuidance(state, agreement, issuedToken, activeRole)}</p>
             </div>
           </div>
       <div className="grid gap-2 sm:grid-cols-3">

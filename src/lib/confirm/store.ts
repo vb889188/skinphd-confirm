@@ -61,7 +61,7 @@ type Actions = {
   expireSessionIfNeeded: () => void;
   signOut: () => void;
   ensurePilotPack: () => Promise<string | null>;
-  hydrateRemote: () => Promise<void>;
+  hydrateRemote: () => Promise<"local" | "remote" | "unavailable">;
   addPerson: (input: { fullName: string; email: string; role: Role; branchId: string; pin: string }) => Promise<string>;
   updatePerson: (input: { id: string; fullName: string; email: string; role: Role; branchId: string; status: "active" | "inactive"; pin?: string }) => Promise<void>;
   removePerson: (id: string) => Promise<void>;
@@ -203,7 +203,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         set({ currentPersonId: null, sessionStartedAt: null });
       },
       hydrateRemote: async () => {
-        if (!remoteEnabled()) return;
+        if (!remoteEnabled()) return "local";
         const me = get().people.find((item) => item.id === get().currentPersonId);
         if (me) setRemoteActor(me);
         try {
@@ -227,8 +227,10 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             audit: remote.audit.length ? remote.audit : state.audit,
             records: remote.records ?? state.records ?? [],
           });
+          return "remote";
         } catch {
           /* keep local cache if the project is unreachable */
+          return "unavailable";
         }
       },
       ensurePilotPack: async () => {
