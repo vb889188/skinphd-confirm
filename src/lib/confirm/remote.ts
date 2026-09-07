@@ -332,6 +332,15 @@ export async function upsertTemplate(template: Template) {
 export async function persistPerson(person: Person) {
   if (!remoteEnabled()) return;
   await upsertPerson(person);
+  await rest(`confirm_people?id=eq.${encodeURIComponent(person.id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      pin_hash: person.pinHash,
+      email: person.email,
+      status: person.status,
+      updated_at: new Date().toISOString(),
+    }),
+  });
 }
 
 export async function persistWorkspace(state: WorkspaceState) {

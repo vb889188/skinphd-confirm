@@ -2160,33 +2160,27 @@ function Detail({
         <Modal onClose={() => setPackPreview(false)} title="Send employee pack?" eyebrow="Confirm mail">
           <div className="grid gap-3 px-5 py-5">
             <p className="text-[13px] leading-relaxed text-muted">
-              This emails the pack and a new PIN from info@relpdev.uk. The old PIN for this person will stop working.
+              This emails the pack from info@relpdev.uk. The current PIN stays valid.
             </p>
             <div className="rounded-md border border-line bg-ground px-3 py-3 text-[13px]">
               <p><strong>To</strong> {employee?.email || "No email on file"}</p>
               <p className="mt-1"><strong>Name</strong> {employee?.fullName || "Employee"}</p>
               <p className="mt-1"><strong>Pack</strong> {agreement.title}</p>
-              <p className="mt-1"><strong>PIN</strong> A new 4-digit PIN is created when you send.</p>
+              <p className="mt-1"><strong>PIN</strong> Not changed. Use Email new PIN on Staff only if they lost it.</p>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setPackPreview(false)}>Cancel</Button>
               <Button
                 disabled={!employee?.email}
                 onClick={() => {
-                  void useWorkspace
-                    .getState()
-                    .issueTemporaryPin(agreement.employeeId)
-                    .then(async (pin) => {
-                      const pack = buildEmployeeMail(useWorkspace.getState(), agreement, window.location.origin, pin);
-                      if (!pack.to) return;
-                      recordEmail(agreement.id, pack.to);
-                      const sent = await deliverMail(pack);
-                      setPackPreview(false);
-                      toast.success(sent === "sent" ? `Pack emailed to ${pack.to}.` : "Finish the pack email in your mail app.");
-                    })
-                    .catch((err) => {
-                      toast.error(err instanceof Error ? err.message : "Could not send the pack");
-                    });
+                  void (async () => {
+                    const pack = buildEmployeeMail(useWorkspace.getState(), agreement, window.location.origin);
+                    if (!pack.to) return;
+                    recordEmail(agreement.id, pack.to);
+                    const sent = await deliverMail(pack);
+                    setPackPreview(false);
+                    toast.success(sent === "sent" ? `Pack emailed to ${pack.to}.` : "Finish the pack email in your mail app.");
+                  })();
                 }}
               >
                 Send email
@@ -2506,7 +2500,7 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
           </Button>
           {isProductionMode() ? (
             <p className="text-[12px] leading-relaxed text-muted">
-              Sessions expire after 8 hours. Change the PIN after first use.
+              The PIN does not expire. Head Office can email a new one from Staff if it is lost.
             </p>
           ) : (
             <p className="text-[12px] leading-relaxed text-muted">

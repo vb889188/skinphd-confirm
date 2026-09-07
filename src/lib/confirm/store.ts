@@ -194,10 +194,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return pin;
       },
       expireSessionIfNeeded: () => {
-        const started = get().sessionStartedAt;
-        if (!started) return;
-        const age = Date.now() - new Date(started).getTime();
-        if (age > 8 * 60 * 60 * 1000) set({ currentPersonId: null, sessionStartedAt: null });
+        /* PINs and sessions do not expire in this pilot. */
       },
       signOut: () => {
         setRemoteActor(null);
