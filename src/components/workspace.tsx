@@ -1114,8 +1114,11 @@ export function Workspace() {
                           }}>Email new PIN</button>
                           {person.status === "active" ? (
                             <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-bold text-danger-fg hover:bg-danger-bg" onClick={() => {
-                              try { store.removePerson(person.id); setPeopleStatus("inactive"); setStaffMenuId(null); toast.success(`${person.fullName} moved to Inactive.`); }
-                              catch (err) { setError(err instanceof Error ? err.message : "Could not deactivate the person"); }
+                              void store.removePerson(person.id).then(() => {
+                                setPeopleStatus("inactive");
+                                setStaffMenuId(null);
+                                toast.success(`${person.fullName} moved to Inactive.`);
+                              }).catch((err) => setError(err instanceof Error ? err.message : "Could not deactivate the person"));
                             }}>Deactivate</button>
                           ) : (
                             <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-bold text-accent hover:bg-sage" onClick={() => {

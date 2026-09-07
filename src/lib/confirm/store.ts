@@ -64,7 +64,7 @@ type Actions = {
   hydrateRemote: () => Promise<void>;
   addPerson: (input: { fullName: string; email: string; role: Role; branchId: string; pin: string }) => Promise<string>;
   updatePerson: (input: { id: string; fullName: string; email: string; role: Role; branchId: string; status: "active" | "inactive"; pin?: string }) => Promise<void>;
-  removePerson: (id: string) => void;
+  removePerson: (id: string) => Promise<void>;
   reactivatePerson: (id: string) => Promise<void>;
   addTemplate: (input: {
     name: string;
@@ -208,7 +208,8 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           const people = remote.people.length
             ? remote.people.map((person) => {
                 const local = state.people.find((item) => item.id === person.id || item.email.toLowerCase() === person.email.toLowerCase());
-                if (local?.pinHash && !person.pinHash) return { ...person, pinHash: local.pinHash };
+                if (local?.pinHash && !person.pinHash) person = { ...person, pinHash: local.pinHash };
+                if (local?.status === "inactive") person = { ...person, status: "inactive" };
                 return person;
               })
             : state.people;
@@ -298,7 +299,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         });
         void persistWorkspace(get()).catch(() => undefined);
       },
-      removePerson: (id) => {
+      removePerson: async (id) => {
         const state = get();
         const person = state.people.find((item) => item.id === id);
         if (!person) throw new Error("Choose a person first");
@@ -308,8 +309,9 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           (item) => item.employeeId === id || item.managerId === id || item.witnessId === id,
         );
         const now = new Date().toISOString();
+        const updated = { ...person, status: "inactive" as const };
         set({
-          people: state.people.map((item) => (item.id === id ? { ...item, status: "inactive" as const } : item)),
+          people: state.people.map((item) => (item.id === id ? updated : item)),
           audit: [
             {
               id: randomId("AUD"),
@@ -324,7 +326,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistPerson({ ...person, status: "inactive" }).catch(() => undefined);
+        await persistPerson(updated);
       },
       reactivatePerson: async (id) => {
         const state = get();
