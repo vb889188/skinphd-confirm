@@ -345,6 +345,8 @@ export async function persistPerson(person: Person) {
 
 export async function persistWorkspace(state: WorkspaceState) {
   if (!remoteEnabled()) return;
+  const me = state.people.find((item) => item.id === state.currentPersonId);
+  if (me) setRemoteActor(me);
   await Promise.all([
     ...state.branches.map(upsertClinic),
     ...state.people.map(upsertPerson),

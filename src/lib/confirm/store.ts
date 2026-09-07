@@ -119,6 +119,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
       signIn: (personId) => {
         const person = get().people.find((item) => item.id === personId && item.status === "active");
         if (!person) throw new Error("Choose an active workspace identity");
+        setRemoteActor(person);
         set({ currentPersonId: person.id, sessionStartedAt: new Date().toISOString() });
       },
       signInWithPin: async (email, pin) => {
@@ -163,14 +164,15 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (!/^\d{4,8}$/.test(nextPin.trim())) throw new Error("Choose a 4 to 8 digit PIN");
         const pinHash = await sha256Hex(`${person.email.trim().toLowerCase()}|${nextPin.trim()}`);
         const now = new Date().toISOString();
+        const updated = { ...person, pinHash };
         set({
-          people: state.people.map((item) => (item.id === person.id ? { ...item, pinHash } : item)),
+          people: state.people.map((item) => (item.id === person.id ? updated : item)),
           audit: [
             { id: randomId("AUD"), agreementId: null, actor: person.email, action: "PIN changed", detail: `${person.fullName} changed their workspace PIN.`, createdAt: now },
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        await persistPerson(updated);
       },
       issueTemporaryPin: async (personId) => {
         requireCapability(actor(get()), "staff", "Issue a temporary PIN");
@@ -290,16 +292,15 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (pin && !/^\d{4,8}$/.test(pin)) throw new Error("Choose a 4 to 8 digit PIN");
         const pinHash = pin ? await sha256Hex(`${email}|${pin}`) : person.pinHash;
         const now = new Date().toISOString();
+        const updated = { ...person, fullName, email, role: input.role, branchId: input.branchId, status: input.status, pinHash };
         set({
-          people: state.people.map((item) =>
-            item.id === input.id ? { ...item, fullName, email, role: input.role, branchId: input.branchId, status: input.status, pinHash } : item,
-          ),
+          people: state.people.map((item) => (item.id === input.id ? updated : item)),
           audit: [
             { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person updated", detail: `${fullName} details were updated.`, createdAt: now },
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        await persistPerson(updated);
       },
       removePerson: async (id) => {
         const state = get();
