@@ -11,7 +11,7 @@ import {
   requiredSignatureCount,
 } from "./rules";
 import type { Agreement, EmployeeRecord, Role, Snapshot, WorkspaceState } from "./types";
-import { persistWorkspace, loadRemoteWorkspace, remoteEnabled, setRemoteActor, upsertEmployeeRecord, upsertSourceFile } from "./remote";
+import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, upsertEmployeeRecord, upsertSourceFile } from "./remote";
 import { requireCapability } from "./access";
 import { recognizeDocument } from "./ocr";
 
@@ -160,7 +160,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const currentHash = await sha256Hex(`${person.email}|${currentPin.trim()}`);
         if (currentHash !== person.pinHash) throw new Error("Current PIN is not correct");
         if (!/^\d{4,8}$/.test(nextPin.trim())) throw new Error("Choose a 4 to 8 digit PIN");
-        const pinHash = await sha256Hex(`${person.email}|${nextPin.trim()}`);
+        const pinHash = await sha256Hex(`${person.email.trim().toLowerCase()}|${nextPin.trim()}`);
         const now = new Date().toISOString();
         set({
           people: state.people.map((item) => (item.id === person.id ? { ...item, pinHash } : item)),
@@ -177,16 +177,18 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const person = state.people.find((item) => item.id === personId);
         if (!person) throw new Error("Choose a staff record first");
         const pin = String(1000 + Math.floor(Math.random() * 9000));
-        const pinHash = await sha256Hex(`${person.email}|${pin}`);
+        const email = person.email.trim().toLowerCase();
+        const pinHash = await sha256Hex(`${email}|${pin}`);
         const now = new Date().toISOString();
+        const updated = { ...person, email, pinHash };
         set({
-          people: state.people.map((item) => (item.id === person.id ? { ...item, pinHash } : item)),
+          people: state.people.map((item) => (item.id === person.id ? updated : item)),
           audit: [
             { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Temporary PIN issued", detail: `A new sign-in PIN was issued for ${person.fullName}.`, createdAt: now },
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        await persistPerson(updated);
         return pin;
       },
       expireSessionIfNeeded: () => {
@@ -258,14 +260,15 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const id = randomId("PER");
         const now = new Date().toISOString();
         const pinHash = await sha256Hex(`${email}|${pin}`);
+        const created = { id, branchId: input.branchId, fullName, email, role: input.role, status: "active" as const, pinHash, scope: input.role === "manager" ? "clinic" as const : "self" as const, createdAt: now };
         set({
-          people: [...state.people, { id, branchId: input.branchId, fullName, email, role: input.role, status: "active", pinHash, scope: input.role === "manager" ? "clinic" : "self", createdAt: now }],
+          people: [...state.people, created],
           audit: [
             { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person added", detail: `${fullName} was added as ${input.role}.`, createdAt: now },
             ...state.audit,
           ],
         });
-        await persistWorkspace(get());
+        await persistPerson(created);
         return id;
       },
       updatePerson: async (input) => {

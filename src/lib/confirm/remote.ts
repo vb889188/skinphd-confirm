@@ -329,6 +329,11 @@ export async function upsertTemplate(template: Template) {
   });
 }
 
+export async function persistPerson(person: Person) {
+  if (!remoteEnabled()) return;
+  await upsertPerson(person);
+}
+
 export async function persistWorkspace(state: WorkspaceState) {
   if (!remoteEnabled()) return;
   await Promise.all([
