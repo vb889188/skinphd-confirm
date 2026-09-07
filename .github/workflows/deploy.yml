@@ -14,7 +14,8 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - run: npm install
+      - name: Install
+        run: npm install --no-audit --no-fund --legacy-peer-deps
       - run: npx tsc --noEmit
 
   deploy:
