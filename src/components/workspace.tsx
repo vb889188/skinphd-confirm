@@ -12,7 +12,8 @@ import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { can, canViewAgreement } from "@/lib/confirm/access";
 import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode } from "@/lib/confirm/remote";
-import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail, employeeMailHref } from "@/lib/confirm/email";
+import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail } from "@/lib/confirm/email";
+import { deliverMail } from "@/lib/confirm/send-mail";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { haptic } from "@/lib/confirm/haptics";
 import { toast } from "sonner";
@@ -273,20 +274,19 @@ export function Workspace() {
       const franchisee = store.people.find((person) => person.id === String(values.managerId));
       const employee = store.people.find((person) => person.id === String(values.employeeId));
       if (franchisee?.email && created) {
-        window.open(
-          employeeMailHref(
-            buildFranchiseeIssuedMail({
-              toName: franchisee.fullName,
-              toEmail: franchisee.email,
-              title: created.title,
-              employeeName: employee?.fullName ?? "Employee",
-              siteUrl: window.location.origin,
-            }),
-          ),
-          "_self",
+        const sent = await deliverMail(
+          buildFranchiseeIssuedMail({
+            toName: franchisee.fullName,
+            toEmail: franchisee.email,
+            title: created.title,
+            employeeName: employee?.fullName ?? "Employee",
+            siteUrl: window.location.origin,
+          }),
         );
+        toast.success(sent === "sent" ? "Pack issued and emailed to the franchisee." : "Pack issued. Finish the franchisee email in your mail app.");
+      } else {
+        toast.success("Pack issued.");
       }
-      toast.success("Pack issued. Tell the franchisee and send the employee the pack email.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the agreement");
     } finally {
@@ -323,7 +323,10 @@ export function Workspace() {
       );
       if (action === "sign" && latest?.status === "completed") {
         const mail = buildSignedRecordMail(useWorkspace.getState(), latest, window.location.origin);
-        if (mail.to) window.open(employeeMailHref(mail), "_self");
+        if (mail.to) {
+          const sent = await deliverMail(mail);
+          toast.success(sent === "sent" ? "Signed pack emailed." : "Finish the signed-pack email in your mail app.");
+        }
       } else if (action === "sign" && latest) {
         const snapshot = useWorkspace.getState();
         const next = latest.snapshot.signers.find(
@@ -331,18 +334,15 @@ export function Workspace() {
         );
         const person = next ? snapshot.people.find((item) => item.id === next.id) : null;
         if (person?.email && next) {
-          window.open(
-            employeeMailHref(
-              buildNextSignerMail({
-                toName: person.fullName,
-                toEmail: person.email,
-                title: latest.title,
-                role: next.role === "manager" ? "franchisee" : next.role,
-                previousSigner: typedName,
-                siteUrl: window.location.origin,
-              }),
-            ),
-            "_self",
+          await deliverMail(
+            buildNextSignerMail({
+              toName: person.fullName,
+              toEmail: person.email,
+              title: latest.title,
+              role: next.role === "manager" ? "franchisee" : next.role,
+              previousSigner: typedName,
+              siteUrl: window.location.origin,
+            }),
           );
         }
       }
@@ -377,9 +377,8 @@ export function Workspace() {
       setActiveRole(role);
       setToken(result.code);
       setIssuedToken(result.code);
-      toast.success(`Sign code ${result.code} prepared for ${result.email}.`);
       const signer = selected.snapshot.signers.find((item) => item.role === role);
-      window.location.href = employeeMailHref(
+      const sent = await deliverMail(
         buildSignCodeMail({
           fullName: signer?.name ?? "",
           email: result.email,
@@ -388,6 +387,7 @@ export function Workspace() {
           siteUrl: window.location.origin,
         }),
       );
+      toast.success(sent === "sent" ? `Sign code emailed to ${result.email}.` : `Sign code ${result.code} ready. Finish the email in your mail app.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not email the sign code");
     } finally {
@@ -997,10 +997,9 @@ export function Workspace() {
                       size="sm"
                       variant="secondary"
                       onClick={() => {
-                        void store.issueTemporaryPin(person.id).then((pin) => {
+                        void store.issueTemporaryPin(person.id).then(async (pin) => {
                           setIssuedPin({ name: person.fullName, email: person.email, pin });
-                          toast.success(`Temporary PIN ready for ${person.fullName}.`);
-                          window.location.href = employeeMailHref(
+                          const sent = await deliverMail(
                             buildWelcomeMail({
                               fullName: person.fullName,
                               email: person.email,
@@ -1010,6 +1009,7 @@ export function Workspace() {
                               siteUrl: window.location.origin,
                             }),
                           );
+                          toast.success(sent === "sent" ? `PIN emailed to ${person.email}.` : `Temporary PIN ready for ${person.fullName}.`);
                         });
                       }}
                     >
@@ -1062,7 +1062,8 @@ export function Workspace() {
                     });
                     form.reset();
                     setError("");
-                    window.location.href = employeeMailHref(mail);
+                    const sent = await deliverMail(mail);
+                    toast.success(sent === "sent" ? `Sign-in details emailed to ${mail.to}.` : "Finish the welcome email in your mail app.");
                   } catch (err) {
                     setError(err instanceof Error ? err.message : "Could not add the person");
                   }
@@ -1432,10 +1433,10 @@ export function Workspace() {
                   status: String(values.status) as "active" | "inactive",
                   pin: String(values.pin || "") || undefined,
                 })
-                .then(() => {
+                .then(async () => {
                   const pin = String(values.pin || "");
                   if (pin) {
-                    window.location.href = employeeMailHref(
+                    await deliverMail(
                       buildWelcomeMail({
                         fullName: String(values.fullName),
                         email: String(values.email),
@@ -1982,15 +1983,16 @@ function Detail({
             void useWorkspace
               .getState()
               .issueTemporaryPin(agreement.employeeId)
-              .then((pin) => {
+              .then(async (pin) => {
                 const pack = buildEmployeeMail(useWorkspace.getState(), agreement, window.location.origin, pin);
                 if (!pack.to) return;
                 recordEmail(agreement.id, pack.to);
-                window.location.href = employeeMailHref(pack);
+                const sent = await deliverMail(pack);
+                toast.success(sent === "sent" ? `Pack emailed to ${pack.to}.` : "Finish the pack email in your mail app.");
               })
-              .catch((err) => {
+              .catch(async (err) => {
                 const pack = buildEmployeeMail(state, agreement, window.location.origin);
-                if (pack.to) window.location.href = employeeMailHref(pack);
+                if (pack.to) await deliverMail(pack);
                 console.warn(err);
               });
           }}
@@ -2006,7 +2008,9 @@ function Detail({
               if (!reminder.to) return;
               recordEmail(agreement.id, reminder.to);
               useWorkspace.getState().markReminded(agreement.id);
-              window.location.href = employeeMailHref(reminder);
+              void deliverMail(reminder).then((sent) => {
+                toast.success(sent === "sent" ? "Reminder emailed." : "Finish the reminder in your mail app.");
+              });
             }}
           >
             Remind outstanding signers
