@@ -177,6 +177,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const state = get();
         const person = state.people.find((item) => item.id === personId);
         if (!person) throw new Error("Choose a staff record first");
+        if (person.status !== "active") throw new Error("Reactivate this person before issuing a PIN");
         const pin = String(1000 + Math.floor(Math.random() * 9000));
         const email = person.email.trim().toLowerCase();
         const pinHash = await sha256Hex(`${email}|${pin}`);
