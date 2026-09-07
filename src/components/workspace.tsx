@@ -607,7 +607,7 @@ export function Workspace() {
                   <button
                     key={item.id}
                     type="button"
-                    className="flex w-full flex-col gap-2 px-6 py-4 text-left transition hover:bg-sage/60 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex w-full items-center gap-4 px-6 py-4 text-left transition hover:bg-ground sm:justify-between"
                     onClick={() => {
                       setSelectedId(item.id);
                       setView("agreements");
@@ -618,9 +618,17 @@ export function Workspace() {
                       }
                     }}
                   >
-                    <span className="min-w-0">
-                      <strong className="block text-sm">{packTitle(item.title)}</strong>
-                      <small className="text-[12px] text-muted">{nextStep(store, item)}</small>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-sage text-[11px] font-extrabold text-forest">
+                        {initials(personName(store, item.employeeId))}
+                      </span>
+                      <span className="min-w-0">
+                      <strong className="block text-sm">{personName(store, item.employeeId)}</strong>
+                      <span className="mt-0.5 block text-[12px] text-ink">{packTitle(item.title)}</span>
+                      <small className="mt-1 block text-[11px] text-muted">
+                        {nextStep(store, item)} · {branchLabel(store, item.branchId)}
+                      </small>
+                    </span>
                     </span>
                     <span className="flex items-center gap-3">
                       <ProgressTrack state={store} agreement={item} compact />
