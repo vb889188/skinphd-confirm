@@ -295,23 +295,22 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           (item) => item.employeeId === id || item.managerId === id || item.witnessId === id,
         );
         const now = new Date().toISOString();
-        if (linked) {
-          set({
-            people: state.people.map((item) => (item.id === id ? { ...item, status: "inactive" as const } : item)),
-            audit: [
-              { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person deactivated", detail: `${person.fullName} was deactivated because signed records still name them.`, createdAt: now },
-              ...state.audit,
-            ],
-          });
-        } else {
-          set({
-            people: state.people.filter((item) => item.id !== id),
-            audit: [
-              { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person removed", detail: `${person.fullName} was removed from the directory.`, createdAt: now },
-              ...state.audit,
-            ],
-          });
-        }
+        set({
+          people: state.people.map((item) => (item.id === id ? { ...item, status: "inactive" as const } : item)),
+          audit: [
+            {
+              id: randomId("AUD"),
+              agreementId: null,
+              actor: ACTOR,
+              action: "Person deactivated",
+              detail: linked
+                ? `${person.fullName} was deactivated. Signed packs that name them stay intact.`
+                : `${person.fullName} was deactivated and stays on Staff as Inactive.`,
+              createdAt: now,
+            },
+            ...state.audit,
+          ],
+        });
         void persistWorkspace(get()).catch(() => undefined);
       },
       addTemplate: async (input) => {

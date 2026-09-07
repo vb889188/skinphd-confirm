@@ -172,6 +172,7 @@ export function Workspace() {
   const [clinicFilter, setClinicFilter] = useState("");
   const [templateFilter, setTemplateFilter] = useState("");
   const [peopleQuery, setPeopleQuery] = useState("");
+  const [peopleStatus, setPeopleStatus] = useState<"all" | "active" | "inactive">("all");
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [archivePersonId, setArchivePersonId] = useState<string | null>(null);
@@ -946,12 +947,19 @@ export function Workspace() {
                 aria-label="Search staff"
                 className="min-h-10 rounded-md border border-line bg-paper px-3 text-sm"
               />
+              <div className="flex gap-2">
+                {(["all", "active", "inactive"] as const).map((id) => (
+                  <Button key={id} size="sm" variant={peopleStatus === id ? "primary" : "secondary"} onClick={() => setPeopleStatus(id)}>
+                    {id === "all" ? "All" : id === "active" ? "Active" : "Inactive"}
+                  </Button>
+                ))}
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
               {store.people
                 .filter((person) => {
                   const files = (store.records ?? []).filter((item) => item.personId === person.id);
                   const haystack = `${person.fullName} ${person.email} ${person.role} ${branchLabel(store, person.branchId)} ${files.map((item) => `${item.fileName} ${item.note} ${item.extractedText}`).join(" ")}`.toLowerCase();
-                  return !peopleQuery || haystack.includes(peopleQuery.toLowerCase());
+                  return (!peopleQuery || haystack.includes(peopleQuery.toLowerCase())) && (peopleStatus === "all" || person.status === peopleStatus);
                 })
                 .map((person) => (
                 <Card radius="section" elevation="sm" padding="md" className="transition hover:-translate-y-0.5 hover:shadow-md">
@@ -999,6 +1007,7 @@ export function Workspace() {
                     >
                       Email new PIN
                     </Button>
+                    {person.status === "active" && (
                     <Button
                       size="sm"
                       variant="danger"
@@ -1006,13 +1015,15 @@ export function Workspace() {
                         try {
                           store.removePerson(person.id);
                           setError("");
+                          toast.success(`${person.fullName} is inactive and stays on Staff.`);
                         } catch (err) {
-                          setError(err instanceof Error ? err.message : "Could not remove the person");
+                          setError(err instanceof Error ? err.message : "Could not deactivate the person");
                         }
                       }}
                     >
-                      Delete
+                      Deactivate
                     </Button>
+                    )}
                   </div>
                 </Card>
               ))}
@@ -1463,26 +1474,29 @@ export function Workspace() {
         </Modal>
       )}
 
-      {profilePersonId && (
-        <Modal
-          onClose={() => setProfilePersonId(null)}
-          title={store.people.find((person) => person.id === profilePersonId)?.fullName ?? "Employee"}
-          eyebrow="Employee file"
-        >
+      {profilePersonId && (() => {
+        const profile = store.people.find((person) => person.id === profilePersonId);
+        if (!profile) return null;
+        const packs = store.agreements.filter(
+          (item) => item.employeeId === profile.id || item.managerId === profile.id || item.witnessId === profile.id,
+        );
+        const papers = (store.records ?? []).filter((item) => item.personId === profile.id);
+        return (
+        <Modal onClose={() => setProfilePersonId(null)} title={profile.fullName} eyebrow="Staff file">
           <div className="grid gap-4 px-5 py-5">
-            <p className="text-[12px] text-muted">
-              {store.people.find((person) => person.id === profilePersonId)?.email}
-              {" · "}
-              {branchLabel(store, store.people.find((person) => person.id === profilePersonId)?.branchId ?? "")}
-            </p>
+            <div className="rounded-md border border-line bg-ground px-4 py-3">
+              <p className="text-sm text-ink">{roleLabel(profile.role)} · {branchLabel(store, profile.branchId)}</p>
+              <p className="mt-1 text-[12px] text-muted">{profile.email}</p>
+              <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">{profile.status}</p>
+            </div>
             <section>
-              <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Completed Confirm packs</p>
+              <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Confirm packs on this file</p>
               <div className="mt-2 grid gap-2">
-                {store.agreements.filter((item) => item.employeeId === profilePersonId && item.status === "completed").map((item) => (
+                {packs.map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    className="rounded-xl border border-line bg-ground px-3 py-3 text-left"
+                    className="rounded-md border border-line bg-paper px-3 py-3 text-left hover:bg-ground"
                     onClick={() => {
                       setProfilePersonId(null);
                       setSelectedId(item.id);
@@ -1490,19 +1504,19 @@ export function Workspace() {
                     }}
                   >
                     <strong className="block text-sm">{packTitle(item.title)}</strong>
-                    <small className="text-[11px] text-muted">{item.snapshotHash.slice(0, 16)} · {shortTime(item.updatedAt)}</small>
+                    <small className="text-[11px] text-muted">
+                      {STATUS_LABEL[item.status]} · {item.employeeId === profile.id ? "Employee" : item.managerId === profile.id ? "Franchisee" : "Witness"}
+                    </small>
                   </button>
                 ))}
-                {store.agreements.filter((item) => item.employeeId === profilePersonId && item.status === "completed").length === 0 && (
-                  <p className="text-[12px] text-muted">No typed-signature packs completed in Confirm yet.</p>
-                )}
+                {packs.length === 0 && <p className="text-[12px] text-muted">No Confirm packs name this person yet.</p>}
               </div>
             </section>
             <section>
-              <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Paper packs stored on this file</p>
+              <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Paper packs</p>
               <div className="mt-2 grid gap-2">
-                {(store.records ?? []).filter((item) => item.personId === profilePersonId).map((item) => (
-                  <article key={item.id} className="rounded-xl border border-line bg-ground px-3 py-3">
+                {papers.map((item) => (
+                  <article key={item.id} className="rounded-md border border-line bg-paper px-3 py-3">
                     <strong className="block text-sm">{item.fileName}</strong>
                     <small className="block text-[11px] text-muted">{item.note} · {shortTime(item.createdAt)}</small>
                     <Button
@@ -1525,25 +1539,29 @@ export function Workspace() {
                     </Button>
                   </article>
                 ))}
-                {(store.records ?? []).filter((item) => item.personId === profilePersonId).length === 0 && (
-                  <p className="text-[12px] text-muted">No paper PDF or photo stored yet.</p>
-                )}
+                {papers.length === 0 && <p className="text-[12px] text-muted">No paper PDF or photo stored yet.</p>}
               </div>
+            </section>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={() => { setProfilePersonId(null); setEditingPersonId(profile.id); }}>
+                Edit details
+              </Button>
               <Button
                 size="sm"
-                className="mt-3"
+                variant="secondary"
                 onClick={() => {
-                  const id = profilePersonId;
+                  const id = profile.id;
                   setProfilePersonId(null);
                   setArchivePersonId(id);
                 }}
               >
-                Upload another completed pack
+                Upload paper pack
               </Button>
-            </section>
+            </div>
           </div>
         </Modal>
-      )}
+        );
+      })()}
 
       {archivePersonId && (
         <Modal
