@@ -2,7 +2,7 @@
 
 Inspect first. Small diffs. Do not rewrite.
 
-Last brought current: 2026-09-07. HEAD: `4da80d1`.
+Last brought current: 2026-09-07. Apply Claude patch 1 only; patches 2–3 were not applied (stale SHAs).
 
 ## Product
 Employee training and equipment agreements as frozen snapshots, typed-name signatures, hashes, audit, optional paper PDF/photo uploads.
@@ -13,7 +13,7 @@ Client consent nav is a locked placeholder. Brand is **SkinPhD**. Branch label i
 
 ## Live
 - Code: https://github.com/vb889188/skinphd-confirm
-- HEAD: `4da80d1`
+- HEAD: see `git log -1` on main (PIN/Home fixes landed in `4da80d1`)
 - Origin HTTP: http://139.59.183.201 (and :8080)
 - Hostname: https://confirm.relpdev.uk — Cloudflare 521/522 until SSL is Flexible or an origin cert is on :443
 - Replit is an import/preview, not the production host

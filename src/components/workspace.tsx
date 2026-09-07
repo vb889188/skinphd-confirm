@@ -1554,7 +1554,7 @@ export function Workspace() {
                 <Copy className="size-3.5" /> Copy
               </Button>
             </div>
-            <p className="text-[11px] leading-relaxed text-muted">Share the PIN through a private channel. Do not place it in a shared note or email thread. It is temporary UI state and cannot be recovered here.</p>
+            <p className="text-[11px] leading-relaxed text-muted">Share the PIN through a private channel. Do not place it in a shared note or email thread. Confirm never stores the plain PIN, so it clears for good on reload or sign-out.</p>
             <Button onClick={closeIssuedPin}>I have sent it</Button>
           </div>
         </Modal>
