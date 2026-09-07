@@ -1069,7 +1069,7 @@ export function Workspace() {
                   return (!peopleQuery || haystack.includes(peopleQuery.toLowerCase())) && (peopleStatus === "all" || person.status === peopleStatus);
                 })
                  .map((person) => (
-                <Card key={person.id} radius="section" elevation="sm" padding="md" className="confirm-card transition hover:-translate-y-0.5 hover:shadow-md">
+                <Card key={person.id} radius="section" elevation="sm" padding="md" className="confirm-card overflow-visible transition hover:-translate-y-0.5 hover:shadow-md">
                   <div className="flex items-start justify-between gap-3">
                     <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => setProfilePersonId(person.id)}>
                       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-sage text-[11px] font-extrabold text-accent">{initials(person.fullName)}</span>
