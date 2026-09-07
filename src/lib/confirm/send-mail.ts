@@ -5,21 +5,23 @@ import { employeeMailHref } from "./email";
 export const sendMailFn = createServerFn({ method: "POST" })
   .inputValidator((data: EmployeeMail) => data)
   .handler(async ({ data }) => {
-    const host = process.env.SMTP_HOST;
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
+    const host = process.env.SMTP_HOST || process.env.MAIL_HOST;
+    const user = process.env.SMTP_USER || process.env.MAIL_USERNAME;
+    const pass = process.env.SMTP_PASS || process.env.MAIL_PASSWORD;
+    const port = Number(process.env.SMTP_PORT || process.env.MAIL_PORT || 587);
     if (!host || !user || !pass) {
       return { ok: false as const, reason: "not_configured" };
     }
     const nodemailer = await import("nodemailer");
+    const secure = process.env.SMTP_SECURE === "true" || port === 465;
     const transport = nodemailer.createTransport({
       host,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: process.env.SMTP_SECURE === "true",
+      port,
+      secure,
       auth: { user, pass },
     });
     await transport.sendMail({
-      from: process.env.SMTP_FROM || `SkinPhD Confirm <${user}>`,
+      from: process.env.SMTP_FROM || process.env.MAIL_FROM || `SkinPhD Confirm <${user}>`,
       to: data.to,
       subject: data.subject,
       text: data.body,

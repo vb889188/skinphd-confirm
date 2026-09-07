@@ -1,24 +1,22 @@
 # SkinPhD Confirm mail
 
-Without SMTP, Confirm still opens the mail app.
+Without SMTP, Confirm opens the mail app.
 
-To send from the droplet, put this in `/opt/skinphd-confirm/.env` and recreate the container:
+Zoho (info@relpdev.uk) on the droplet — `/opt/skinphd-confirm/.env`:
 
 ```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-gmail@gmail.com
-SMTP_PASS=your-app-password
-SMTP_FROM=SkinPhD Confirm <your-gmail@gmail.com>
+MAIL_HOST=smtppro.zoho.com
+MAIL_PORT=465
+MAIL_USERNAME=info@relpdev.uk
+MAIL_PASSWORD=use-the-zoho-password
+MAIL_FROM=SkinPhD Confirm <info@relpdev.uk>
 ```
 
-Gmail: Google Account → Security → App passwords (2FA must be on).
+Port 465 uses SSL. Then:
 
 ```bash
 cd /opt/skinphd-confirm
 docker compose up --build -d
 ```
 
-Then Add person and Email new PIN should send without opening the mail app. A toast says “emailed”.
-
-Do not commit the app password.
+Do not commit `.env`. If this password was pasted in chat, rotate it in Zoho when you can.

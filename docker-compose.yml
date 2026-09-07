@@ -10,12 +10,10 @@ services:
     ports:
       - "80:8080"
       - "8080:8080"
+    env_file:
+      - .env
     environment:
       PORT: 8080
       VITE_AUTH_ENABLED: "false"
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
+      MAIL_FROM: ${MAIL_FROM:-SkinPhD Confirm <info@relpdev.uk>}
     restart: unless-stopped
