@@ -1,7 +1,8 @@
 FROM node:22-alpine AS build
 WORKDIR /app
+ENV NODE_OPTIONS=--max-old-space-size=384
 COPY package.json package-lock.json ./
-RUN npm install
+RUN npm install --no-audit --no-fund --legacy-peer-deps
 COPY . .
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
