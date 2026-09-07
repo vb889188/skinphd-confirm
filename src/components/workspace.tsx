@@ -1575,30 +1575,31 @@ export function Workspace() {
       )}
 
       {showCreate && (
-        <Modal onClose={() => setShowCreate(false)} title="Create an agreement" eyebrow="Controlled issue flow">
+        <Modal className="agreement-modal" onClose={() => setShowCreate(false)} title="Create an agreement" eyebrow="Controlled issue flow">
           <form onSubmit={onCreate}>
-            <div className="grid gap-3.5 p-5 sm:grid-cols-2">
-              <p className="sm:col-span-2 rounded-md bg-sage px-3 py-3 text-[10px] leading-relaxed text-status-green-fg">
+            <div className="agreement-form grid gap-6 p-5 sm:p-6">
+              {error && <p role="alert" className="agreement-error sm:col-span-2">{error}</p>}
+              <p className="agreement-notice sm:col-span-2">
                 Source wording from the selected SkinPhD form will be frozen into a SHA-256 snapshot. This workspace records the issued fields and signatures. It does not run payroll deductions or decide competence.
               </p>
-              <label className="sm:col-span-2 grid gap-1.5 text-[10px] font-extrabold text-muted">
-                Source template
-                <select
-                  name="templateId"
-                  required
-                  value={draftTemplate?.id}
-                  onChange={(event) => setDraftTemplateId(event.target.value)}
-                  className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink"
-                >
-                  {approvedTemplates.map((template) => (
-                    <option key={template.id} value={template.id}>{template.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="sm:col-span-2 grid gap-1.5 text-[10px] font-extrabold text-muted">
-                Agreement title
-                <input key={draftTemplate?.id} name="title" required defaultValue={draftTemplate?.name} className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
-              </label>
+              <div className="form-section sm:col-span-2">
+                <div className="form-section-heading"><span className="form-step">01</span><div><h3>Choose the source</h3><p>Select the approved wording that will be frozen into this record.</p></div></div>
+                <div className="mt-4 grid gap-3">
+                  <label className="form-field">
+                    <span>Source template <em>Required</em></span>
+                    <select name="templateId" required value={draftTemplate?.id} onChange={(event) => setDraftTemplateId(event.target.value)}>
+                      {approvedTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="form-field">
+                    <span>Agreement title <em>Required</em></span>
+                    <input key={draftTemplate?.id} name="title" required defaultValue={draftTemplate?.name} />
+                  </label>
+                </div>
+              </div>
+              <div className="form-section sm:col-span-2">
+                <div className="form-section-heading"><span className="form-step">02</span><div><h3>Assign the pack</h3><p>These people and branch become part of the frozen agreement.</p></div></div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
                 SkinPhD branch
                 <select name="branchId" required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink">
@@ -1648,6 +1649,11 @@ export function Workspace() {
                 Phone
                 <input name="employeePhone" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
               </label>
+                </div>
+              </div>
+              <div className="form-section sm:col-span-2">
+                <div className="form-section-heading"><span className="form-step">03</span><div><h3>Complete the pack details</h3><p>Only fields present on the selected source form are shown.</p></div></div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {draftTemplate?.category === "training" && (
                 <>
                   <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
@@ -1698,8 +1704,10 @@ export function Workspace() {
                 Module / activity
                 <textarea name="activity" required defaultValue={draftTemplate?.module} key={`${draftTemplate?.id}-activity`} className="min-h-16 rounded-md border border-line px-2.5 py-2 text-sm font-normal text-ink" />
               </label>
+                </div>
+              </div>
             </div>
-            <footer className="flex justify-end gap-2 border-t border-line px-5 py-4">
+            <footer className="agreement-footer flex justify-end gap-2 border-t border-line px-5 py-4 sm:px-6">
               <Button variant="secondary" onClick={() => setShowCreate(false)}>
                 Cancel
               </Button>
@@ -2083,7 +2091,7 @@ export function Workspace() {
       )}
 
       {selected && (
-        <Modal onClose={() => setSelectedId(null)} title={packTitle(selected.title)} eyebrow={selected.id}>
+        <Modal className="agreement-detail-modal" onClose={() => setSelectedId(null)} title={packTitle(selected.title)} eyebrow={selected.id}>
           <Detail
             state={store}
             agreement={selected}
@@ -2269,15 +2277,17 @@ function Modal({
   eyebrow,
   onClose,
   children,
+  className,
 }: {
   title: string;
   eyebrow: string;
   onClose: () => void;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent>
+      <DialogContent className={className}>
         <DialogHeader>
           <div>
             <DialogDescription>{eyebrow}</DialogDescription>
@@ -2328,14 +2338,17 @@ function Detail({
   onSign: (action: "sign" | "decline") => Promise<void>;
   error: string;
 }) {
-  const [detailTab, setDetailTab] = useState("overview");
   const open = agreement.status === "awaiting_signatures" || agreement.status === "partially_signed";
+  const [detailTab, setDetailTab] = useState(open ? "signatures" : "overview");
   const actor = state.people.find((person) => person.id === state.currentPersonId);
   const nextSigner = agreement.snapshot.signers.find((signer) => {
     const signature = state.signatures.find((item) => item.agreementId === agreement.id && item.role === signer.role);
     return signature?.outcome !== "signed";
   });
-  const signingRole = activeRole || (nextSigner && (actor?.role === "manager" || actor?.id === nextSigner.id) ? nextSigner.role : "");
+  const signingRole =
+    nextSigner && (actor?.role === "manager" || actor?.id === nextSigner.id)
+      ? nextSigner.role
+      : "";
   useEffect(() => {
     if (!signingRole || activeRole === signingRole) return;
     setActiveRole(signingRole);
@@ -2381,7 +2394,12 @@ function Detail({
           </div>
         </Modal>
       )}
-      <div className="mb-4 flex flex-wrap gap-2 no-print sm:justify-end">
+      <div className="detail-actions mb-5 flex flex-col gap-2 no-print sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="confirm-kicker text-[9px] text-muted uppercase">Record actions</p>
+          <p className="mt-1 text-[11px] text-muted">Choose an action for this frozen pack.</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
         {actor?.role === "manager" && (
           <>
         <Button
@@ -2423,8 +2441,9 @@ function Detail({
           <Printer className="size-3.5" />
           Print issued pack
         </Button>
+        </div>
       </div>
-      <section className="mb-4 rounded-xl border border-line bg-ground/70 p-4">
+      <section className="detail-status mb-5 rounded-xl border border-line bg-ground/70 p-4 sm:p-5" aria-live="polite">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="confirm-kicker text-[9px] text-muted uppercase">Current status</p>
@@ -2436,7 +2455,7 @@ function Detail({
         </div>
         <ProgressTrack state={state} agreement={agreement} />
       </section>
-      {error && <p className="mb-3 rounded-md bg-danger-bg px-3 py-2 text-[12px] text-danger-fg">{error}</p>}
+      {error && <p role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-bg px-3 py-3 text-[12px] text-danger-fg">{error}</p>}
       <Tabs value={detailTab} onValueChange={setDetailTab} className="mt-4">
       <TabsList className="no-print">
         <TabsTrigger value="overview">Overview</TabsTrigger>

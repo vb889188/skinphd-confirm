@@ -115,6 +115,63 @@ body {
 .confirm-stat::after { content: ""; position:absolute; width:90px; height:90px; right:-26px; bottom:-40px; border:1px solid rgba(23,107,80,.14); border-radius:50%; }
 @keyframes confirm-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+/* Agreement modals: a quiet, numbered workflow instead of one uninterrupted form. */
+.agreement-modal { max-width: 58rem; }
+.agreement-detail-modal { max-width: 62rem; }
+.agreement-form { background: linear-gradient(180deg, #fbfcfa 0%, #f7faf8 100%); }
+.agreement-notice {
+  border: 1px solid #c8ddd2;
+  border-left: 4px solid #176b50;
+  border-radius: .7rem;
+  background: #e5f0ea;
+  padding: .8rem .9rem;
+  color: #23684f;
+  font-size: 11px;
+  line-height: 1.65;
+}
+.agreement-error {
+  border: 1px solid #efc4c6;
+  border-radius: .7rem;
+  background: #fff1f1;
+  padding: .75rem .9rem;
+  color: #8e3338;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.form-section {
+  border: 1px solid #d9e3de;
+  border-radius: .85rem;
+  background: rgba(251,252,250,.82);
+  padding: 1rem;
+}
+.form-section-heading { display:flex; align-items:flex-start; gap:.7rem; }
+.form-section-heading h3 { margin:0; font-size:13px; font-weight:700; color:#17231f; }
+.form-section-heading p { margin:.2rem 0 0; color:#61716a; font-size:11px; line-height:1.45; }
+.form-step {
+  display:grid; place-items:center; flex:none; width:1.8rem; height:1.8rem;
+  border-radius:.55rem; background:#d7e6de; color:#176b50;
+  font:700 10px/1 "DM Mono",monospace; letter-spacing:.04em;
+}
+.form-field, .agreement-form .form-section label {
+  display:grid; gap:.4rem; min-width:0;
+  color:#61716a; font-size:10px; font-weight:800; letter-spacing:.01em;
+}
+.form-field em {
+  margin-left:.35rem; color:#8d6110; font-size:9px; font-style:normal; font-weight:700;
+}
+.agreement-form input, .agreement-form select, .agreement-form textarea {
+  min-height: 2.65rem; width:100%; border:1px solid #d9e3de; border-radius:.55rem;
+  background:#fbfcfa; padding:.55rem .7rem; color:#17231f; font-size:13px; font-weight:400;
+}
+.agreement-form textarea { min-height:4.1rem; }
+.agreement-form input::placeholder, .agreement-form textarea::placeholder { color:#93a19a; }
+.agreement-footer {
+  position:sticky; bottom:0; z-index:5; background:rgba(251,252,250,.96);
+  box-shadow:0 -8px 18px rgba(15,51,41,.05); backdrop-filter:blur(8px);
+}
+.detail-actions > div:last-child > button { min-height:2.65rem; }
+.detail-status { box-shadow: inset 0 0 0 1px rgba(215,230,222,.3); }
+
 @keyframes confirm-pulse {
   0%,
   100% {
