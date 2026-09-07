@@ -199,6 +199,7 @@ export function Workspace() {
     branchId: string;
     pin: string;
   } | null>(null);
+  const [staffMenuId, setStaffMenuId] = useState<string | null>(null);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [profileTab, setProfileTab] = useState("overview");
 
@@ -1093,32 +1094,35 @@ export function Workspace() {
                     <Button size="sm" onClick={() => setProfilePersonId(person.id)}>
                       Open profile
                     </Button>
-                     <details className="relative">
-                       <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-ink hover:bg-ground">
-                         <MoreHorizontal className="size-3.5" /> More
-                       </summary>
-                       <div className="absolute right-0 z-10 mt-1 grid min-w-48 gap-1 rounded-lg border border-line bg-paper p-1.5 shadow-lg">
-                         <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => setArchivePersonId(person.id)}>Upload completed pack</button>
-                         <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => setEditingPersonId(person.id)}>Edit details</button>
-                         <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => {
-                           void store.issueTemporaryPin(person.id).then(async (pin) => {
-                             setIssuedPin({ name: person.fullName, email: person.email, pin });
-                             const sent = await deliverMail(buildWelcomeMail({ fullName: person.fullName, email: person.email, role: person.role, clinic: branchLabel(store, person.branchId), pin, siteUrl: window.location.origin }));
-                             toast.success(sent === "sent" ? `PIN emailed to ${person.email}.` : `Temporary PIN ready for ${person.fullName}.`);
-                           });
-                         }}>Email new PIN</button>
-                         {person.status === "active" ? (
-                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-bold text-danger-fg hover:bg-danger-bg" onClick={() => {
-                             try { store.removePerson(person.id); setPeopleStatus("inactive"); setError(""); toast.success(`${person.fullName} moved to Inactive.`); }
-                             catch (err) { setError(err instanceof Error ? err.message : "Could not deactivate the person"); }
-                           }}>Deactivate</button>
-                         ) : (
-                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-bold text-accent hover:bg-sage" onClick={() => {
-                             void store.reactivatePerson(person.id).then(() => { setPeopleStatus("active"); toast.success(`${person.fullName} is Active again.`); }).catch((err) => setError(err instanceof Error ? err.message : "Could not reactivate"));
-                           }}>Reactivate</button>
-                         )}
-                       </div>
-                     </details>
+                    <div className="relative">
+                      <Button size="sm" variant="secondary" type="button" onClick={() => setStaffMenuId(staffMenuId === person.id ? null : person.id)}>
+                        More
+                      </Button>
+                      {staffMenuId === person.id && (
+                        <div className="absolute left-0 z-30 mt-1 grid min-w-52 gap-1 rounded-lg border border-line bg-paper p-1.5 shadow-lg">
+                          <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => { setArchivePersonId(person.id); setStaffMenuId(null); }}>Upload completed pack</button>
+                          <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => { setEditingPersonId(person.id); setStaffMenuId(null); }}>Edit details</button>
+                          <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => {
+                            setStaffMenuId(null);
+                            void store.issueTemporaryPin(person.id).then(async (pin) => {
+                              setIssuedPin({ name: person.fullName, email: person.email, pin });
+                              const sent = await deliverMail(buildWelcomeMail({ fullName: person.fullName, email: person.email, role: person.role, clinic: branchLabel(store, person.branchId), pin, siteUrl: window.location.origin }));
+                              toast.success(sent === "sent" ? `PIN emailed to ${person.email}.` : `Temporary PIN ready for ${person.fullName}.`);
+                            });
+                          }}>Email new PIN</button>
+                          {person.status === "active" ? (
+                            <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-bold text-danger-fg hover:bg-danger-bg" onClick={() => {
+                              try { store.removePerson(person.id); setPeopleStatus("inactive"); setStaffMenuId(null); toast.success(`${person.fullName} moved to Inactive.`); }
+                              catch (err) { setError(err instanceof Error ? err.message : "Could not deactivate the person"); }
+                            }}>Deactivate</button>
+                          ) : (
+                            <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-bold text-accent hover:bg-sage" onClick={() => {
+                              void store.reactivatePerson(person.id).then(() => { setPeopleStatus("active"); setStaffMenuId(null); toast.success(`${person.fullName} is Active again.`); }).catch((err) => setError(err instanceof Error ? err.message : "Could not reactivate"));
+                            }}>Reactivate</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </Card>
               ))}
