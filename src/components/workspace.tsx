@@ -186,6 +186,13 @@ export function Workspace() {
   const [deskFilter, setDeskFilter] = useState<"all" | "today" | "employee" | "franchisee" | "witness" | "remind">("all");
   const [draftTemplateId, setDraftTemplateId] = useState("");
   const [issuedPin, setIssuedPin] = useState<{ name: string; email: string; pin: string } | null>(null);
+  const [pendingPerson, setPendingPerson] = useState<{
+    fullName: string;
+    email: string;
+    role: Role;
+    branchId: string;
+    pin: string;
+  } | null>(null);
 
   useEffect(() => {
     store.expireSessionIfNeeded();
@@ -1041,33 +1048,14 @@ export function Workspace() {
               className="h-fit rounded-3xl border border-line bg-paper p-5"
               onSubmit={(event) => {
                 event.preventDefault();
-                const form = event.currentTarget;
-                const values = Object.fromEntries(new FormData(form).entries());
-                void (async () => {
-                  try {
-                    await store.addPerson({
-                      fullName: String(values.fullName),
-                      email: String(values.email),
-                      role: String(values.role) as Role,
-                      branchId: String(values.branchId),
-                      pin: String(values.pin),
-                    });
-                    const mail = buildWelcomeMail({
-                      fullName: String(values.fullName),
-                      email: String(values.email),
-                      role: String(values.role),
-                      clinic: branchLabel(store, String(values.branchId)),
-                      pin: String(values.pin),
-                      siteUrl: window.location.origin,
-                    });
-                    form.reset();
-                    setError("");
-                    const sent = await deliverMail(mail);
-                    toast.success(sent === "sent" ? `Sign-in details emailed to ${mail.to}.` : "Finish the welcome email in your mail app.");
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : "Could not add the person");
-                  }
-                })();
+                const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+                setPendingPerson({
+                  fullName: String(values.fullName).trim(),
+                  email: String(values.email).trim(),
+                  role: String(values.role) as Role,
+                  branchId: String(values.branchId),
+                  pin: String(values.pin).trim(),
+                });
               }}
             >
               <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Add to directory</p>
@@ -1266,6 +1254,53 @@ export function Workspace() {
           <span>Private employee agreement workspace</span>
         </footer>
       </section>
+
+      {pendingPerson && (
+        <Modal onClose={() => setPendingPerson(null)} title="Send sign-in details?" eyebrow="Confirm mail">
+          <div className="grid gap-3 px-5 py-5">
+            <p className="text-[13px] leading-relaxed text-muted">
+              This will add the person and email the PIN from info@relpdev.uk. Cancel if the address is wrong.
+            </p>
+            <div className="rounded-md border border-line bg-ground px-3 py-3 text-[13px]">
+              <p><strong>To</strong> {pendingPerson.email}</p>
+              <p className="mt-1"><strong>Name</strong> {pendingPerson.fullName}</p>
+              <p className="mt-1"><strong>Role</strong> {pendingPerson.role === "manager" ? "franchisee" : pendingPerson.role}</p>
+              <p className="mt-1"><strong>Branch</strong> {branchLabel(store, pendingPerson.branchId)}</p>
+              <p className="mt-1"><strong>PIN</strong> {pendingPerson.pin}</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setPendingPerson(null)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  const draft = pendingPerson;
+                  void (async () => {
+                    try {
+                      await store.addPerson(draft);
+                      const sent = await deliverMail(
+                        buildWelcomeMail({
+                          fullName: draft.fullName,
+                          email: draft.email,
+                          role: draft.role,
+                          clinic: branchLabel(store, draft.branchId),
+                          pin: draft.pin,
+                          siteUrl: window.location.origin,
+                        }),
+                      );
+                      setPendingPerson(null);
+                      setError("");
+                      toast.success(sent === "sent" ? `Sign-in details emailed to ${draft.email}.` : "Finish the welcome email in your mail app.");
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Could not add the person");
+                    }
+                  })();
+                }}
+              >
+                Send email
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {issuedPin && (
         <Modal onClose={() => setIssuedPin(null)} title={issuedPin.name} eyebrow="Temporary PIN">
