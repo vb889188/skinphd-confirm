@@ -202,6 +202,8 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
       },
       hydrateRemote: async () => {
         if (!remoteEnabled()) return;
+        const me = get().people.find((item) => item.id === get().currentPersonId);
+        if (me) setRemoteActor(me);
         try {
           const remote = await loadRemoteWorkspace();
           const state = get();
