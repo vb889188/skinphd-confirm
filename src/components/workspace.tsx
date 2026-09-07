@@ -200,6 +200,7 @@ export function Workspace() {
     pin: string;
   } | null>(null);
   const [staffMenuId, setStaffMenuId] = useState<string | null>(null);
+  const [revealedPins, setRevealedPins] = useState<Record<string, string>>({});
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [profileTab, setProfileTab] = useState("overview");
 
@@ -1105,6 +1106,7 @@ export function Workspace() {
                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => {
                             setStaffMenuId(null);
                             void store.issueTemporaryPin(person.id).then(async (pin) => {
+                              setRevealedPins((current) => ({ ...current, [person.id]: pin }));
                               setIssuedPin({ name: person.fullName, email: person.email, pin });
                               const sent = await deliverMail(buildWelcomeMail({ fullName: person.fullName, email: person.email, role: person.role, clinic: branchLabel(store, person.branchId), pin, siteUrl: window.location.origin }));
                               toast.success(sent === "sent" ? `PIN emailed to ${person.email}.` : `Temporary PIN ready for ${person.fullName}.`);
@@ -1375,7 +1377,8 @@ export function Workspace() {
                   const draft = pendingPerson;
                   void (async () => {
                     try {
-                      await store.addPerson(draft);
+                      const id = await store.addPerson(draft);
+                      setRevealedPins((current) => ({ ...current, [id]: draft.pin }));
                       const sent = await deliverMail(
                         buildWelcomeMail({
                           fullName: draft.fullName,
@@ -1645,6 +1648,10 @@ export function Workspace() {
                   </div>
                   <p className="mt-1 text-[12px] text-muted">{branchLabel(store, profile.branchId)}</p>
                   <p className="mt-1 truncate text-[11px] text-muted">{profile.email}</p>
+                  <p className="mt-2 text-[13px] text-ink">
+                    <strong>PIN</strong>{" "}
+                    {revealedPins[profile.id] ?? "Not stored in the file. Email a new PIN to see a number here."}
+                  </p>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 divide-x divide-line rounded-lg border border-line bg-paper">
@@ -1728,6 +1735,28 @@ export function Workspace() {
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={() => { setProfilePersonId(null); setEditingPersonId(profile.id); }}>
                 Edit details
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  void store.issueTemporaryPin(profile.id).then(async (pin) => {
+                    setRevealedPins((current) => ({ ...current, [profile.id]: pin }));
+                    const sent = await deliverMail(
+                      buildWelcomeMail({
+                        fullName: profile.fullName,
+                        email: profile.email,
+                        role: profile.role,
+                        clinic: branchLabel(store, profile.branchId),
+                        pin,
+                        siteUrl: window.location.origin,
+                      }),
+                    );
+                    toast.success(sent === "sent" ? `PIN emailed to ${profile.email}.` : `PIN ready: ${pin}`);
+                  });
+                }}
+              >
+                Email new PIN
               </Button>
               <Button
                 size="sm"
