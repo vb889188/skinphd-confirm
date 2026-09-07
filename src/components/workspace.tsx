@@ -1022,21 +1022,34 @@ export function Workspace() {
                     >
                       Email new PIN
                     </Button>
-                    {person.status === "active" && (
+                    {person.status === "active" ? (
                     <Button
                       size="sm"
                       variant="danger"
                       onClick={() => {
                         try {
                           store.removePerson(person.id);
+                          setPeopleStatus("inactive");
                           setError("");
-                          toast.success(`${person.fullName} is inactive and stays on Staff.`);
+                          toast.success(`${person.fullName} moved to Inactive.`);
                         } catch (err) {
                           setError(err instanceof Error ? err.message : "Could not deactivate the person");
                         }
                       }}
                     >
                       Deactivate
+                    </Button>
+                    ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        void store.reactivatePerson(person.id).then(() => {
+                          setPeopleStatus("active");
+                          toast.success(`${person.fullName} is Active again.`);
+                        }).catch((err) => setError(err instanceof Error ? err.message : "Could not reactivate"));
+                      }}
+                    >
+                      Reactivate
                     </Button>
                     )}
                   </div>

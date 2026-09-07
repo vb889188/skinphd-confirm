@@ -65,6 +65,7 @@ type Actions = {
   addPerson: (input: { fullName: string; email: string; role: Role; branchId: string; pin: string }) => Promise<string>;
   updatePerson: (input: { id: string; fullName: string; email: string; role: Role; branchId: string; status: "active" | "inactive"; pin?: string }) => Promise<void>;
   removePerson: (id: string) => void;
+  reactivatePerson: (id: string) => Promise<void>;
   addTemplate: (input: {
     name: string;
     category: "training" | "equipment" | "internal_waiver";
@@ -325,7 +326,23 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        void persistPerson({ ...person, status: "inactive" }).catch(() => undefined);
+      },
+      reactivatePerson: async (id) => {
+        const state = get();
+        const person = state.people.find((item) => item.id === id);
+        if (!person) throw new Error("Choose a person first");
+        requireCapability(actor(state), "directory_write", "Reactivate staff", person.branchId);
+        const now = new Date().toISOString();
+        const updated = { ...person, status: "active" as const };
+        set({
+          people: state.people.map((item) => (item.id === id ? updated : item)),
+          audit: [
+            { id: randomId("AUD"), agreementId: null, actor: ACTOR, action: "Person reactivated", detail: `${person.fullName} was set back to Active.`, createdAt: now },
+            ...state.audit,
+          ],
+        });
+        await persistPerson(updated);
       },
       addTemplate: async (input) => {
         requireCapability(actor(get()), "templates", "Upload source forms");
