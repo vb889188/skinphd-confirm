@@ -122,10 +122,12 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
       },
       signInWithPin: async (email, pin) => {
         const normalized = email.trim().toLowerCase();
-        const person = get().people.find((item) => item.email === normalized && item.status === "active");
+        const code = pin.trim();
+        const person = get().people.find((item) => item.email.toLowerCase() === normalized && item.status === "active");
         if (!person || !person.pinHash) throw new Error("No active staff record for that email.");
-        const hash = await sha256Hex(`${person.email}|${pin.trim()}`);
-        if (hash !== person.pinHash) {
+        const hash = await sha256Hex(`${normalized}|${code}`);
+        const alt = await sha256Hex(`${person.email}|${code}`);
+        if (hash !== person.pinHash && alt !== person.pinHash) {
           throw new Error("That PIN does not match. If Head Office emailed a temporary PIN, the old number no longer works.");
         }
         set({ currentPersonId: person.id, sessionStartedAt: new Date().toISOString() });
@@ -202,9 +204,16 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         try {
           const remote = await loadRemoteWorkspace();
           const state = get();
+          const people = remote.people.length
+            ? remote.people.map((person) => {
+                const local = state.people.find((item) => item.id === person.id || item.email.toLowerCase() === person.email.toLowerCase());
+                if (local?.pinHash && !person.pinHash) return { ...person, pinHash: local.pinHash };
+                return person;
+              })
+            : state.people;
           set({
             branches: remote.branches.length ? remote.branches : state.branches,
-            people: remote.people.length ? remote.people : state.people,
+            people,
             templates: remote.templates,
             agreements: remote.agreements,
             signatures: remote.signatures,
@@ -256,7 +265,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        await persistWorkspace(get());
         return id;
       },
       updatePerson: async (input) => {
