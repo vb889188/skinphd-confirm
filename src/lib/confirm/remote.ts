@@ -331,6 +331,8 @@ export async function upsertTemplate(template: Template) {
 
 export async function persistPerson(person: Person) {
   if (!remoteEnabled()) return;
+  // POST upsert updates all columns when RLS allows. PATCH repeats pin/email/status
+  // so a merge that skipped those fields still lands after a refresh.
   await upsertPerson(person);
   await rest(`confirm_people?id=eq.${encodeURIComponent(person.id)}`, {
     method: "PATCH",
