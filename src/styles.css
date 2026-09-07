@@ -141,6 +141,10 @@ body {
   .confirm-main { padding-bottom: 5rem; }
   .confirm-card { border-radius: 14px; }
   input, select, textarea { font-size: 16px; } /* prevents iOS zoom while preserving dense desktop type */
+  .confirm-main { overflow-x: clip; }
+  .confirm-main .confirm-kicker { font-size: 11px; }
+  .confirm-main [class*="text-\[9px\]"], .confirm-main [class*="text-\[10px\]"] { font-size: 11px; }
+  details > summary::-webkit-details-marker { display: none; }
 }
 
 @media print {

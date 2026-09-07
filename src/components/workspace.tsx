@@ -9,6 +9,7 @@ import {
   Printer,
   RotateCcw,
   Download,
+  MoreHorizontal,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
@@ -198,6 +199,8 @@ export function Workspace() {
     branchId: string;
     pin: string;
   } | null>(null);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState("overview");
 
   useEffect(() => {
     store.expireSessionIfNeeded();
@@ -477,7 +480,7 @@ export function Workspace() {
   return (
     <TooltipProvider>
     <main className="confirm-shell min-h-[100dvh] bg-transparent text-ink lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
-      <aside className="confirm-sidebar relative flex flex-col px-3 py-4 text-sidebar-text shadow-[8px_0_40px_rgba(10,36,29,0.18)] lg:sticky lg:top-0 lg:h-screen lg:px-4 lg:py-7">
+      <aside className="confirm-sidebar relative hidden flex-col px-3 py-4 text-sidebar-text shadow-[8px_0_40px_rgba(10,36,29,0.18)] lg:sticky lg:top-0 lg:h-screen lg:px-4 lg:py-7 lg:flex">
         <div className="mb-7 flex items-center gap-3 border-b border-white/10 px-2 pb-6">
           <img src="/skinphd-mark.svg" alt="" className="size-10" />
           <span>
@@ -485,7 +488,7 @@ export function Workspace() {
             <small className="confirm-kicker mt-0.5 block text-[10px] text-sidebar-soft uppercase">Head Office workspace</small>
           </span>
         </div>
-        <nav aria-label="Primary navigation" className="flex gap-2 overflow-x-auto lg:block lg:overflow-visible">
+        <nav aria-label="Primary navigation" className="flex gap-2 lg:block lg:overflow-visible">
           <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Work</p>
           <NavButton current={view} id="overview" label="Home" count={stats.needsAction} onSelect={setView} />
           <NavButton current={view} id="agreements" label="Agreements" count={visibleAgreements.length} onSelect={setView} />
@@ -507,6 +510,50 @@ export function Workspace() {
       </aside>
 
       <section className="confirm-main min-w-0 px-4 py-5 sm:px-8 lg:px-12 lg:py-8">
+        <nav aria-label="Mobile navigation" className="relative mb-5 lg:hidden">
+          <div className="flex items-center gap-1 rounded-xl border border-line bg-paper p-1 shadow-xs">
+            {([
+              ["overview", "Home"],
+              ["agreements", "Agreements"],
+              ...(can(current, "staff") ? [["people", "Staff"] as const] : []),
+              ["settings", "Settings"],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => { setView(id); setMobileMoreOpen(false); }}
+                className={cn("min-h-10 min-w-0 flex-1 rounded-lg px-2 text-[11px] font-bold", view === id ? "bg-forest text-paper" : "text-muted hover:bg-ground")}
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-expanded={mobileMoreOpen}
+              aria-controls="mobile-more-menu"
+              onClick={() => setMobileMoreOpen((open) => !open)}
+              className={cn("grid min-h-10 min-w-10 place-items-center rounded-lg text-muted hover:bg-ground", mobileMoreOpen && "bg-ground text-ink")}
+            >
+              <MoreHorizontal className="size-4" />
+              <span className="sr-only">More views</span>
+            </button>
+          </div>
+          {mobileMoreOpen && (
+            <div id="mobile-more-menu" className="absolute right-0 z-20 mt-2 grid w-56 gap-1 rounded-xl border border-line bg-paper p-2 shadow-lg">
+              {([
+                ...(can(current, "templates") ? [["templates", "Source forms"] as const] : []),
+                ...(can(current, "clinics") ? [["locations", "SkinPhD branches"] as const] : []),
+                ...(isManager ? [["clients", "Client consent"] as const] : []),
+                ...(can(current, "audit") ? [["audit", "History"] as const] : []),
+              ] as const).map(([id, label]) => (
+                <button key={id} type="button" onClick={() => { setView(id); setMobileMoreOpen(false); }} className={cn("flex min-h-11 items-center justify-between rounded-lg px-3 text-left text-xs font-bold", view === id ? "bg-sage text-ink" : "text-muted hover:bg-ground")}>
+                  {label}
+                  {id === "templates" && <span className="text-[10px] text-muted">{approvedTemplates.length}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </nav>
         <header className="mx-auto mb-6 flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="confirm-kicker mb-2 text-[10px] font-medium text-accent uppercase">SkinPhD / Confirm / {view}</p>
@@ -779,6 +826,7 @@ export function Workspace() {
               <AgreementQueue
                 state={store}
                 items={filtered}
+                 hasFilters={Boolean(query || statusFilter || clinicFilter || templateFilter)}
                 canCreate={isManager}
                 onOpen={(id) => {
                   setSelectedId(id);
@@ -1019,7 +1067,7 @@ export function Workspace() {
                   const haystack = `${person.fullName} ${person.email} ${person.role} ${branchLabel(store, person.branchId)} ${files.map((item) => `${item.fileName} ${item.note} ${item.extractedText}`).join(" ")}`.toLowerCase();
                   return (!peopleQuery || haystack.includes(peopleQuery.toLowerCase())) && (peopleStatus === "all" || person.status === peopleStatus);
                 })
-                .map((person) => (
+                 .map((person) => (
                 <Card key={person.id} radius="section" elevation="sm" padding="md" className="confirm-card transition hover:-translate-y-0.5 hover:shadow-md">
                   <div className="flex items-start justify-between gap-3">
                     <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => setProfilePersonId(person.id)}>
@@ -1041,71 +1089,49 @@ export function Workspace() {
                     {" · "}
                     {(store.records ?? []).filter((item) => item.personId === person.id).length} paper pack(s)
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Button size="sm" onClick={() => setProfilePersonId(person.id)}>
                       Open profile
                     </Button>
-                    <Button size="sm" variant="secondary" onClick={() => setArchivePersonId(person.id)}>
-                      Upload completed pack
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => setEditingPersonId(person.id)}>
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        void store.issueTemporaryPin(person.id).then(async (pin) => {
-                          setIssuedPin({ name: person.fullName, email: person.email, pin });
-                          const sent = await deliverMail(
-                            buildWelcomeMail({
-                              fullName: person.fullName,
-                              email: person.email,
-                              role: person.role,
-                              clinic: branchLabel(store, person.branchId),
-                              pin,
-                              siteUrl: window.location.origin,
-                            }),
-                          );
-                          toast.success(sent === "sent" ? `PIN emailed to ${person.email}.` : `Temporary PIN ready for ${person.fullName}.`);
-                        });
-                      }}
-                    >
-                      Email new PIN
-                    </Button>
-                    {person.status === "active" ? (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => {
-                        try {
-                          store.removePerson(person.id);
-                          setPeopleStatus("inactive");
-                          setError("");
-                          toast.success(`${person.fullName} moved to Inactive.`);
-                        } catch (err) {
-                          setError(err instanceof Error ? err.message : "Could not deactivate the person");
-                        }
-                      }}
-                    >
-                      Deactivate
-                    </Button>
-                    ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        void store.reactivatePerson(person.id).then(() => {
-                          setPeopleStatus("active");
-                          toast.success(`${person.fullName} is Active again.`);
-                        }).catch((err) => setError(err instanceof Error ? err.message : "Could not reactivate"));
-                      }}
-                    >
-                      Reactivate
-                    </Button>
-                    )}
+                     <details className="relative">
+                       <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-ink hover:bg-ground">
+                         <MoreHorizontal className="size-3.5" /> More
+                       </summary>
+                       <div className="absolute right-0 z-10 mt-1 grid min-w-48 gap-1 rounded-lg border border-line bg-paper p-1.5 shadow-lg">
+                         <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => setArchivePersonId(person.id)}>Upload completed pack</button>
+                         <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => setEditingPersonId(person.id)}>Edit details</button>
+                         <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => {
+                           void store.issueTemporaryPin(person.id).then(async (pin) => {
+                             setIssuedPin({ name: person.fullName, email: person.email, pin });
+                             const sent = await deliverMail(buildWelcomeMail({ fullName: person.fullName, email: person.email, role: person.role, clinic: branchLabel(store, person.branchId), pin, siteUrl: window.location.origin }));
+                             toast.success(sent === "sent" ? `PIN emailed to ${person.email}.` : `Temporary PIN ready for ${person.fullName}.`);
+                           });
+                         }}>Email new PIN</button>
+                         {person.status === "active" ? (
+                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-bold text-danger-fg hover:bg-danger-bg" onClick={() => {
+                             try { store.removePerson(person.id); setPeopleStatus("inactive"); setError(""); toast.success(`${person.fullName} moved to Inactive.`); }
+                             catch (err) { setError(err instanceof Error ? err.message : "Could not deactivate the person"); }
+                           }}>Deactivate</button>
+                         ) : (
+                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-bold text-accent hover:bg-sage" onClick={() => {
+                             void store.reactivatePerson(person.id).then(() => { setPeopleStatus("active"); toast.success(`${person.fullName} is Active again.`); }).catch((err) => setError(err instanceof Error ? err.message : "Could not reactivate"));
+                           }}>Reactivate</button>
+                         )}
+                       </div>
+                     </details>
                   </div>
                 </Card>
               ))}
+              {store.people.filter((person) => {
+                const files = (store.records ?? []).filter((item) => item.personId === person.id);
+                const haystack = `${person.fullName} ${person.email} ${person.role} ${branchLabel(store, person.branchId)} ${files.map((item) => `${item.fileName} ${item.note} ${item.extractedText}`).join(" ")}`.toLowerCase();
+                return (!peopleQuery || haystack.includes(peopleQuery.toLowerCase())) && (peopleStatus === "all" || person.status === peopleStatus);
+              }).length === 0 && (
+                <div className="col-span-full rounded-xl border border-dashed border-line bg-paper px-6 py-12 text-center">
+                  <p className="font-display text-lg text-ink">No staff match these filters</p>
+                  <p className="mt-1 text-[12px] text-muted">Try a different name, branch, or status.</p>
+                </div>
+              )}
               </div>
             </div>
             <form
@@ -1131,19 +1157,19 @@ export function Workspace() {
               <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Add to directory</p>
               <h2 className="mb-3 font-display text-xl font-medium">New person</h2>
               <div className="grid gap-2.5">
-                <input name="fullName" required placeholder="Full name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                <input name="email" required type="email" placeholder="Work email" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                <input name="pin" required inputMode="numeric" minLength={4} maxLength={8} placeholder="4–8 digit PIN" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                <select name="role" required className="min-h-10 rounded-md border border-line px-2.5 text-sm">
+                <label className="grid gap-1 text-[11px] font-bold text-muted">Full name<input name="fullName" required placeholder="Full name" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" /></label>
+                <label className="grid gap-1 text-[11px] font-bold text-muted">Work email<input name="email" required type="email" placeholder="Work email" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" /></label>
+                <label className="grid gap-1 text-[11px] font-bold text-muted">Temporary PIN<input name="pin" required inputMode="numeric" minLength={4} maxLength={8} placeholder="4–8 digit PIN" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" /></label>
+                <label className="grid gap-1 text-[11px] font-bold text-muted">Role<select name="role" required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink">
                   <option value="employee">Employee / applicant</option>
                   <option value="manager">Franchisee / manager</option>
                   <option value="witness">Witness</option>
-                </select>
-                <select name="branchId" required className="min-h-10 rounded-md border border-line px-2.5 text-sm">
+                </select></label>
+                <label className="grid gap-1 text-[11px] font-bold text-muted">SkinPhD branch<select name="branchId" required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink">
                   {store.branches.map((branch) => (
                     <option key={branch.id} value={branch.id}>{branch.name}</option>
                   ))}
-                </select>
+                </select></label>
                 <Button type="submit">Add person</Button>
               </div>
             </form>
@@ -1628,10 +1654,23 @@ export function Workspace() {
                 </div>
               </div>
             </div>
-            <section>
+            <Tabs value={profileTab} onValueChange={setProfileTab}>
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="packs">Confirm packs</TabsTrigger>
+              <TabsTrigger value="papers">Paper records</TabsTrigger>
+            </TabsList>
+            <TabsContent value="overview">
+              <div className="rounded-xl border border-line bg-ground/60 p-4 text-[12px] leading-relaxed text-muted">
+                <p className="font-semibold text-ink">Staff file overview</p>
+                <p className="mt-1">{profile.fullName} is listed as a {roleLabel(profile.role).toLowerCase()} at {branchLabel(store, profile.branchId)}.</p>
+                <p className="mt-2">Use the Confirm packs and Paper records tabs to review the records already stored on this file.</p>
+              </div>
+            </TabsContent>
+            <TabsContent value="packs">
               <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Confirm packs on this file</p>
               <div className="mt-2 grid gap-2">
-                {packs.map((item) => (
+                {[...packs].sort((a, b) => Number(a.status === "completed") - Number(b.status === "completed")).map((item) => (
                   <button
                     key={item.id}
                     type="button"
@@ -1650,8 +1689,8 @@ export function Workspace() {
                 ))}
                 {packs.length === 0 && <p className="text-[12px] text-muted">No Confirm packs name this person yet.</p>}
               </div>
-            </section>
-            <section>
+            </TabsContent>
+            <TabsContent value="papers">
               <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Paper packs</p>
               <div className="mt-2 grid gap-2">
                 {papers.map((item) => (
@@ -1680,7 +1719,8 @@ export function Workspace() {
                 ))}
                 {papers.length === 0 && <p className="text-[12px] text-muted">No paper PDF or photo stored yet.</p>}
               </div>
-            </section>
+            </TabsContent>
+            </Tabs>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={() => { setProfilePersonId(null); setEditingPersonId(profile.id); }}>
                 Edit details
@@ -1943,12 +1983,14 @@ function Stat({ icon, tone, label, value, note }: { icon: ReactNode; tone: "gree
 function AgreementQueue({
   state,
   items,
+  hasFilters,
   canCreate,
   onOpen,
   onCreate,
 }: {
   state: WorkspaceState;
   items: Agreement[];
+  hasFilters: boolean;
   canCreate: boolean;
   onOpen: (id: string) => void;
   onCreate: () => void;
@@ -1969,11 +2011,11 @@ function AgreementQueue({
       {items.length === 0 ? (
         <div className="grid min-h-64 place-content-center justify-items-center px-8 py-10 text-center text-muted">
           <span className="grid size-12 place-items-center rounded-[10px] border border-line bg-sage font-display text-lg font-bold text-accent">A</span>
-          <h3 className="mt-3 font-display text-lg text-ink">No agreements yet</h3>
+           <h3 className="mt-3 font-display text-lg text-ink">{hasFilters ? "No agreements match these filters" : "No agreements yet"}</h3>
           <p className="mt-1 mb-4 text-[11px]">
-            {canCreate ? "Create the first agreement from an allocated SkinPhD source form." : "No agreements are assigned to this identity yet."}
+             {hasFilters ? "Try a different search term, status, branch, or source form." : canCreate ? "Create the first agreement from an allocated SkinPhD source form." : "No agreements are assigned to this identity yet."}
           </p>
-          {canCreate && (
+           {canCreate && !hasFilters && (
             <Button onClick={onCreate}>
               Create first agreement
             </Button>
@@ -2090,6 +2132,7 @@ function Detail({
   onSign: (action: "sign" | "decline") => Promise<void>;
   error: string;
 }) {
+  const [detailTab, setDetailTab] = useState("overview");
   const open = agreement.status === "awaiting_signatures" || agreement.status === "partially_signed";
   const actor = state.people.find((person) => person.id === state.currentPersonId);
   const nextSigner = agreement.snapshot.signers.find((signer) => {
@@ -2152,7 +2195,16 @@ function Detail({
         )}
           </>
         )}
-        <Button size="sm" variant="secondary" onClick={() => window.print()}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            setDetailTab("document");
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(() => window.print());
+            });
+          }}
+        >
           <Printer className="size-3.5" />
           Print issued pack
         </Button>
@@ -2170,6 +2222,13 @@ function Detail({
         <ProgressTrack state={state} agreement={agreement} />
       </section>
       {error && <p className="mb-3 rounded-md bg-danger-bg px-3 py-2 text-[12px] text-danger-fg">{error}</p>}
+      <Tabs value={detailTab} onValueChange={setDetailTab} className="mt-4">
+      <TabsList className="no-print">
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="signatures">Signatures</TabsTrigger>
+        <TabsTrigger value="document">Document</TabsTrigger>
+      </TabsList>
+      <TabsContent value="overview">
       <div className="mb-4 grid gap-x-6 rounded-xl border border-line bg-paper px-4 sm:grid-cols-2">
         <Row label="Employee" value={personName(state, agreement.employeeId)} />
         <Row label="Franchisee" value={personName(state, agreement.managerId)} />
@@ -2177,6 +2236,8 @@ function Detail({
         <Row label="Source form" value={`${agreement.snapshot.template.category.replaceAll("_", " ")} · v${agreement.snapshot.template.version}`} />
         {agreement.snapshot.template.hasWaiver && <Row label="Waiver addendum" value="Included from source form" />}
       </div>
+      </TabsContent>
+      <TabsContent value="signatures">
       {open && (
         <div className="my-4 rounded-xl border border-accent/20 bg-sage/80 p-4 no-print sm:p-5">
           <div className="mb-4 flex items-center gap-2">
@@ -2267,6 +2328,9 @@ function Detail({
       )}
         </div>
       )}
+      {!open && <div className="rounded-xl border border-line bg-ground/60 px-4 py-5 text-[12px] text-muted">Signing is closed for this record. Review the recorded signatures in the document.</div>}
+      </TabsContent>
+      <TabsContent value="document">
       <Row label="Deemed cost" value={rands(agreement.costCents)} />
       <Row label="Attendance / dates" value={`${agreement.startsOn || "Not set"} → ${agreement.endsOn || "Not set"}`} />
       {agreement.snapshot.fields.days != null && <Row label="Course days" value={String(agreement.snapshot.fields.days)} />}
@@ -2315,6 +2379,8 @@ function Detail({
             <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-status-green-fg">{agreement.snapshot.template.content}</p>
           </div>
         </TabsContent>
+      </Tabs>
+      </TabsContent>
       </Tabs>
     </div>
   );
