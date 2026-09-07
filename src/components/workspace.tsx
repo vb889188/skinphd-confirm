@@ -1,11 +1,16 @@
 import { FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
+  BellRing,
   Check,
+  CircleCheck,
+  Clock3,
   FileText,
   Plus,
   Printer,
   RotateCcw,
   Download,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
 import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
@@ -471,13 +476,13 @@ export function Workspace() {
 
   return (
     <TooltipProvider>
-    <main className="min-h-screen bg-transparent text-ink lg:grid lg:grid-cols-[272px_minmax(0,1fr)]">
-      <aside className="flex flex-col bg-linear-to-b from-forest to-forest-dark px-4 py-7 text-sidebar-text shadow-[8px_0_40px_rgba(10,36,29,0.18)] lg:sticky lg:top-0 lg:h-screen">
+    <main className="confirm-shell min-h-[100dvh] bg-transparent text-ink lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
+      <aside className="confirm-sidebar relative flex flex-col px-3 py-4 text-sidebar-text shadow-[8px_0_40px_rgba(10,36,29,0.18)] lg:sticky lg:top-0 lg:h-screen lg:px-4 lg:py-7">
         <div className="mb-7 flex items-center gap-3 border-b border-white/10 px-2 pb-6">
           <img src="/skinphd-mark.svg" alt="" className="size-10" />
           <span>
             <strong className="block font-display text-lg font-semibold tracking-tight text-paper">Confirm</strong>
-            <small className="mt-0.5 block text-[11px] tracking-[0.16em] text-sidebar-soft uppercase">Employee records</small>
+            <small className="confirm-kicker mt-0.5 block text-[10px] text-sidebar-soft uppercase">Head Office workspace</small>
           </span>
         </div>
         <nav aria-label="Primary navigation" className="flex gap-2 overflow-x-auto lg:block lg:overflow-visible">
@@ -501,15 +506,15 @@ export function Workspace() {
         </div>
       </aside>
 
-      <section className="min-w-0 px-4 py-6 sm:px-8 lg:px-14">
+      <section className="confirm-main min-w-0 px-4 py-5 sm:px-8 lg:px-12 lg:py-8">
         <header className="mx-auto mb-6 flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="mb-1 text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">SkinPhD Confirm</p>
-            <h1 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">{headings[view]}</h1>
+            <p className="confirm-kicker mb-2 text-[10px] font-medium text-accent uppercase">SkinPhD / Confirm / {view}</p>
+            <h1 className="font-display text-[2rem] font-medium tracking-[-0.035em] text-ink sm:text-4xl">{headings[view]}</h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{summaries[view]}</p>
           </div>
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-paper px-3 text-[11px] font-bold text-muted shadow-xs">
               <b className="tabular-nums text-ink">{stats.needsAction}</b>
               outstanding
             </span>
@@ -544,8 +549,38 @@ export function Workspace() {
         )}
         {view === "overview" && (
           <div className="mx-auto grid max-w-7xl gap-4">
+            <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Head Office summary">
+              <Stat
+                icon={<Clock3 className="size-4" />}
+                tone="amber"
+                label="Open packs"
+                value={stats.needsAction}
+                note="Waiting on at least one signer"
+              />
+              <Stat
+                icon={<UserRound className="size-4" />}
+                tone="blue"
+                label="Waiting on staff"
+                value={stats.waitingEmployee}
+                note="Employee signature is next"
+              />
+              <Stat
+                icon={<BellRing className="size-4" />}
+                tone="violet"
+                label="Reminders due"
+                value={stats.remindersDue}
+                note="No reminder in the last 3 days"
+              />
+              <Stat
+                icon={<CircleCheck className="size-4" />}
+                tone="green"
+                label="Completed"
+                value={stats.completed}
+                note="Frozen signed records retained"
+              />
+            </section>
             {isManager && (
-              <section className="overflow-hidden rounded-md border border-line bg-paper" aria-label="Head Office desk">
+              <section className="confirm-card overflow-hidden rounded-xl border border-line bg-paper" aria-label="Head Office desk">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
                   <div>
                     <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Signature queue</p>
@@ -581,7 +616,7 @@ export function Workspace() {
                 </div>
               </section>
             )}
-            <section className="overflow-hidden rounded-md border border-line bg-paper">
+            <section className="confirm-card overflow-hidden rounded-xl border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Queue</p>
                 <h2 className="font-display text-xl font-medium">
@@ -614,7 +649,7 @@ export function Workspace() {
                   <button
                     key={item.id}
                     type="button"
-                    className="flex w-full items-center gap-4 px-6 py-4 text-left transition hover:bg-ground sm:justify-between"
+                    className="group flex w-full flex-col items-stretch gap-3 px-4 py-4 text-left transition hover:bg-ground sm:flex-row sm:items-center sm:justify-between sm:px-6"
                     onClick={() => {
                       setSelectedId(item.id);
                       setView("agreements");
@@ -637,9 +672,9 @@ export function Workspace() {
                       </small>
                     </span>
                     </span>
-                    <span className="flex items-center gap-3">
+                    <span className="flex items-center justify-between gap-3 sm:justify-end">
                       <ProgressTrack state={store} agreement={item} compact />
-                      <span className="rounded-full bg-forest px-4 py-2 text-[11px] font-bold text-paper">Open</span>
+                      <span className="rounded-full bg-forest px-4 py-2 text-[11px] font-bold text-paper transition group-hover:bg-accent">Open</span>
                     </span>
                   </button>
                 ))}
@@ -651,7 +686,7 @@ export function Workspace() {
               </div>
             </section>
             {isManager && (
-            <section className="overflow-hidden rounded-3xl border border-line bg-paper">
+            <section className="confirm-card overflow-hidden rounded-2xl border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Why this exists</p>
                 <h2 className="font-display text-xl font-medium">Paper can go missing. This copy stays.</h2>
@@ -955,19 +990,27 @@ export function Workspace() {
         {view === "people" && can(current, "staff") && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_320px]">
             <div className="grid gap-3">
-              <input
-                value={peopleQuery}
-                onChange={(event) => setPeopleQuery(event.target.value)}
-                placeholder="Search staff or indexed paper packs"
-                aria-label="Search staff"
-                className="min-h-10 rounded-md border border-line bg-paper px-3 text-sm"
-              />
-              <div className="flex gap-2">
-                {(["all", "active", "inactive"] as const).map((id) => (
-                  <Button key={id} size="sm" variant={peopleStatus === id ? "primary" : "secondary"} onClick={() => setPeopleStatus(id)}>
-                    {id === "all" ? "All" : id === "active" ? "Active" : "Inactive"}
-                  </Button>
-                ))}
+              <div className="confirm-card rounded-xl border border-line bg-paper p-3 shadow-sm">
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <input
+                    value={peopleQuery}
+                    onChange={(event) => setPeopleQuery(event.target.value)}
+                    placeholder="Search staff, email, branch or paper pack"
+                    aria-label="Search staff"
+                    className="min-h-11 rounded-md border border-line bg-ground/60 px-3 text-sm"
+                  />
+                  <div className="flex gap-2 overflow-x-auto">
+                    {(["all", "active", "inactive"] as const).map((id) => (
+                      <Button key={id} size="sm" variant={peopleStatus === id ? "primary" : "secondary"} onClick={() => setPeopleStatus(id)}>
+                        {id === "all"
+                          ? `All ${store.people.length}`
+                          : id === "active"
+                            ? `Active ${store.people.filter((person) => person.status === "active").length}`
+                            : `Inactive ${store.people.filter((person) => person.status === "inactive").length}`}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
               {store.people
@@ -977,14 +1020,22 @@ export function Workspace() {
                   return (!peopleQuery || haystack.includes(peopleQuery.toLowerCase())) && (peopleStatus === "all" || person.status === peopleStatus);
                 })
                 .map((person) => (
-                <Card radius="section" elevation="sm" padding="md" className="transition hover:-translate-y-0.5 hover:shadow-md">
-                  <button type="button" className="text-left" onClick={() => setProfilePersonId(person.id)}>
-                    <strong className="block text-sm">{person.fullName}</strong>
-                  </button>
-                  <small className="mt-1.5 block text-[11px] text-muted capitalize">
-                    {roleLabel(person.role)} · {branchLabel(store, person.branchId)} · {person.status}
+                <Card key={person.id} radius="section" elevation="sm" padding="md" className="confirm-card transition hover:-translate-y-0.5 hover:shadow-md">
+                  <div className="flex items-start justify-between gap-3">
+                    <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => setProfilePersonId(person.id)}>
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-sage text-[11px] font-extrabold text-accent">{initials(person.fullName)}</span>
+                      <span className="min-w-0">
+                        <strong className="block truncate text-sm">{person.fullName}</strong>
+                        <small className="mt-0.5 block truncate text-[10px] text-muted">{person.email}</small>
+                      </span>
+                    </button>
+                    <span className={cn("shrink-0 rounded-full px-2 py-1 text-[9px] font-extrabold uppercase", person.status === "active" ? "bg-status-green-bg text-status-green-fg" : "bg-status-slate-bg text-status-slate-fg")}>
+                      {person.status}
+                    </span>
+                  </div>
+                  <small className="mt-3 block text-[11px] text-muted capitalize">
+                    {roleLabel(person.role)} · {branchLabel(store, person.branchId)}
                   </small>
-                  <small className="mt-1 block text-[11px] text-muted">{person.email}</small>
                   <p className="mt-2 text-[11px] text-muted">
                     {store.agreements.filter((item) => item.employeeId === person.id && item.status === "completed").length} completed Confirm pack(s)
                     {" · "}
@@ -1547,10 +1598,35 @@ export function Workspace() {
         return (
         <Modal onClose={() => setProfilePersonId(null)} title={profile.fullName} eyebrow="Staff file">
           <div className="grid gap-4 px-5 py-5">
-            <div className="rounded-md border border-line bg-ground px-4 py-3">
-              <p className="text-sm text-ink">{roleLabel(profile.role)} · {branchLabel(store, profile.branchId)}</p>
-              <p className="mt-1 text-[12px] text-muted">{profile.email}</p>
-              <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">{profile.status}</p>
+            <div className="rounded-xl border border-line bg-ground/70 p-4">
+              <div className="flex items-center gap-3">
+                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-forest text-sm font-bold text-paper shadow-sm">
+                  {initials(profile.fullName)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-ink">{roleLabel(profile.role)}</p>
+                    <span className={cn(
+                      "rounded-full px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.08em]",
+                      profile.status === "active" ? toneClass.green : toneClass.slate,
+                    )}>
+                      {profile.status}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[12px] text-muted">{branchLabel(store, profile.branchId)}</p>
+                  <p className="mt-1 truncate text-[11px] text-muted">{profile.email}</p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 divide-x divide-line rounded-lg border border-line bg-paper">
+                <div className="px-3 py-2.5">
+                  <strong className="block font-display text-xl tabular-nums">{packs.length}</strong>
+                  <span className="text-[10px] text-muted">Confirm packs</span>
+                </div>
+                <div className="px-3 py-2.5">
+                  <strong className="block font-display text-xl tabular-nums">{papers.length}</strong>
+                  <span className="text-[10px] text-muted">Paper records</span>
+                </div>
+              </div>
             </div>
             <section>
               <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Confirm packs on this file</p>
@@ -1831,8 +1907,8 @@ function NavButton({
     <button
       type="button"
       className={cn(
-        "mb-1 flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-[13px] whitespace-nowrap transition-colors",
-        current === id ? "bg-white/12 text-paper shadow-sm" : "text-sidebar-text hover:bg-white/8 hover:text-paper",
+        "mb-1 flex min-h-10 w-full items-center justify-between rounded-lg px-3 text-left text-[12px] whitespace-nowrap transition-colors",
+        current === id ? "confirm-nav-active bg-white/12 text-paper" : "text-sidebar-text hover:bg-white/8 hover:text-paper",
       )}
       onClick={() => onSelect(id)}
     >
@@ -1844,7 +1920,7 @@ function NavButton({
   );
 }
 
-function Stat({ icon, tone, label, value, note }: { icon: string; tone: "green" | "amber" | "blue" | "slate" | "violet"; label: string; value: number; note: string }) {
+function Stat({ icon, tone, label, value, note }: { icon: ReactNode; tone: "green" | "amber" | "blue" | "slate" | "violet"; label: string; value: number; note: string }) {
   const iconTone = {
     green: "bg-status-green-bg text-status-green-fg",
     amber: "bg-status-amber-bg text-status-amber-fg",
@@ -1853,11 +1929,13 @@ function Stat({ icon, tone, label, value, note }: { icon: string; tone: "green" 
     violet: "bg-status-violet-bg text-status-violet-fg",
   }[tone];
   return (
-    <article className="min-h-32 rounded-2xl border border-line bg-paper p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <span className={cn("grid size-7 place-items-center rounded-md text-xs font-extrabold", iconTone)}>{icon}</span>
-      <p className="mt-4 mb-1 text-[11px] text-muted">{label}</p>
-      <strong className="block font-display text-3xl font-medium tabular-nums">{value}</strong>
-      <small className="mt-2 block text-[10px] text-muted">{note}</small>
+    <article className="confirm-card confirm-stat min-h-32 rounded-2xl border border-line bg-paper p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <span className={cn("grid size-8 place-items-center rounded-lg", iconTone)}>{icon}</span>
+        <strong className="font-display text-3xl font-medium tabular-nums">{value}</strong>
+      </div>
+      <p className="mt-4 text-[11px] font-bold text-ink">{label}</p>
+      <small className="mt-1 block text-[10px] leading-relaxed text-muted">{note}</small>
     </article>
   );
 }
@@ -1876,7 +1954,7 @@ function AgreementQueue({
   onCreate: () => void;
 }) {
   return (
-    <section className="overflow-hidden rounded-md border border-line bg-paper">
+    <section className="confirm-card overflow-hidden rounded-xl border border-line bg-paper">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
           <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Records</p>
@@ -1902,21 +1980,21 @@ function AgreementQueue({
           )}
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <div className="grid min-w-xl grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)] items-center gap-3 bg-ground px-5 py-2 text-[9px] font-extrabold tracking-[0.09em] text-muted uppercase">
+        <div>
+          <div className="hidden grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)] items-center gap-3 bg-ground px-5 py-2 text-[9px] font-extrabold tracking-[0.09em] text-muted uppercase md:grid">
             <span>Agreement</span>
             <span>Status</span>
             <span>Signatures</span>
             <span />
           </div>
-          {items.map((item) => (
-            <div key={item.id} className="grid min-w-xl grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)] items-center gap-3 border-t border-line px-5 py-4 transition-colors hover:bg-sage/40">
+           {items.map((item) => (
+            <div key={item.id} className="group grid grid-cols-1 items-center gap-3 border-t border-line px-4 py-4 transition-colors hover:bg-sage/40 md:grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)] md:px-5">
               <div className="flex min-w-0 items-center gap-2.5">
                 <span className="grid h-10 w-8 shrink-0 place-items-center rounded-md border border-line bg-sage font-display text-sm font-bold text-accent">
                   <FileText className="size-3.5" />
                 </span>
                 <span className="min-w-0">
-                  <strong className="block truncate text-xs">{item.title}</strong>
+                   <strong className="block truncate text-[13px] font-semibold group-hover:text-accent">{item.title}</strong>
                   <small className="mt-0.5 block truncate text-[10px] text-muted">
                     {personName(state, item.employeeId)} · {nextStep(state, item)}
                   </small>
@@ -1929,10 +2007,12 @@ function AgreementQueue({
                 <ProgressTrack state={state} agreement={item} compact />
               </span>
               <span className="text-[10px] text-muted tabular-nums">
+                <span className="md:hidden">Signatures </span>
                 {state.signatures.filter((sig) => sig.agreementId === item.id && sig.outcome === "signed").length} of {item.requiredSignatures}
               </span>
               <Button
                 size="sm"
+                className="w-full md:w-auto"
                 variant={item.status === "completed" ? "secondary" : "primary"}
                 onClick={() => onOpen(item.id)}
               >
@@ -2026,8 +2106,8 @@ function Detail({
   const mail = buildEmployeeMail(state, agreement, typeof window === "undefined" ? "https://confirm.relpdev.uk" : window.location.origin);
   const recordEmail = useWorkspace((store) => store.noteEmailSent);
   return (
-    <div className="px-5 py-4">
-      <div className="mb-3 flex flex-wrap justify-end gap-2 no-print">
+    <div className="px-4 py-4 sm:px-6 sm:py-5">
+      <div className="mb-4 flex flex-wrap gap-2 no-print sm:justify-end">
         {actor?.role === "manager" && (
           <>
         <Button
@@ -2077,30 +2157,44 @@ function Detail({
           Print issued pack
         </Button>
       </div>
-      <ProgressTrack state={state} agreement={agreement} />
+      <section className="mb-4 rounded-xl border border-line bg-ground/70 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="confirm-kicker text-[9px] text-muted uppercase">Current status</p>
+            <p className="mt-1 text-sm font-semibold text-ink">{nextStep(state, agreement)}</p>
+          </div>
+          <b className={cn("inline-flex rounded-full px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.06em]", toneClass[STATUS_TONE[agreement.status]])}>
+            {STATUS_LABEL[agreement.status]}
+          </b>
+        </div>
+        <ProgressTrack state={state} agreement={agreement} />
+      </section>
       {error && <p className="mb-3 rounded-md bg-danger-bg px-3 py-2 text-[12px] text-danger-fg">{error}</p>}
-      <Row label="Employee" value={personName(state, agreement.employeeId)} />
-      <Row label="Franchisee" value={personName(state, agreement.managerId)} />
-      <Row label="SkinPhD branch" value={branchLabel(state, agreement.branchId)} />
-      <Row label="Source form" value={`${agreement.snapshot.template.category.replaceAll("_", " ")} · v${agreement.snapshot.template.version}`} />
-      {agreement.snapshot.template.hasWaiver && <Row label="Waiver addendum" value="Included from source form" />}
-      <div className="flex justify-between gap-5 border-b border-line py-3.5 text-[11px]">
-        <span className="text-muted">Status</span>
-        <b className={cn("inline-flex rounded-full px-2 py-1 text-[9px] font-extrabold", toneClass[STATUS_TONE[agreement.status]])}>
-          {STATUS_LABEL[agreement.status]}
-        </b>
+      <div className="mb-4 grid gap-x-6 rounded-xl border border-line bg-paper px-4 sm:grid-cols-2">
+        <Row label="Employee" value={personName(state, agreement.employeeId)} />
+        <Row label="Franchisee" value={personName(state, agreement.managerId)} />
+        <Row label="SkinPhD branch" value={branchLabel(state, agreement.branchId)} />
+        <Row label="Source form" value={`${agreement.snapshot.template.category.replaceAll("_", " ")} · v${agreement.snapshot.template.version}`} />
+        {agreement.snapshot.template.hasWaiver && <Row label="Waiver addendum" value="Included from source form" />}
       </div>
-      <Row label="Next step" value={nextStep(state, agreement)} />
       {open && (
-        <div className="my-4 rounded-md border border-accent/20 bg-sage p-4 no-print">
-          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Who signs</p>
-          <p className="mt-1 mb-3 text-[12px] leading-relaxed text-status-green-fg">{nextStep(state, agreement)}</p>
-      <div className="grid gap-2">
+        <div className="my-4 rounded-xl border border-accent/20 bg-sage/80 p-4 no-print sm:p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="grid size-8 place-items-center rounded-lg bg-accent text-paper">
+              <ShieldCheck className="size-4" />
+            </span>
+            <div>
+              <p className="confirm-kicker text-[9px] text-muted uppercase">Controlled signing</p>
+              <p className="mt-0.5 text-[12px] font-semibold text-status-green-fg">{nextStep(state, agreement)}</p>
+            </div>
+          </div>
+      <div className="grid gap-2 sm:grid-cols-3">
         {agreement.snapshot.signers.map((signer) => {
           const signature = state.signatures.find((item) => item.agreementId === agreement.id && item.role === signer.role);
           const isCurrent = signingRole === signer.role;
           return (
-            <article key={signer.role} className={cn("rounded-[10px] border bg-paper p-3", isCurrent ? "border-accent" : "border-line")}>
+            <article key={signer.role} className={cn("relative rounded-[10px] border bg-paper p-3", isCurrent ? "border-accent shadow-sm" : "border-line")}>
+              {isCurrent && <span className="absolute top-3 right-3 size-2 rounded-full bg-accent live-dot" />}
               <strong className="block text-sm">{signer.name}</strong>
               <small className="mt-1 block text-[11px] text-muted">
                 {roleLabel(signer.role)}
@@ -2118,19 +2212,20 @@ function Detail({
       </div>
       {signingRole && (
         <form
-          className="mt-3 grid gap-2.5"
+          className="mt-4 grid gap-3 rounded-xl border border-line bg-paper p-4"
           onSubmit={(event) => {
             event.preventDefault();
             if (!activeRole && signingRole) setActiveRole(signingRole);
             void onSign("sign");
           }}
         >
-          <p className="text-[11px] font-bold text-ink">
-            Record {roleLabel(signingRole)} signature
-          </p>
+          <div>
+            <p className="confirm-kicker text-[9px] text-muted uppercase">Signature step</p>
+            <p className="mt-1 text-sm font-bold text-ink">Record {roleLabel(signingRole)} signature</p>
+          </div>
           <Button
             variant="secondary"
-            className="w-full"
+            className="w-full sm:w-fit"
             disabled={saving}
             onClick={() => {
               if (!activeRole && signingRole) setActiveRole(signingRole);
@@ -2146,23 +2241,25 @@ function Detail({
               <p className="mt-1 text-[11px] text-muted">This pilot does not expire the code. Email also opened to the signer.</p>
             </div>
           )}
-          <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
-            Email code
-            <input value={token} onChange={(event) => setToken(event.target.value)} required inputMode="numeric" minLength={6} maxLength={6} placeholder="6-digit code" className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal tracking-[0.3em] text-ink" />
-          </label>
-          <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
-            Typed name
-            <input autoFocus value={typedName} onChange={(event) => setTypedName(event.target.value)} required className="min-h-10 rounded-md border border-line px-2.5 text-sm font-normal text-ink" />
-          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
+              Email code
+              <input value={token} onChange={(event) => setToken(event.target.value)} required inputMode="numeric" minLength={6} maxLength={6} placeholder="6-digit code" className="min-h-11 rounded-md border border-line bg-ground/50 px-3 text-sm font-normal tracking-[0.3em] text-ink" />
+            </label>
+            <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
+              Typed name
+              <input value={typedName} onChange={(event) => setTypedName(event.target.value)} required className="min-h-11 rounded-md border border-line bg-ground/50 px-3 text-sm font-normal text-ink" />
+            </label>
+          </div>
           <label htmlFor="consent-checkbox" className="grid grid-cols-[20px_1fr] items-start gap-2 py-1 text-[11px] font-medium text-status-green-fg">
             <Checkbox id="consent-checkbox" checked={consent} onCheckedChange={setConsent} />
             <span>{consentCopy()}</span>
           </label>
-          <div className="sticky bottom-0 z-10 -mx-4 mt-2 flex flex-wrap justify-end gap-2 border-t border-line bg-sage/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-1">
-            <Button variant="danger" size="lg" disabled={saving} onClick={() => void onSign("decline")}>
+          <div className="sticky bottom-0 z-10 -mx-4 mt-2 grid grid-cols-1 gap-2 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex sm:justify-end sm:border-0 sm:bg-transparent sm:px-0 sm:py-1">
+            <Button variant="danger" size="lg" className="w-full sm:w-auto" disabled={saving} onClick={() => void onSign("decline")}>
               Decline
             </Button>
-            <Button type="submit" size="lg" className="min-w-40" disabled={saving}>
+            <Button type="submit" size="lg" className="w-full sm:min-w-48 sm:w-auto" disabled={saving}>
               {saving ? "Saving…" : "Record typed signature"}
             </Button>
           </div>

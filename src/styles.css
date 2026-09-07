@@ -1,17 +1,18 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @theme {
   --color-forest: #0f3329;
   --color-forest-dark: #0a241d;
-  --color-ink: #14201c;
-  --color-muted: #5a6862;
-  --color-line: #e2e8e4;
-  --color-paper: #ffffff;
-  --color-ground: #eef3ef;
+  --color-ink: #17231f;
+  --color-muted: #61716a;
+  --color-line: #d9e3de;
+  --color-paper: #fbfcfa;
+  --color-ground: #edf3ef;
   --color-sage: #d7e6de;
-  --color-accent: #1b6b51;
-  --color-accent-hover: #145541;
+  --color-accent: #176b50;
+  --color-accent-hover: #0f5540;
   --color-sidebar-text: #c5d8d0;
   --color-sidebar-soft: #a9c4b9;
   --color-sidebar-label: #7fa394;
@@ -37,7 +38,7 @@
   --color-gold-hover: #9c6f2c;
   --color-gold-soft: #f6ead0;
   --color-gold-fg: #7a5420;
-  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --radius-lg: 1rem;
   --radius-md: 0.7rem;
@@ -80,10 +81,33 @@ body {
   font-family: var(--font-sans);
   color: var(--color-ink);
   background:
-    radial-gradient(900px 420px at 8% -8%, #d7e6de 0%, transparent 50%),
-    radial-gradient(700px 360px at 100% 0%, #e7eee9 0%, transparent 46%),
+    linear-gradient(135deg, rgba(215, 230, 222, 0.52), transparent 38%),
     var(--color-ground);
 }
+
+/* Confirm is a long-session operations tool: quiet surfaces, crisp edges, useful density. */
+::selection { background: #c6ded2; color: #0f3329; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.confirm-shell { background: rgba(251, 252, 250, 0.58); }
+.confirm-sidebar { background: linear-gradient(165deg, #123d30 0%, #0b2a21 72%, #09241d 100%); }
+.confirm-sidebar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .12;
+  background-image: radial-gradient(#d7e6de 0.6px, transparent 0.6px);
+  background-size: 11px 11px;
+  mask-image: linear-gradient(to bottom, black, transparent 80%);
+}
+.confirm-main { animation: confirm-enter .35s ease-out both; }
+.confirm-kicker { font-family: "DM Mono", monospace; letter-spacing: .12em; }
+.confirm-card { box-shadow: 0 1px 2px rgba(15,51,41,.04), 0 12px 30px rgba(15,51,41,.04); }
+.confirm-card:hover { border-color: #c4d6cd; }
+.confirm-nav-active { box-shadow: inset 3px 0 0 #d7e6de, 0 5px 16px rgba(0,0,0,.1); }
+.confirm-stat { position: relative; overflow: hidden; }
+.confirm-stat::after { content: ""; position:absolute; width:90px; height:90px; right:-26px; bottom:-40px; border:1px solid rgba(23,107,80,.14); border-radius:50%; }
+@keyframes confirm-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 @keyframes confirm-pulse {
   0%,
@@ -106,6 +130,17 @@ body {
     transition: none !important;
     transform: none !important;
   }
+}
+
+@media (max-width: 1023px) {
+  .confirm-sidebar { position: sticky; top: 0; z-index: 20; }
+  .confirm-sidebar nav { scrollbar-width: none; }
+  .confirm-sidebar nav::-webkit-scrollbar { display: none; }
+}
+@media (max-width: 639px) {
+  .confirm-main { padding-bottom: 5rem; }
+  .confirm-card { border-radius: 14px; }
+  input, select, textarea { font-size: 16px; } /* prevents iOS zoom while preserving dense desktop type */
 }
 
 @media print {
