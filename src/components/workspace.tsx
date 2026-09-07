@@ -536,13 +536,6 @@ export function Workspace() {
   }
 
   function closeIssuedPin() {
-    if (issuedPin) {
-      setRevealedPins((currentPins) => {
-        const nextPins = { ...currentPins };
-        delete nextPins[issuedPin.personId];
-        return nextPins;
-      });
-    }
     setIssuedPin(null);
   }
 
@@ -704,8 +697,6 @@ export function Workspace() {
                 label="Open packs"
                 value={stats.needsAction}
                 note="Waiting on at least one signer"
-                active={deskFilter === "all"}
-                onClick={() => setDeskFilter("all")}
               />
               <Stat
                 icon={<UserRound className="size-4" />}
@@ -713,8 +704,6 @@ export function Workspace() {
                 label="Waiting on staff"
                 value={stats.waitingEmployee}
                 note="Employee signature is next"
-                active={deskFilter === "employee"}
-                onClick={() => setDeskFilter("employee")}
               />
               <Stat
                 icon={<BellRing className="size-4" />}
@@ -722,8 +711,6 @@ export function Workspace() {
                 label="Reminders due"
                 value={stats.remindersDue}
                 note="No reminder in the last 3 days"
-                active={deskFilter === "remind"}
-                onClick={() => setDeskFilter("remind")}
               />
               <Stat
                 icon={<CircleCheck className="size-4" />}
@@ -731,8 +718,6 @@ export function Workspace() {
                 label="Completed"
                 value={stats.completed}
                 note="Frozen signed records retained"
-                active={deskFilter === "completed"}
-                onClick={() => setDeskFilter("completed" as typeof deskFilter)}
               />
             </section>
             {isManager && (
@@ -748,13 +733,14 @@ export function Workspace() {
                     </Button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-5 sm:divide-y-0">
+                <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
                   {[
                     ["today", stats.issuedToday, "Issued today"],
                     ["employee", stats.waitingEmployee, "Employee"],
                     ["franchisee", stats.waitingFranchisee, "Franchisee"],
                     ["witness", stats.waitingWitness, "Witness"],
                     ["remind", stats.remindersDue, "Reminders"],
+                    ["completed", stats.completed, "Completed"],
                   ].map(([id, value, label]) => (
                     <button
                       key={String(id)}
@@ -1546,7 +1532,7 @@ export function Workspace() {
         <Modal onClose={closeIssuedPin} title={issuedPin.name} eyebrow="Temporary PIN">
           <div className="grid gap-3 px-5 py-5">
             <p className="text-[13px] leading-relaxed text-muted">
-              The previous PIN for {issuedPin.email} no longer works. Send this number privately. Confirm will not show it again.
+              The previous PIN for {issuedPin.email} no longer works. Send this number privately. It stays visible on this staff file until a newer PIN replaces it or you reload.
             </p>
             <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-ground px-4 py-3">
               <p className="font-display text-4xl font-medium tracking-[0.2em] text-ink">{issuedPin.pin}</p>
