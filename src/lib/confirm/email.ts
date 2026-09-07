@@ -54,7 +54,7 @@ export function buildSignCodeMail(input: { fullName: string; email: string; titl
       "Use this 6-digit code to record your typed signature.",
       "",
       `Code: ${input.code}`,
-      "This code expires in 15 minutes.",
+      "This pilot does not expire the code. Ask Head Office for a new one only if this number was already used.",
       "",
       input.siteUrl,
       "",

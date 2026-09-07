@@ -81,7 +81,7 @@ Do not modify anything under `sources/` if present.
 
 ## Signing rules (do not weaken)
 - Typed name must `namesMatch` the official signer name on the snapshot (Head Office signing as franchisee types **Amelia Naidoo**, not SkinPhD Head Office, if that is the snapshot name)
-- 6-digit code hashed, 15 minute expiry, required to record sign
+- 6-digit code hashed, required to record sign. Expiry is off for the pilot.
 - Snapshot JSON is immutable after issue
 
 ## Deploy

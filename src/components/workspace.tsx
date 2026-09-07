@@ -2059,7 +2059,7 @@ function Detail({
             <div className="rounded-md border border-line bg-paper px-3 py-3">
               <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Head Office sign code</p>
               <p className="mt-1 font-display text-3xl tracking-[0.2em] text-ink">{issuedToken}</p>
-              <p className="mt-1 text-[11px] text-muted">Valid 15 minutes. Email also opened to the signer.</p>
+              <p className="mt-1 text-[11px] text-muted">This pilot does not expire the code. Email also opened to the signer.</p>
             </div>
           )}
           <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">

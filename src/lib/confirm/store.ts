@@ -656,7 +656,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const now = new Date();
         const code = String(100000 + Math.floor(Math.random() * 900000));
         const tokenHash = await sha256Hex(code);
-        const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+        const expiresAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
         const links = state.links.map((link) =>
           link.agreementId === agreementId && link.role === role && link.status === "pending"
             ? { ...link, status: "revoked" as const }
@@ -684,7 +684,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               agreementId,
               actor: ACTOR,
               action: "Sign code emailed",
-              detail: `A 15-minute sign code was prepared for ${signer.name} (${role}).`,
+              detail: `A sign code was prepared for ${signer.name} (${role}). Codes do not expire during this pilot.`,
               createdAt: now.toISOString(),
             },
             ...state.audit,
@@ -719,11 +719,8 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           }
           if (link.status === "consumed") throw new Error("This signing link has already been used");
           if (link.status === "revoked" || link.status === "declined") throw new Error("This signing link is no longer valid");
-          if (link.status !== "pending" || new Date(link.expiresAt).getTime() <= Date.now()) {
-            set({
-              links: links.map((item) => (item.id === link.id ? { ...item, status: "expired" as const } : item)),
-            });
-            throw new Error("This signing link has expired");
+          if (link.status !== "pending") {
+            throw new Error("This signing link is no longer valid");
           }
           linkId = link.id;
         }
