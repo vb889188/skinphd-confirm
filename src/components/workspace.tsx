@@ -173,7 +173,7 @@ export function Workspace() {
   const [clinicFilter, setClinicFilter] = useState("");
   const [templateFilter, setTemplateFilter] = useState("");
   const [peopleQuery, setPeopleQuery] = useState("");
-  const [peopleStatus, setPeopleStatus] = useState<"all" | "active" | "inactive">("all");
+  const [peopleStatus, setPeopleStatus] = useState<"all" | "active" | "inactive">("active");
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [archivePersonId, setArchivePersonId] = useState<string | null>(null);
