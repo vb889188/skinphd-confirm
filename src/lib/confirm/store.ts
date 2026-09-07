@@ -714,7 +714,8 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           const tokenHash = await sha256Hex(input.token);
           const link = links.find((item) => item.tokenHash === tokenHash);
           if (!link || link.agreementId !== agreement.id || link.role !== input.role) {
-            throw new Error("This signing link is not valid");
+            const who = input.role === "manager" ? "franchisee" : input.role;
+            throw new Error(`This code is not valid for the ${who}. Email a new 6-digit code for that signer.`);
           }
           if (link.status === "consumed") throw new Error("This signing link has already been used");
           if (link.status === "revoked" || link.status === "declined") throw new Error("This signing link is no longer valid");

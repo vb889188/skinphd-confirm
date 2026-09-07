@@ -345,11 +345,20 @@ export function Workspace() {
           );
         }
       }
-      setTypedName("");
-      setToken("");
       setConsent(false);
       setIssuedToken("");
-      setActiveRole("");
+      setToken("");
+      const nextRole = latest?.snapshot.signers.find(
+        (signer) =>
+          signer.role !== role &&
+          !useWorkspace.getState().signatures.some((item) => item.agreementId === latest.id && item.role === signer.role && item.outcome === "signed"),
+      );
+      if (action === "sign" && nextRole && current?.role === "manager") {
+        setActiveRole(nextRole.role);
+        setTypedName(nextRole.name);
+      } else {
+        setActiveRole("");
+      }
     } catch (err) {
       haptic("warn");
       setError(err instanceof Error ? err.message : "Could not record the signature");
