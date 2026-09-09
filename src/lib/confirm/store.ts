@@ -132,10 +132,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const code = pin.trim();
         const person = get().people.find((item) => item.email.toLowerCase() === normalized && item.status === "active");
         if (!person || !person.pinHash) throw new Error("No active staff record for that email.");
-        if (person.role === "employee" || person.role === "witness") {
-          throw new Error("Therapists and witnesses do not collect a PIN. Sign at the salon table, or open the personal link Head Office sent.");
-        }
-        if (person.role === "employee" || person.role === "witness") {
+        if (person.role !== "manager") {
           throw new Error("Therapists and witnesses do not collect a PIN. Sign at the salon table, or open the personal link Head Office sent.");
         }
         const hash = await sha256Hex(`${normalized}|${code}`);
