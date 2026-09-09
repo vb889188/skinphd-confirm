@@ -10,6 +10,21 @@ export function employeeMailHref(mail: EmployeeMail) {
   return `mailto:${encodeURIComponent(mail.to)}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`;
 }
 
+function whereYouCanSign(link?: string) {
+  return [
+    "You can do this wherever you are today:",
+    "",
+    "• At the salon / shop — ask them to pass you the tablet. Type your legal name as it appears on the staff list, tick the box, and you are done. You do not need a PIN.",
+    "• Not at the shop — open the personal link on your phone. You can do this from home, in the car, or before you come in.",
+    "• After you have signed — keep this email. The same link opens your copy of the pack.",
+    "",
+    "This is not a password. This is not a PIN. This is not a 6-digit code. It is only this one pack.",
+    "",
+    link ? "Your personal link:" : "If you do not have a personal link yet, ask Head Office to email one, or sign on the tablet when you are in the salon.",
+    ...(link ? [link] : []),
+  ];
+}
+
 export function buildWelcomeMail(input: {
   fullName: string;
   email: string;
@@ -19,48 +34,56 @@ export function buildWelcomeMail(input: {
   siteUrl: string;
 }): EmployeeMail {
   const role =
-    input.role === "manager" ? "franchisee" : input.role === "witness" ? "witness" : "employee";
+    input.role === "manager" ? "franchisee / Head Office" : input.role === "witness" ? "witness" : "employee";
+  const desk = input.role === "manager";
   return {
     to: input.email,
-    subject: "SkinPhD Confirm sign-in details",
-    body: [
-      `Hello ${input.fullName},`,
-      "",
-      "A SkinPhD Confirm workspace identity was created for you.",
-      "",
-      `Name: ${input.fullName}`,
-      `Email: ${input.email}`,
-      `Role: ${role}`,
-      `SkinPhD branch: ${input.clinic}`,
-      `PIN: ${input.pin}`,
-      "",
-      "Sign in here:",
-      input.siteUrl,
-      "",
-      "This PIN does not expire. Head Office can issue a new one if it is lost.",
-      "",
-      "SkinPhD Confirm",
-    ].join("\n"),
+    subject: desk ? "Your SkinPhD Confirm desk login" : "You are on the SkinPhD Confirm staff list",
+    body: desk
+      ? [
+          `Hello ${input.fullName},`,
+          "",
+          "Head Office set up your Confirm desk login. This PIN is only to open the Head Office / franchisee workspace. It is not used to sign a pack.",
+          "",
+          `Name: ${input.fullName}`,
+          `Email: ${input.email}`,
+          `Role: ${role}`,
+          `SkinPhD branch: ${input.clinic}`,
+          `Workspace PIN: ${input.pin}`,
+          "",
+          "Open the desk here:",
+          input.siteUrl,
+          "",
+          "Change this PIN under Settings after you first sign in. If you lose it, Head Office can email a new one.",
+          "",
+          "SkinPhD Confirm",
+        ].join("\n")
+      : [
+          `Hello ${input.fullName},`,
+          "",
+          "You are on the SkinPhD Confirm staff list. You do not get a workspace PIN.",
+          "",
+          ...whereYouCanSign(input.siteUrl.includes("?sign=") ? input.siteUrl : undefined),
+          "",
+          "SkinPhD Confirm",
+        ].join("\n"),
   };
 }
 
 export function buildSignCodeMail(input: { fullName: string; email: string; title: string; code: string; siteUrl: string }): EmployeeMail {
+  const link = `${input.siteUrl}?sign=${input.code}`;
   return {
     to: input.email,
-    subject: `SkinPhD Confirm — your pack`,
+    subject: `Please sign your SkinPhD pack — at the salon or from home`,
     body: [
       `Hello ${input.fullName},`,
       "",
-      "This is your personal link for one frozen SkinPhD Confirm pack. It is not a PIN and not a 6-digit code.",
-      "",
+      "Head Office has a SkinPhD pack waiting for your name.",
       `Pack: ${input.title}`,
       "",
-      "Open it on your phone. If you have not signed yet, type your legal name as it appears on the staff list, tick the box, and record your signature — from home or before you come in.",
-      "If you have already signed, the same link opens your copy of the frozen pack.",
+      ...whereYouCanSign(link),
       "",
-      `${input.siteUrl}?sign=${input.code}`,
-      "",
-      "If you are in the salon, you can still sign on the tablet at the table instead.",
+      "When the page opens: type your legal name exactly as it appears on the staff list, tick the box, and record your signature. You may also draw a mark with your finger.",
       "",
       "SkinPhD Confirm",
     ].join("\n"),
@@ -76,15 +99,17 @@ export function buildFranchiseeIssuedMail(input: {
 }): EmployeeMail {
   return {
     to: input.toEmail,
-    subject: `Pack issued — ${input.title}`,
+    subject: `Pack issued for ${input.employeeName}`,
     body: [
       `Hello ${input.toName},`,
       "",
       "A SkinPhD Confirm pack was issued for your branch.",
       `Employee: ${input.employeeName}`,
-      `Agreement: ${input.title}`,
+      `Pack: ${input.title}`,
       "",
-      "The employee should sign first. They can do that at the salon table, or from home on the personal link Head Office emailed. You sign after that name is recorded. Nobody collects a 6-digit code.",
+      `${input.employeeName} signs first. They can do that at the salon on the tablet, or from home on the personal link Head Office emails them. They do not collect a PIN.`,
+      "",
+      "You sign after their name is on the pack.",
       input.siteUrl,
       "",
       "SkinPhD Confirm",
@@ -99,50 +124,81 @@ export function buildNextSignerMail(input: {
   role: string;
   previousSigner: string;
   siteUrl: string;
+  packUrl?: string;
 }): EmployeeMail {
+  const employeeFacing = input.role !== "franchisee" && input.role !== "manager";
   return {
     to: input.toEmail,
-    subject: `Your turn to sign — ${input.title}`,
-    body: [
-      `Hello ${input.toName},`,
-      "",
-      `${input.previousSigner} has recorded a typed signature.`,
-      `SkinPhD Confirm is waiting for you as ${input.role}.`,
-      "",
-      "Sign at the salon table, or open the personal link Head Office emailed. There is no PIN and no 6-digit code.",
-      input.siteUrl,
-      "",
-      "SkinPhD Confirm",
-    ].join("\n"),
+    subject: employeeFacing
+      ? `Your turn to sign — at the salon or from home`
+      : `Your turn to sign — ${input.title}`,
+    body: employeeFacing
+      ? [
+          `Hello ${input.toName},`,
+          "",
+          `${input.previousSigner} has already put their name on this SkinPhD pack.`,
+          `Pack: ${input.title}`,
+          "",
+          "It is your turn.",
+          "",
+          ...whereYouCanSign(input.packUrl),
+          "",
+          "SkinPhD Confirm",
+        ].join("\n")
+      : [
+          `Hello ${input.toName},`,
+          "",
+          `${input.previousSigner} has recorded their name on this pack.`,
+          `Pack: ${input.title}`,
+          "",
+          "Please sign at the Confirm desk when you can. The employee does not use a PIN. You still use your workspace PIN to open the desk.",
+          input.siteUrl,
+          "",
+          "SkinPhD Confirm",
+        ].join("\n"),
   };
 }
 
-export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, siteUrl: string, pin?: string): EmployeeMail {
+export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, siteUrl: string, pin?: string, packUrl?: string): EmployeeMail {
   const employee = state.people.find((person) => person.id === agreement.employeeId);
   const manager = state.people.find((person) => person.id === agreement.managerId);
   const clinic = state.branches.find((branch) => branch.id === agreement.branchId);
   const complete = agreement.status === "completed";
+  const name = employee?.fullName ?? "colleague";
   return {
     to: employee?.email ?? "",
-    subject: complete ? `Stored pack: ${agreement.title}` : `SkinPhD Confirm: ${agreement.title}`,
-    body: [
-      `Hello ${employee?.fullName ?? "colleague"},`,
-      "",
-      complete ? "SkinPhD Confirm has stored this signed pack." : "A pack is ready for your typed signature.",
-      `- Title: ${agreement.title}`,
-      `- Status: ${agreement.status.replaceAll("_", " ")}`,
-      `- Franchisee: ${manager?.fullName ?? "Not set"}`,
-      `- SkinPhD branch: ${clinic ? `${clinic.name} (${clinic.code})` : "Not set"}`,
-      `- Snapshot: ${agreement.snapshotHash}`,
-      "",
-      "Sign in",
-      siteUrl,
-      `Email: ${employee?.email ?? ""}`,
-      pin ? `PIN: ${pin}` : "Therapists do not collect a PIN. Use the personal link Head Office emailed to sign or to open your copy.",
-      pin ? "This PIN does not expire. Head Office can issue a new one if it is lost." : "",
-      "",
-      "SkinPhD Confirm",
-    ].filter((line) => line !== "").join("\n"),
+    subject: complete
+      ? `Your signed SkinPhD pack is stored`
+      : `Your SkinPhD pack — sign at the salon or from home`,
+    body: complete
+      ? [
+          `Hello ${name},`,
+          "",
+          "Your pack is complete. SkinPhD Head Office has stored the signed copy.",
+          `Pack: ${agreement.title}`,
+          `Branch: ${clinic ? clinic.name : "Not set"}`,
+          `Franchisee: ${manager?.fullName ?? "Not set"}`,
+          "",
+          packUrl
+            ? "Open your copy on this personal link (keep this email — you do not need a PIN):"
+            : "Ask Head Office to email your personal copy link if you want to open this pack from home.",
+          packUrl ?? "",
+          "",
+          "SkinPhD Confirm",
+        ].filter((line) => line !== "").join("\n")
+      : [
+          `Hello ${name},`,
+          "",
+          "Head Office has a SkinPhD pack waiting for your name.",
+          `Pack: ${agreement.title}`,
+          `Branch: ${clinic ? clinic.name : "Not set"}`,
+          "",
+          ...whereYouCanSign(packUrl),
+          pin ? "" : "",
+          pin ? `Head Office / franchisee desk PIN (not for therapists): ${pin}` : "",
+          "",
+          "SkinPhD Confirm",
+        ].filter((line) => line !== "").join("\n"),
   };
 }
 
@@ -153,12 +209,25 @@ export function buildReminderMail(state: WorkspaceState, agreement: Agreement, s
   const recipients = outstanding
     .map((signer) => state.people.find((person) => person.id === signer.id)?.email)
     .filter((email): email is string => Boolean(email));
+  const names = outstanding
+    .map((item) => {
+      const person = state.people.find((entry) => entry.id === item.id);
+      const who = item.role === "manager" ? "franchisee" : item.role === "witness" ? "witness" : "employee";
+      return person ? `${person.fullName} (${who})` : who;
+    })
+    .join(", ");
   return {
     to: recipients.join(","),
-    subject: `Reminder: SkinPhD Confirm signature outstanding — ${agreement.title}`,
+    subject: `Reminder: a SkinPhD pack still needs a name`,
     body: [
-      "A SkinPhD Confirm pack is waiting for signature.",
-      `Outstanding: ${outstanding.map((item) => item.role).join(", ") || "none"}`,
+      "A SkinPhD Confirm pack is still waiting for a signature.",
+      `Pack: ${agreement.title}`,
+      `Still needed: ${names || "none"}`,
+      "",
+      "If you are the employee: you can sign at the salon on the tablet, or from home on the personal link Head Office emailed you. You do not need a PIN. If you cannot find that email, ask Head Office to send the link again.",
+      "",
+      "If you are the franchisee: open the Confirm desk with your workspace PIN and sign after the employee.",
+      "",
       siteUrl,
       "",
       "SkinPhD Confirm",
@@ -169,19 +238,26 @@ export function buildReminderMail(state: WorkspaceState, agreement: Agreement, s
 export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreement, siteUrl: string, recordUrl?: string): EmployeeMail {
   const employee = state.people.find((person) => person.id === agreement.employeeId);
   const manager = state.people.find((person) => person.id === agreement.managerId);
+  const clinic = state.branches.find((branch) => branch.id === agreement.branchId);
   return {
     to: [employee?.email, manager?.email].filter((email): email is string => Boolean(email)).join(","),
-    subject: `Signed record stored: ${agreement.title}`,
+    subject: `Signed: ${employee?.fullName ?? "employee"} pack is stored`,
     body: [
-      "The agreement is complete. SkinPhD Confirm has stored the signed record.",
-      `Employee: ${employee?.fullName ?? "Not set"}`,
+      `Hello ${employee?.fullName ?? "colleague"},`,
+      "",
+      "This pack is finished. Your name is on it, and SkinPhD Head Office has stored the signed copy.",
+      `Pack: ${agreement.title}`,
+      `Branch: ${clinic ? clinic.name : "Not set"}`,
       `Franchisee: ${manager?.fullName ?? "Not set"}`,
-      `Snapshot: ${agreement.snapshotHash}`,
+      "",
+      "You do not need a PIN to see it.",
       "",
       recordUrl
-        ? "The employee can open their copy on this personal link (not a PIN):"
-        : "Ask Head Office to email the employee their copy link if they need to open the pack from home.",
+        ? "Open your copy any time — from home or anywhere — on this personal link:"
+        : "If you want a phone copy, ask Head Office to email your personal link.",
       recordUrl ?? siteUrl,
+      "",
+      "Keep this email. If you are at the salon, they can also print the certificate of record for you.",
       "",
       "SkinPhD Confirm",
     ].join("\n"),

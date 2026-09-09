@@ -430,6 +430,15 @@ export function Workspace() {
         );
         const person = next ? snapshot.people.find((item) => item.id === next.id) : null;
         if (person?.email && next) {
+          let packUrl: string | undefined;
+          if (next.role !== "manager") {
+            try {
+              const copy = await useWorkspace.getState().issueSignCode(latest.id, next.role);
+              packUrl = `${window.location.origin}?sign=${copy.token}`;
+            } catch {
+              /* notice still goes out */
+            }
+          }
           await deliverMail(
             buildNextSignerMail({
               toName: person.fullName,
@@ -438,6 +447,7 @@ export function Workspace() {
               role: next.role === "manager" ? "franchisee" : next.role,
               previousSigner: typedName,
               siteUrl: window.location.origin,
+              packUrl,
             }),
           );
         }
@@ -2397,7 +2407,7 @@ function Detail({
         <Modal onClose={() => setPackPreview(false)} title="Send employee pack?" eyebrow="Confirm mail">
           <div className="grid gap-3 px-5 py-5">
             <p className="text-[13px] leading-relaxed text-muted">
-              This emails the pack from info@relpdev.uk. Therapists open their copy from the personal link, not a PIN.
+              This emails the employee, in plain language, that they can sign at the salon, from home, or open their copy later. It is not a PIN.
             </p>
             <div className="rounded-md border border-line bg-ground px-3 py-3 text-[13px]">
               <p><strong>To</strong> {employee?.email || "No email on file"}</p>
@@ -2410,7 +2420,15 @@ function Detail({
                 disabled={!employee?.email}
                 onClick={() => {
                   void (async () => {
-                    const pack = buildEmployeeMail(useWorkspace.getState(), agreement, window.location.origin);
+                    const origin = window.location.origin;
+                    let packUrl: string | undefined;
+                    try {
+                      const copy = await useWorkspace.getState().issueSignCode(agreement.id, "employee");
+                      packUrl = `${origin}?sign=${copy.token}`;
+                    } catch {
+                      /* still send the notice */
+                    }
+                    const pack = buildEmployeeMail(useWorkspace.getState(), agreement, origin, undefined, packUrl);
                     if (!pack.to) return;
                     recordEmail(agreement.id, pack.to);
                     const sent = await deliverMail(pack);
@@ -2603,13 +2621,13 @@ function Detail({
               void onIssueCode(signingRole as Role);
             }}
           >
-            If they are at home — send to their phone
+            Send to their phone — salon, home, or later
           </Button>
           {actor?.role === "manager" && issuedToken && (
             <div className="rounded-md border border-line bg-paper px-3 py-3">
               <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Personal link</p>
               <p className="mt-1 break-all text-[12px] text-ink">{typeof window !== "undefined" ? `${window.location.origin}?sign=${issuedToken}` : issuedToken}</p>
-              <p className="mt-1 text-[11px] text-muted">Same link to sign from home and to open their copy later. Not a PIN. Not a 6-digit code.</p>
+              <p className="mt-1 text-[11px] text-muted">One link. They can sign at the salon, from home, or open their copy later. Not a PIN.</p>
             </div>
           )}
           <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
@@ -2845,7 +2863,7 @@ function PersonalLinkSign({ token }: { token: string }) {
         <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Personal link · not a PIN</p>
         <h1 className="mt-2 font-display text-3xl">{packTitle(agreement.title)}</h1>
         <p className="mt-2 text-sm text-muted">
-          {roleLabel(link.role)} · type {signer.name} exactly as it appears on the staff list. You can do this from home, before you come in, or after you leave.
+          {roleLabel(link.role)} · type {signer.name} exactly as it appears on the staff list. You can do this at the salon, from home, or anywhere you have this link.
         </p>
         {error && <p className="mt-3 rounded-md bg-danger-bg px-3 py-2 text-[11px] text-danger-fg">{error}</p>}
         <div className="mt-5 grid gap-3">

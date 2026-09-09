@@ -24,13 +24,14 @@ Settings → current PIN + new PIN.
 
 ## How an employee signs and later opens their copy
 
-Therapists do not log into the Head Office workspace.
+Therapists do not log into the Head Office workspace. Every employee email says the same three options, in plain language:
 
-1. **At the table.** Pass the tablet. They type their own legal name, tick consent, optional drawn mark. Head Office never types it for them.
-2. **From home / before they come in.** Head Office opens the pack → **If they are at home — send to their phone**. That email is a personal link, not a PIN. They read the frozen wording and sign on their phone.
-3. **Their copy later.** The same personal link stays valid after they sign. It opens the frozen pack they put their name on. When the pack completes, Confirm emails that copy link with the signed record. Head Office can also tap **Email the employee their copy**.
+1. **At the salon.** Pass the tablet. They type their own legal name. No PIN.
+2. **Not at the shop / at home.** Open the personal link on their phone.
+3. **After they signed.** The same link is their copy. Keep the email.
 
-There is no 6-digit pack code.
+Head Office: pack → **Send to their phone — salon, home, or later**, or **Email the employee their copy**.
+
 
 ## Rules
 - Do not reuse 2468 after the pilot.
