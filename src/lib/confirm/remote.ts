@@ -131,7 +131,7 @@ type TemplateRow = {
 type PayloadRow = { id: string; agreement_id?: string | null; payload?: Signature | SigningLink; actor?: string; action?: string; detail?: string; created_at: string };
 
 export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branches" | "people" | "templates" | "agreements" | "signatures" | "links" | "audit" | "records">> {
-  const [clinics, people, agreements, signatures, links, audit, uploaded, records] = await Promise.all([
+  const settled = await Promise.allSettled([
     rest<ClinicRow[]>("confirm_clinics?select=*&order=name.asc"),
     rest<PersonRow[]>("confirm_people?select=id,clinic_id,full_name,email,role,status,scope,created_at&order=full_name.asc"),
     rest<AgreementRow[]>("confirm_agreements?select=*&order=created_at.desc"),
@@ -143,6 +143,15 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
       "confirm_employee_records?select=id,person_id,file_name,mime_type,byte_size,sha256,note,extracted_text,created_at&order=created_at.desc",
     ),
   ]);
+  const value = <T,>(item: PromiseSettledResult<T>, fallback: T) => (item.status === "fulfilled" ? item.value : fallback);
+  const clinics = value(settled[0], [] as ClinicRow[]);
+  const people = value(settled[1], [] as PersonRow[]);
+  const agreements = value(settled[2], [] as AgreementRow[]);
+  const signatures = value(settled[3], [] as PayloadRow[]);
+  const links = value(settled[4], [] as PayloadRow[]);
+  const audit = value(settled[5], [] as PayloadRow[]);
+  const uploaded = value(settled[6], [] as TemplateRow[]);
+  const records = value(settled[7], [] as Array<{ id: string; person_id: string; file_name: string; mime_type: string; byte_size: number; sha256: string; note: string; extracted_text?: string; created_at: string }>);
 
   const customTemplates: Template[] = uploaded.map((row) => ({
     id: row.id,

@@ -240,6 +240,7 @@ export const confirmRestFn = createServerFn({ method: "POST" })
       if (!allowedWrite) return { ok: false as const, error: "This personal link cannot change Head Office records." };
     }
     if (!session && (path.startsWith("confirm_source_files") || path.startsWith("confirm_employee_records"))) {
+      if (method === "GET") return { ok: true as const, body: "[]" };
       return { ok: false as const, error: "Source files stay on the Head Office desk." };
     }
 
