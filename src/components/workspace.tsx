@@ -2610,8 +2610,10 @@ function Detail({
         >
           <div>
             <p className="confirm-kicker text-[9px] text-muted uppercase">Signature step</p>
-            <p className="mt-1 text-sm font-bold text-ink">Record {roleLabel(signingRole)} signature</p>
+            <p className="mt-1 text-sm font-bold text-ink">Read the pack, then record {roleLabel(signingRole)} signature</p>
+            <p className="mt-1 text-[12px] text-muted">The person signing must see this wording. Do not type their name for them.</p>
           </div>
+          <FrozenPackRead state={state} agreement={agreement} compact />
           <Button
             variant="secondary"
             className="w-full sm:w-fit"
@@ -2627,7 +2629,7 @@ function Detail({
             <div className="rounded-md border border-line bg-paper px-3 py-3">
               <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Personal link</p>
               <p className="mt-1 break-all text-[12px] text-ink">{typeof window !== "undefined" ? `${window.location.origin}?sign=${issuedToken}` : issuedToken}</p>
-              <p className="mt-1 text-[11px] text-muted">One link. They can sign at the salon, from home, or open their copy later. Not a PIN.</p>
+              <p className="mt-1 text-[11px] text-muted">One link. They can read and sign at the salon, from home, or open their copy later.</p>
             </div>
           )}
           <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
@@ -2730,6 +2732,74 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+function FrozenPackRead({
+  state,
+  agreement,
+  compact,
+}: {
+  state: WorkspaceState;
+  agreement: Agreement;
+  compact?: boolean;
+}) {
+  const fields = agreement.snapshot.fields;
+  return (
+    <article className={cn("rounded-xl border border-line bg-paper", compact ? "p-4" : "p-5")}>
+      <p className="confirm-kicker text-[9px] text-muted uppercase">Read this pack first</p>
+      <h2 className="mt-1 font-display text-xl leading-tight">{packTitle(agreement.title)}</h2>
+      <p className="mt-1 text-[12px] text-muted">{agreement.snapshot.template.module}</p>
+      <dl className="mt-3 grid gap-2 text-[12px] sm:grid-cols-2">
+        <div>
+          <dt className="text-muted">Employee</dt>
+          <dd>{personName(state, agreement.employeeId)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted">Franchisee</dt>
+          <dd>{personName(state, agreement.managerId)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted">SkinPhD branch</dt>
+          <dd>{branchLabel(state, agreement.branchId)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted">Deemed cost</dt>
+          <dd>{rands(agreement.costCents)}</dd>
+        </div>
+        {agreement.startsOn && (
+          <div>
+            <dt className="text-muted">Attendance</dt>
+            <dd>
+              {agreement.startsOn}
+              {agreement.endsOn ? ` → ${agreement.endsOn}` : ""}
+            </dd>
+          </div>
+        )}
+        {fields.employeeTitle && (
+          <div>
+            <dt className="text-muted">Position</dt>
+            <dd>{fields.employeeTitle}</dd>
+          </div>
+        )}
+        {fields.equipmentMake && (
+          <div>
+            <dt className="text-muted">Equipment</dt>
+            <dd>
+              {[fields.equipmentMake, fields.equipmentModel, fields.equipmentSerial].filter(Boolean).join(" · ")}
+            </dd>
+          </div>
+        )}
+      </dl>
+      {agreement.snapshot.template.hasWaiver && (
+        <p className="mt-3 text-[11px] text-muted">A waiver addendum from the source form is included in the wording below.</p>
+      )}
+      <div className="mt-4 max-h-[min(55vh,28rem)] overflow-y-auto rounded-md border border-line bg-ground/40 p-3">
+        <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">What you are putting your name on</p>
+        <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-ink">{agreement.snapshot.template.content}</p>
+      </div>
+      <p className="mt-3 text-[10px] text-muted">This wording is frozen. Scroll it all the way through before you type your name.</p>
+    </article>
+  );
+}
+
 function PersonalLinkSign({ token }: { token: string }) {
   const store = useWorkspace();
   const [typedName, setTypedName] = useState("");
@@ -2820,7 +2890,7 @@ function PersonalLinkSign({ token }: { token: string }) {
     return (
       <main className="min-h-screen bg-ground px-4 py-8">
         <Card className="mx-auto max-w-xl p-6">
-          <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Your copy · not a PIN</p>
+          <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Your copy</p>
           <h1 className="mt-2 font-display text-3xl">{packTitle(agreement.title)}</h1>
           <p className="mt-2 text-sm text-muted">
             {signer.name} · {roleLabel(link.role)} · {STATUS_LABEL[agreement.status]}
@@ -2860,13 +2930,14 @@ function PersonalLinkSign({ token }: { token: string }) {
   return (
     <main className="min-h-screen bg-ground px-4 py-8">
       <Card className="mx-auto max-w-xl p-6">
-        <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Personal link · not a PIN</p>
+        <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Your SkinPhD pack</p>
         <h1 className="mt-2 font-display text-3xl">{packTitle(agreement.title)}</h1>
         <p className="mt-2 text-sm text-muted">
-          {roleLabel(link.role)} · type {signer.name} exactly as it appears on the staff list. You can do this at the salon, from home, or anywhere you have this link.
+          Read the pack below first. Then type {signer.name} exactly as it appears on the staff list. You can do this at the salon, from home, or anywhere you have this link.
         </p>
         {error && <p className="mt-3 rounded-md bg-danger-bg px-3 py-2 text-[11px] text-danger-fg">{error}</p>}
-        <div className="mt-5 grid gap-3">
+        <div className="mt-5 grid gap-4">
+          <FrozenPackRead state={store} agreement={agreement} />
           <label className="grid gap-1.5 text-[10px] font-extrabold text-muted uppercase">
             Typed legal name
             <input value={typedName} onChange={(event) => setTypedName(event.target.value)} className="min-h-11 rounded-md border border-line px-3 text-sm font-normal text-ink" />

@@ -32,7 +32,7 @@ export function nextStatus(signedCount: number, required: number): AgreementStat
 }
 
 export function consentCopy(): string {
-  return "I have reviewed the frozen agreement snapshot and I intend this typed name to be recorded as my signature for this employee agreement. This action does not decide competence, treatment authorization, payroll deductions, or legal enforceability.";
+  return "I have read this pack and I intend this typed name to be my signature on it. This does not decide competence, treatment authorisation, payroll deductions, or legal enforceability.";
 }
 
 export function assertAssigned(
