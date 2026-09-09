@@ -20,6 +20,7 @@ import { useWorkspace } from "@/lib/confirm/store";
 import { sha256Hex } from "@/lib/confirm/crypto";
 import { can, canViewAgreement } from "@/lib/confirm/access";
 import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode, remoteEnabled, setLinkToken } from "@/lib/confirm/remote";
+import { startConfirmLive } from "@/lib/confirm/live";
 import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail } from "@/lib/confirm/email";
 import { deliverMail } from "@/lib/confirm/send-mail";
 import { extractSourceDocument } from "@/lib/confirm/extract";
@@ -269,19 +270,21 @@ export function Workspace() {
 
   useEffect(() => {
     if (!current || !remoteEnabled()) return;
-    const tick = () => {
+    const pull = () => {
       if (document.hidden) return;
       void hydrateRemote().then(setConnectionStatus);
     };
-    const timer = window.setInterval(tick, 8000);
-    window.addEventListener("focus", tick);
-    window.addEventListener("confirm-live", tick);
-    document.addEventListener("visibilitychange", tick);
+    const stopLive = startConfirmLive({ onChange: pull });
+    const timer = window.setInterval(pull, 30_000);
+    window.addEventListener("focus", pull);
+    window.addEventListener("confirm-live", pull);
+    document.addEventListener("visibilitychange", pull);
     return () => {
+      stopLive();
       window.clearInterval(timer);
-      window.removeEventListener("focus", tick);
-      window.removeEventListener("confirm-live", tick);
-      document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("focus", pull);
+      window.removeEventListener("confirm-live", pull);
+      document.removeEventListener("visibilitychange", pull);
     };
   }, [current?.id, hydrateRemote]);
 
@@ -3184,11 +3187,18 @@ function PersonalLinkSign({ token }: { token: string }) {
       }
     };
     void pull();
+    const stopLive = startConfirmLive({
+      linkToken: token,
+      onChange: () => {
+        if (!document.hidden) void pull();
+      },
+    });
     const timer = window.setInterval(() => {
       if (!document.hidden) void pull();
-    }, 8000);
+    }, 30_000);
     return () => {
       cancelled = true;
+      stopLive();
       window.clearInterval(timer);
     };
   }, [token]);

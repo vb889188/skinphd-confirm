@@ -12,4 +12,4 @@ Tenant `49937a9c-4c8c-420f-bac7-f2ff3f22f43e`. Tables stay named `confirm_*`. `c
 - `confirm_signing_links` — hashed one-time tokens
 - `confirm_audit` — issue, sign, reminder, directory actions
 
-RLS requires header `x-confirm-workspace` on the **server**. The browser never sends that key. Head Office / franchisee sign in with email + PIN; Confirm issues an 8-hour desk session. Therapists open a personal pack link, which only loads that pack. PIN hashes are not sent to the browser.
+RLS requires header `x-confirm-workspace` on the **server**. The Head Office desk keeps a live line open (`/api/confirm-live`). A pack issued or a name recorded on one tablet is pushed to the others. Polling every 30 seconds is only the backup if that line drops.

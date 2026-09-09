@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiConfirmLiveRouteImport } from './routes/api/confirm-live'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiConfirmLiveRoute = ApiConfirmLiveRouteImport.update({
+  id: '/api/confirm-live',
+  path: '/api/confirm-live',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/confirm-live': typeof ApiConfirmLiveRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/confirm-live': typeof ApiConfirmLiveRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/confirm-live': typeof ApiConfirmLiveRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/confirm-live'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/confirm-live'
+  id: '__root__' | '/' | '/api/confirm-live'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiConfirmLiveRoute: typeof ApiConfirmLiveRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/confirm-live': {
+      id: '/api/confirm-live'
+      path: '/api/confirm-live'
+      fullPath: '/api/confirm-live'
+      preLoaderRoute: typeof ApiConfirmLiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiConfirmLiveRoute: ApiConfirmLiveRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

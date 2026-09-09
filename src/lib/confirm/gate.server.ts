@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { sha256Hex } from "./crypto";
+import { bumpConfirmLive } from "./live-bus.server";
 import type { Person } from "./types";
 
 type SessionPayload = {
@@ -257,6 +258,7 @@ export const confirmRestFn = createServerFn({ method: "POST" })
         headers,
         body: data.body && method !== "GET" ? data.body : undefined,
       });
+      if (method !== "GET") bumpConfirmLive();
       if (method === "GET" && path.startsWith("confirm_people")) {
         const stripped = stripPeople(rows);
         const filtered = link?.agreement ? filterLinkRows(path, stripped, { agreement: link.agreement }) : stripped;
@@ -270,3 +272,10 @@ export const confirmRestFn = createServerFn({ method: "POST" })
       return { ok: false as const, error: err instanceof Error ? err.message : "Database request failed" };
     }
   });
+
+export async function allowConfirmLive(session?: string, linkToken?: string) {
+  const { secret } = supabaseConfig();
+  if (session && (await verifySession(session, secret))) return true;
+  if (linkToken && (await resolveLink(linkToken))) return true;
+  return false;
+}
