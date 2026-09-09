@@ -13,6 +13,8 @@ export const sendMailFn = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "not_configured" };
     }
     const nodemailer = await import("nodemailer");
+    const { existsSync, readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
     const secure = process.env.SMTP_SECURE === "true" || port === 465;
     const transport = nodemailer.createTransport({
       host,
@@ -20,14 +22,23 @@ export const sendMailFn = createServerFn({ method: "POST" })
       secure,
       auth: { user, pass },
     });
-    const publicUrl = process.env.CONFIRM_PUBLIC_URL || process.env.MAIL_LOGO_URL || "https://confirm.relpdev.uk";
-    const logoUrl = `${publicUrl.replace(/\/$/, "")}/skinphd-logo.png`;
+    const publicUrl = (process.env.CONFIRM_PUBLIC_URL || process.env.MAIL_LOGO_URL || "https://confirm.relpdev.uk").replace(/\/$/, "");
+    const hostedLogo = `${publicUrl}/skinphd-logo.png`;
+    const logoPath = [
+      join(process.cwd(), ".output/public/skinphd-logo.png"),
+      join(process.cwd(), "public/skinphd-logo.png"),
+      "/app/.output/public/skinphd-logo.png",
+    ].find((path) => existsSync(path));
+    const embedded = logoPath ? readFileSync(logoPath) : null;
     await transport.sendMail({
       from: process.env.SMTP_FROM || process.env.MAIL_FROM || `SkinPhD Confirm <${user}>`,
       to: data.to,
       subject: data.subject,
       text: data.body,
-      html: brandedHtml(data.subject, data.body, logoUrl),
+      html: brandedHtml(data.subject, data.body, embedded ? "cid:skinphd-logo" : hostedLogo),
+      attachments: embedded
+        ? [{ filename: "skinphd-logo.png", content: embedded, cid: "skinphd-logo", contentType: "image/png" }]
+        : [],
     });
     return { ok: true as const };
   });

@@ -58,7 +58,7 @@ export function brandedHtml(subject: string, body: string, logoUrl?: string) {
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fbfcfa;border:1px solid #d9e3de;border-radius:16px;overflow:hidden;">
           <tr>
             <td style="background:#fbfcfa;padding:22px 28px 16px;border-bottom:4px solid #b8863a;">
-              <img src="${escapeHtml(logo)}" alt="SkinPhD" width="160" style="display:block;height:auto;max-width:160px;">
+              <img src="${escapeHtml(logo)}" alt="SkinPhD" width="200" style="display:block;height:auto;max-width:200px;border:0;">
               <p style="margin:10px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#0f3329;">Confirm</p>
             </td>
           </tr>
