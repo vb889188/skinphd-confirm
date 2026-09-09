@@ -11,7 +11,7 @@ import {
   requiredSignatureCount,
 } from "./rules";
 import type { Agreement, EmployeeRecord, Role, Snapshot, WorkspaceState } from "./types";
-import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, upsertEmployeeRecord, upsertSourceFile } from "./remote";
+import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile } from "./remote";
 import { requireCapability } from "./access";
 import { recognizeDocument } from "./ocr";
 
@@ -131,19 +131,9 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
       signInWithPin: async (email, pin) => {
         const normalized = email.trim().toLowerCase();
         const code = pin.trim();
-        const person = get().people.find((item) => item.email.toLowerCase() === normalized && item.status === "active");
-        if (!person || !person.pinHash) throw new Error("No active staff record for that email.");
-        if (person.role !== "manager") {
-          throw new Error("Therapists and witnesses do not collect a PIN. Sign at the salon table, or open the personal link Head Office sent.");
-        }
-        const hash = await sha256Hex(`${normalized}|${code}`);
-        const alt = await sha256Hex(`${person.email}|${code}`);
-        if (hash !== person.pinHash && alt !== person.pinHash) {
-          throw new Error("That PIN does not match. If Head Office emailed a temporary PIN, the old number no longer works.");
-        }
-        set({ currentPersonId: person.id, sessionStartedAt: new Date().toISOString() });
-        setRemoteActor(person);
         if (remoteEnabled()) {
+          const person = await signInOnServer(normalized, code);
+          set({ currentPersonId: person.id, sessionStartedAt: new Date().toISOString() });
           try {
             const remote = await loadRemoteWorkspace();
             set({
@@ -157,20 +147,49 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               signatures: remote.signatures,
               links: remote.links,
               audit: remote.audit,
+              records: remote.records ?? get().records,
             });
           } catch {
-            /* keep local */
+            const state = get();
+            if (!state.people.some((item) => item.id === person.id)) {
+              set({ people: [person, ...state.people] });
+            }
           }
+          return person.id;
         }
+        const person = get().people.find((item) => item.email.toLowerCase() === normalized && item.status === "active");
+        if (!person || !person.pinHash) throw new Error("No active staff record for that email.");
+        if (person.role !== "manager") {
+          throw new Error("Therapists and witnesses do not collect a PIN. Sign at the salon table, or open the personal link Head Office sent.");
+        }
+        const hash = await sha256Hex(`${normalized}|${code}`);
+        const alt = await sha256Hex(`${person.email}|${code}`);
+        if (hash !== person.pinHash && alt !== person.pinHash) {
+          throw new Error("That PIN does not match. If Head Office emailed a temporary PIN, the old number no longer works.");
+        }
+        set({ currentPersonId: person.id, sessionStartedAt: new Date().toISOString() });
+        setRemoteActor(person);
         return person.id;
       },
       changePin: async (currentPin, nextPin) => {
         const state = get();
         const person = state.people.find((item) => item.id === state.currentPersonId);
-        if (!person?.pinHash) throw new Error("Sign in before changing the PIN");
+        if (!person) throw new Error("Sign in before changing the PIN");
+        if (!/^\d{4,8}$/.test(nextPin.trim())) throw new Error("Choose a 4 to 8 digit PIN");
+        if (remoteEnabled()) {
+          await changePinOnServer(currentPin, nextPin);
+          const now = new Date().toISOString();
+          set({
+            audit: [
+              { id: randomId("AUD"), agreementId: null, actor: person.email, action: "PIN changed", detail: `${person.fullName} changed their workspace PIN.`, createdAt: now },
+              ...state.audit,
+            ],
+          });
+          return;
+        }
+        if (!person.pinHash) throw new Error("Sign in before changing the PIN");
         const currentHash = await sha256Hex(`${person.email}|${currentPin.trim()}`);
         if (currentHash !== person.pinHash) throw new Error("Current PIN is not correct");
-        if (!/^\d{4,8}$/.test(nextPin.trim())) throw new Error("Choose a 4 to 8 digit PIN");
         const pinHash = await sha256Hex(`${person.email.trim().toLowerCase()}|${nextPin.trim()}`);
         const now = new Date().toISOString();
         const updated = { ...person, pinHash };
@@ -209,6 +228,8 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
       },
       signOut: () => {
         setRemoteActor(null);
+        clearSessionToken();
+        setLinkToken("");
         set({ currentPersonId: null, sessionStartedAt: null });
       },
       hydrateRemote: async () => {
@@ -218,17 +239,9 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         try {
           const remote = await loadRemoteWorkspace();
           const state = get();
-          const people = remote.people.length
-            ? remote.people.map((person) => {
-                const local = state.people.find((item) => item.id === person.id || item.email.toLowerCase() === person.email.toLowerCase());
-                if (local?.pinHash && !person.pinHash) person = { ...person, pinHash: local.pinHash };
-                if (local?.status === "inactive") person = { ...person, status: "inactive" };
-                return person;
-              })
-            : state.people;
           set({
             branches: remote.branches.length ? remote.branches : state.branches,
-            people,
+            people: remote.people.length ? remote.people : state.people,
             templates: remote.templates,
             agreements: remote.agreements,
             signatures: remote.signatures,
@@ -238,7 +251,6 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           });
           return "remote";
         } catch {
-          /* keep local cache if the project is unreachable */
           return "unavailable";
         }
       },
@@ -1014,6 +1026,6 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
     }),
-    { name: "skinphd-confirm.workspace.v9" },
+    { name: "skinphd-confirm.workspace.v10" },
   ),
 );

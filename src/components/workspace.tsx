@@ -19,7 +19,7 @@ import type { Agreement, AuditEvent, Role, Signature, WorkspaceState } from "@/l
 import { useWorkspace } from "@/lib/confirm/store";
 import { sha256Hex } from "@/lib/confirm/crypto";
 import { can, canViewAgreement } from "@/lib/confirm/access";
-import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode, remoteEnabled } from "@/lib/confirm/remote";
+import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode, remoteEnabled, setLinkToken } from "@/lib/confirm/remote";
 import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail } from "@/lib/confirm/email";
 import { deliverMail } from "@/lib/confirm/send-mail";
 import { extractSourceDocument } from "@/lib/confirm/extract";
@@ -653,7 +653,6 @@ export function Workspace() {
     return (
       <WorkspaceGate
         onEnter={async (email, pin) => {
-          await store.hydrateRemote();
           await store.signInWithPin(email, pin);
         }}
       />
@@ -3155,6 +3154,7 @@ function PersonalLinkSign({ token }: { token: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    setLinkToken(token);
     void (async () => {
       try {
         await useWorkspace.getState().hydrateRemote();
@@ -3167,7 +3167,7 @@ function PersonalLinkSign({ token }: { token: string }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [token]);
 
   const link = store.links.find((item) => item.tokenHash === linkKey && item.status !== "revoked" && item.status !== "declined");
   const agreement = link ? store.agreements.find((item) => item.id === link.agreementId) : null;

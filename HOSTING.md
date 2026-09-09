@@ -23,6 +23,11 @@ Set these at **build** time.
 - `VITE_CONFIRM_WORKSPACE_KEY` — required header for Confirm tables
 - `VITE_CONFIRM_MODE=production`
 - `VITE_AUTH_ENABLED=false`
+- `CONFIRM_WORKSPACE_KEY` — server only (do not rely on the VITE_ copy in the browser)
+- `CONFIRM_SESSION_SECRET` — HMAC for desk sessions (8 hours)
+- `CONFIRM_PUBLIC_URL` — public site used for the mail logo
+
+The workspace key and anon key stay on the server. Head Office signs in with email + PIN; that issues a desk session. Personal links only load that one pack.
 
 Do not put a Supabase service-role key in this app.
 

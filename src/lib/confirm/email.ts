@@ -10,6 +10,57 @@ export function employeeMailHref(mail: EmployeeMail) {
   return `mailto:${encodeURIComponent(mail.to)}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`;
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "\u0026amp;")
+    .replace(/</g, "\u0026lt;")
+    .replace(/>/g, "\u0026gt;")
+    .replace(/"/g, "\u0026quot;");
+}
+
+function bodyToHtml(body: string) {
+  const escaped = escapeHtml(body).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#176b50;word-break:break-all;">$1</a>');
+  return escaped
+    .split(/\n{2,}/)
+    .map((block) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#17231f;">${block.trim().replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+}
+
+export function brandedHtml(subject: string, body: string, logoUrl?: string) {
+  const logo = logoUrl || "https://confirm.relpdev.uk/skinphd-logo.png";
+  return `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#edf3ef;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#edf3ef;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fbfcfa;border:1px solid #d9e3de;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td style="background:#fbfcfa;padding:22px 28px 16px;border-bottom:4px solid #b8863a;">
+              <img src="${escapeHtml(logo)}" alt="SkinPhD" width="160" style="display:block;height:auto;max-width:160px;">
+              <p style="margin:10px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#0f3329;">Confirm</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;font-family:'Segoe UI',Arial,sans-serif;color:#17231f;">
+              <h1 style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;font-weight:500;color:#0f3329;">${escapeHtml(subject)}</h1>
+              ${bodyToHtml(body)}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 28px 24px;border-top:1px solid #d9e3de;font-family:'Segoe UI',Arial,sans-serif;font-size:12px;line-height:1.5;color:#61716a;">
+              SkinPhD (Pty) Ltd · <a href="https://skinphd.co.za" style="color:#176b50;">skinphd.co.za</a><br/>
+              This is a Confirm record for an employee pack. It is not a salon booking and not a client treatment consent.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 function whereYouCanSign(link?: string) {
   return [
     "You can do this wherever you are today:",

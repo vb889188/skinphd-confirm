@@ -12,4 +12,4 @@ Tenant `49937a9c-4c8c-420f-bac7-f2ff3f22f43e`. Tables stay named `confirm_*`. `c
 - `confirm_signing_links` — hashed one-time tokens
 - `confirm_audit` — issue, sign, reminder, directory actions
 
-RLS requires header `x-confirm-workspace`. After sign-in the client also sends `x-confirm-person`, `x-confirm-role`, `x-confirm-scope`, and `x-confirm-branch`. Employees only select agreements they are on. History and source files are manager-only. Headers can still be spoofed with the anon key until Supabase Auth is used.
+RLS requires header `x-confirm-workspace` on the **server**. The browser never sends that key. Head Office / franchisee sign in with email + PIN; Confirm issues an 8-hour desk session. Therapists open a personal pack link, which only loads that pack. PIN hashes are not sent to the browser.

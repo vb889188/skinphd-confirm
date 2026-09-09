@@ -1,6 +1,8 @@
 # SkinPhD Confirm mail
 
-Without SMTP, Confirm opens the mail app.
+Mail is a SkinPhD-branded HTML letter (logo, forest green, gold rule) plus a plain-text copy. Footer links to [skinphd.co.za](https://skinphd.co.za).
+
+Without SMTP, Confirm opens the mail app (plain text).
 
 Zoho (info@relpdev.uk) on the droplet — `/opt/skinphd-confirm/.env`:
 
@@ -10,6 +12,7 @@ MAIL_PORT=465
 MAIL_USERNAME=info@relpdev.uk
 MAIL_PASSWORD=use-the-zoho-password
 MAIL_FROM=SkinPhD Confirm <info@relpdev.uk>
+CONFIRM_PUBLIC_URL=https://confirm.relpdev.uk
 ```
 
 Port 465 uses SSL. Then:

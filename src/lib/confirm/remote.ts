@@ -1,54 +1,87 @@
 import type { Agreement, AuditEvent, Branch, EmployeeRecord, Person, Signature, SigningLink, Template, WorkspaceState } from "./types";
 import { SOURCE_TEMPLATES } from "./templates";
+import { CONFIRM_TENANT_ID } from "./remote-shared";
+import { confirmChangePinFn, confirmConfiguredFn, confirmRestFn, confirmSignInFn } from "./gate.server";
 
-export const CONFIRM_TENANT_ID = "49937a9c-4c8c-420f-bac7-f2ff3f22f43e";
+export { CONFIRM_TENANT_ID };
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-const workspaceKey = import.meta.env.VITE_CONFIRM_WORKSPACE_KEY as string | undefined;
+const SESSION_KEY = "confirm-desk-session";
+let linkToken = "";
+let configured: boolean | null = null;
 
 export function remoteEnabled() {
-  return Boolean(url && key && workspaceKey);
+  if (configured === false) return false;
+  return import.meta.env.VITE_CONFIRM_MODE === "production" || Boolean(import.meta.env.VITE_SUPABASE_URL) || configured === true;
 }
 
 export function isProductionMode() {
   return import.meta.env.VITE_CONFIRM_MODE === "production";
 }
 
-let actorHeaders: Record<string, string> = {};
-
 export function setRemoteActor(person: Person | null) {
-  actorHeaders = person
-    ? {
-        "x-confirm-person": person.id,
-        "x-confirm-role": person.role,
-        "x-confirm-scope": person.scope ?? (person.role === "manager" ? "clinic" : "self"),
-        "x-confirm-branch": person.branchId,
-      }
-    : {};
+  void person;
+}
+
+export function setLinkToken(token: string) {
+  linkToken = token;
+}
+
+export function getSessionToken() {
+  if (typeof window === "undefined") return "";
+  return sessionStorage.getItem(SESSION_KEY) || "";
+}
+
+export function setSessionToken(token: string) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(SESSION_KEY, token);
+}
+
+export function clearSessionToken() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+export async function probeRemote() {
+  try {
+    const result = await confirmConfiguredFn();
+    configured = result.ok;
+    return result.ok;
+  } catch {
+    configured = false;
+    return false;
+  }
+}
+
+export async function signInOnServer(email: string, pin: string) {
+  const result = await confirmSignInFn({ data: { email, pin } });
+  if (!result.ok) throw new Error(result.error);
+  setSessionToken(result.token);
+  setRemoteActor(result.person);
+  return result.person;
+}
+
+export async function changePinOnServer(currentPin: string, nextPin: string) {
+  const result = await confirmChangePinFn({ data: { session: getSessionToken(), currentPin, nextPin } });
+  if (!result.ok) throw new Error(result.error);
+  return result.pinHash;
 }
 
 async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!url || !key || !workspaceKey) throw new Error("Supabase is not configured");
-  const response = await fetch(`${url}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-      "x-confirm-workspace": workspaceKey,
-      ...actorHeaders,
-      ...(init.headers ?? {}),
+  const preferHeader = init.headers && typeof init.headers === "object" && !Array.isArray(init.headers)
+    ? (init.headers as Record<string, string>).Prefer
+    : undefined;
+  const result = await confirmRestFn({
+    data: {
+      path,
+      method: init.method || "GET",
+      body: init.body ? String(init.body) : undefined,
+      prefer: preferHeader,
+      session: getSessionToken(),
+      linkToken: linkToken || undefined,
     },
   });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Supabase request failed (${response.status})`);
-  }
-  if (response.status === 204) return undefined as T;
-  const body = await response.text();
-  return (body ? JSON.parse(body) : undefined) as T;
+  if (!result.ok) throw new Error(result.error || "Confirm could not reach the database");
+  return (result.body ? JSON.parse(result.body) : undefined) as T;
 }
 
 type ClinicRow = { id: string; name: string; code: string; created_at: string };
@@ -100,7 +133,7 @@ type PayloadRow = { id: string; agreement_id?: string | null; payload?: Signatur
 export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branches" | "people" | "templates" | "agreements" | "signatures" | "links" | "audit" | "records">> {
   const [clinics, people, agreements, signatures, links, audit, uploaded, records] = await Promise.all([
     rest<ClinicRow[]>("confirm_clinics?select=*&order=name.asc"),
-    rest<PersonRow[]>("confirm_people?select=*&order=full_name.asc"),
+    rest<PersonRow[]>("confirm_people?select=id,clinic_id,full_name,email,role,status,scope,created_at&order=full_name.asc"),
     rest<AgreementRow[]>("confirm_agreements?select=*&order=created_at.desc"),
     rest<PayloadRow[]>("confirm_signatures?select=*"),
     rest<PayloadRow[]>("confirm_signing_links?select=*"),
@@ -142,7 +175,7 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
       email: row.email,
       role: row.role,
       status: row.status,
-      pinHash: row.pin_hash,
+      pinHash: null,
       scope: row.scope,
       createdAt: row.created_at,
     })),
@@ -208,22 +241,23 @@ export async function upsertClinic(branch: Branch) {
 }
 
 export async function upsertPerson(person: Person) {
+  const row: Record<string, unknown> = {
+    id: person.id,
+    tenant_id: CONFIRM_TENANT_ID,
+    clinic_id: person.branchId,
+    full_name: person.fullName,
+    email: person.email,
+    role: person.role,
+    status: person.status,
+    scope: person.scope ?? (person.role === "manager" ? "clinic" : "self"),
+    updated_at: new Date().toISOString(),
+    created_at: person.createdAt,
+  };
+  if (person.pinHash) row.pin_hash = person.pinHash;
   await rest("confirm_people?on_conflict=id", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify({
-      id: person.id,
-      tenant_id: CONFIRM_TENANT_ID,
-      clinic_id: person.branchId,
-      full_name: person.fullName,
-      email: person.email,
-      role: person.role,
-      status: person.status,
-      pin_hash: person.pinHash,
-      scope: person.scope ?? (person.role === "manager" ? "clinic" : "self"),
-      updated_at: new Date().toISOString(),
-      created_at: person.createdAt,
-    }),
+    body: JSON.stringify(row),
   });
 }
 
@@ -331,17 +365,16 @@ export async function upsertTemplate(template: Template) {
 
 export async function persistPerson(person: Person) {
   if (!remoteEnabled()) return;
-  // POST upsert updates all columns when RLS allows. PATCH repeats pin/email/status
-  // so a merge that skipped those fields still lands after a refresh.
   await upsertPerson(person);
+  const patch: Record<string, unknown> = {
+    email: person.email,
+    status: person.status,
+    updated_at: new Date().toISOString(),
+  };
+  if (person.pinHash) patch.pin_hash = person.pinHash;
   await rest(`confirm_people?id=eq.${encodeURIComponent(person.id)}`, {
     method: "PATCH",
-    body: JSON.stringify({
-      pin_hash: person.pinHash,
-      email: person.email,
-      status: person.status,
-      updated_at: new Date().toISOString(),
-    }),
+    body: JSON.stringify(patch),
   });
 }
 
@@ -422,5 +455,3 @@ export async function fetchSourceFile(id: string) {
   );
   return rows[0] ?? null;
 }
-
-

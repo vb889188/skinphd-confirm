@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { EmployeeMail } from "./email";
-import { employeeMailHref } from "./email";
+import { brandedHtml, employeeMailHref } from "./email";
 
 export const sendMailFn = createServerFn({ method: "POST" })
   .inputValidator((data: EmployeeMail) => data)
@@ -20,11 +20,14 @@ export const sendMailFn = createServerFn({ method: "POST" })
       secure,
       auth: { user, pass },
     });
+    const publicUrl = process.env.CONFIRM_PUBLIC_URL || process.env.MAIL_LOGO_URL || "https://confirm.relpdev.uk";
+    const logoUrl = `${publicUrl.replace(/\/$/, "")}/skinphd-logo.png`;
     await transport.sendMail({
       from: process.env.SMTP_FROM || process.env.MAIL_FROM || `SkinPhD Confirm <${user}>`,
       to: data.to,
       subject: data.subject,
       text: data.body,
+      html: brandedHtml(data.subject, data.body, logoUrl),
     });
     return { ok: true as const };
   });
