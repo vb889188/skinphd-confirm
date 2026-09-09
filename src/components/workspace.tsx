@@ -21,7 +21,7 @@ import { sha256Hex } from "@/lib/confirm/crypto";
 import { can, canViewAgreement } from "@/lib/confirm/access";
 import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode, remoteEnabled, setLinkToken } from "@/lib/confirm/remote";
 import { startConfirmLive } from "@/lib/confirm/live";
-import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail } from "@/lib/confirm/email";
+import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail, confirmSiteUrl, packSignUrl } from "@/lib/confirm/email";
 import { deliverMail } from "@/lib/confirm/send-mail";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { haptic } from "@/lib/confirm/haptics";
@@ -438,7 +438,7 @@ export function Workspace() {
             toEmail: franchisee.email,
             title: created.title,
             employeeName: employee?.fullName ?? "Employee",
-            siteUrl: window.location.origin,
+            siteUrl: confirmSiteUrl(),
           }),
         );
         toast.success(sent === "sent" ? "Pack issued and emailed to the franchisee." : "Pack issued. Finish the franchisee email in your mail app.");
@@ -482,11 +482,11 @@ export function Workspace() {
             : "Saved. Signature recorded on the frozen snapshot.",
       );
       if (action === "sign" && latest?.status === "completed") {
-        const origin = window.location.origin;
+        const origin = confirmSiteUrl();
         let recordUrl = origin;
         try {
           const copy = await useWorkspace.getState().issueSignCode(latest.id, "employee");
-          recordUrl = `${origin}?sign=${copy.token}`;
+          recordUrl = packSignUrl(copy.token);
         } catch {
           /* pack email still goes out without a copy link */
         }
@@ -506,7 +506,7 @@ export function Workspace() {
           if (next.role !== "manager") {
             try {
               const copy = await useWorkspace.getState().issueSignCode(latest.id, next.role);
-              packUrl = `${window.location.origin}?sign=${copy.token}`;
+              packUrl = packSignUrl(copy.token);
             } catch {
               /* notice still goes out */
             }
@@ -518,7 +518,7 @@ export function Workspace() {
               title: latest.title,
               role: next.role === "manager" ? "franchisee" : next.role,
               previousSigner: typedName,
-              siteUrl: window.location.origin,
+              siteUrl: confirmSiteUrl(),
               packUrl,
             }),
           );
@@ -559,10 +559,10 @@ export function Workspace() {
       setActiveRole(role);
       setIssuedToken(result.token);
       const signer = selected.snapshot.signers.find((item) => item.role === role);
-      const origin = window.location.origin;
+      const origin = confirmSiteUrl();
       const sent = await deliverMail(
         alreadySigned
-          ? buildSignedRecordMail(useWorkspace.getState(), selected, origin, `${origin}?sign=${result.token}`)
+          ? buildSignedRecordMail(useWorkspace.getState(), selected, origin, packSignUrl(result.token))
           : buildSignCodeMail({
               fullName: signer?.name ?? "",
               email: result.email,
@@ -633,7 +633,7 @@ export function Workspace() {
   async function remindAgreement(item: Agreement) {
     setError("");
     try {
-      const reminder = buildReminderMail(store, item, window.location.origin);
+      const reminder = buildReminderMail(store, item, confirmSiteUrl());
       if (!reminder.to) throw new Error("No outstanding signer email is available for this pack.");
       store.noteEmailSent(item.id, reminder.to);
       store.markReminded(item.id);
@@ -1231,7 +1231,7 @@ export function Workspace() {
                             void store.issueTemporaryPin(person.id).then(async (pin) => {
                               setRevealedPins((current) => ({ ...current, [person.id]: pin }));
                               setIssuedPin({ personId: person.id, name: person.fullName, email: person.email, pin });
-                              const sent = await deliverMail(buildWelcomeMail({ fullName: person.fullName, email: person.email, role: person.role, clinic: branchLabel(store, person.branchId), pin, siteUrl: window.location.origin }));
+                              const sent = await deliverMail(buildWelcomeMail({ fullName: person.fullName, email: person.email, role: person.role, clinic: branchLabel(store, person.branchId), pin, siteUrl: confirmSiteUrl() }));
                               toast.success(sent === "sent" ? `PIN emailed to ${person.email}.` : `Temporary PIN ready for ${person.fullName}.`);
                             });
                           }}>Email new PIN</button>
@@ -1517,7 +1517,7 @@ export function Workspace() {
                             role: draft.role,
                             clinic: branchLabel(store, draft.branchId),
                             pin: draft.pin,
-                            siteUrl: window.location.origin,
+                            siteUrl: confirmSiteUrl(),
                           }),
                         );
                         toast.success(sent === "sent" ? `Sign-in details emailed to ${draft.email}.` : "Finish the welcome email in your mail app.");
@@ -1743,7 +1743,7 @@ export function Workspace() {
                         role: String(values.role),
                         clinic: branchLabel(store, String(values.branchId)),
                         pin,
-                        siteUrl: window.location.origin,
+                        siteUrl: confirmSiteUrl(),
                       }),
                     );
                   }
@@ -1911,7 +1911,7 @@ export function Workspace() {
                         role: profile.role,
                         clinic: branchLabel(store, profile.branchId),
                         pin,
-                        siteUrl: window.location.origin,
+                        siteUrl: confirmSiteUrl(),
                       }),
                     );
                     toast.success(sent === "sent" ? `PIN emailed to ${profile.email}.` : `PIN ready: ${pin}`);
@@ -2681,7 +2681,7 @@ function Detail({
     setActiveRole(signingRole);
     setTypedName("");
   }, [signingRole, activeRole, setActiveRole, setTypedName]);
-  const mail = buildEmployeeMail(state, agreement, typeof window === "undefined" ? "https://confirm.relpdev.uk" : window.location.origin);
+  const mail = buildEmployeeMail(state, agreement, confirmSiteUrl());
   const recordEmail = useWorkspace((store) => store.noteEmailSent);
   const [packPreview, setPackPreview] = useState(false);
   const employee = state.people.find((person) => person.id === agreement.employeeId);
@@ -2704,11 +2704,11 @@ function Detail({
                 disabled={!employee?.email}
                 onClick={() => {
                   void (async () => {
-                    const origin = window.location.origin;
+                    const origin = confirmSiteUrl();
                     let packUrl: string | undefined;
                     try {
                       const copy = await useWorkspace.getState().issueSignCode(agreement.id, "employee");
-                      packUrl = `${origin}?sign=${copy.token}`;
+                      packUrl = packSignUrl(copy.token);
                     } catch {
                       /* still send the notice */
                     }
@@ -2757,7 +2757,7 @@ function Detail({
             size="sm"
             variant="secondary"
             onClick={() => {
-              const reminder = buildReminderMail(state, agreement, window.location.origin);
+              const reminder = buildReminderMail(state, agreement, confirmSiteUrl());
               if (!reminder.to) return;
               recordEmail(agreement.id, reminder.to);
               useWorkspace.getState().markReminded(agreement.id);
@@ -2898,66 +2898,93 @@ function Detail({
         })}
       </div>
       {signingRole && (
-        <form
-          className="mt-4 grid gap-3 rounded-xl border border-line bg-paper p-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!activeRole && signingRole) setActiveRole(signingRole);
-            void onSign("sign");
-          }}
-        >
-          <div>
-            <p className="confirm-kicker text-[9px] text-muted uppercase">Signature step</p>
-            <p className="mt-1 text-sm font-bold text-ink">Read the pack, then record {roleLabel(signingRole)} signature</p>
-            <p className="mt-1 text-[12px] text-muted">The person signing must see this wording. Do not type their name for them.</p>
-          </div>
+        <>
           <FrozenPackRead state={state} agreement={agreement} compact />
-          <Button
-            variant="secondary"
-            className="w-full sm:w-fit"
-            disabled={saving}
-            onClick={() => {
+          <div className="mt-4 grid gap-3 rounded-xl border border-line bg-ground/50 p-4">
+            <div>
+              <p className="confirm-kicker text-[9px] text-muted uppercase">Send to their phone</p>
+              <p className="mt-1 text-sm font-bold text-ink">Salon, home, or later — this is not a signature</p>
+              <p className="mt-1 text-[12px] text-muted">
+                Emails a personal link. They read the pack on their phone. You do not type their name here to send it.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full sm:w-fit"
+              disabled={saving}
+              onClick={() => {
+                if (!activeRole && signingRole) setActiveRole(signingRole);
+                void onIssueCode(signingRole as Role);
+              }}
+            >
+              Send to their phone — salon, home, or later
+            </Button>
+            {actor?.role === "manager" && issuedToken && (
+              <div className="rounded-md border border-line bg-paper px-3 py-3">
+                <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Personal link</p>
+                <p className="mt-1 break-all text-[12px] text-ink">{packSignUrl(issuedToken)}</p>
+                <p className="mt-1 text-[11px] text-muted">One link. They can read and sign at the salon, from home, or open their copy later.</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="mt-2"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(packSignUrl(issuedToken)).then(
+                      () => toast.success("Link copied."),
+                      () => toast.error("Copy the link from the box above."),
+                    );
+                  }}
+                >
+                  <Copy className="size-3.5" />
+                  Copy link
+                </Button>
+              </div>
+            )}
+          </div>
+          <form
+            className="mt-4 grid gap-3 rounded-xl border border-line bg-paper p-4"
+            onSubmit={(event) => {
+              event.preventDefault();
               if (!activeRole && signingRole) setActiveRole(signingRole);
-              void onIssueCode(signingRole as Role);
+              void onSign("sign");
             }}
           >
-            Send to their phone — salon, home, or later
-          </Button>
-          {actor?.role === "manager" && issuedToken && (
-            <div className="rounded-md border border-line bg-paper px-3 py-3">
-              <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Personal link</p>
-              <p className="mt-1 break-all text-[12px] text-ink">{typeof window !== "undefined" ? `${window.location.origin}?sign=${issuedToken}` : issuedToken}</p>
-              <p className="mt-1 text-[11px] text-muted">One link. They can read and sign at the salon, from home, or open their copy later.</p>
+            <div>
+              <p className="confirm-kicker text-[9px] text-muted uppercase">Signature step</p>
+              <p className="mt-1 text-sm font-bold text-ink">At the salon table — record {roleLabel(signingRole)} signature</p>
+              <p className="mt-1 text-[12px] text-muted">Only the person signing types their legal name. Do not type it for them.</p>
             </div>
-          )}
-          <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
-            Typed legal name
-            <input
-              value={typedName}
-              onChange={(event) => setTypedName(event.target.value)}
-              required
-              autoComplete="off"
-              placeholder="Type the name on the staff list exactly"
-              className="min-h-11 rounded-md border border-line bg-ground/50 px-3 text-sm font-normal text-ink"
-            />
-          </label>
-          <div>
-            <p className="mb-1.5 text-[10px] font-extrabold text-muted uppercase">Drawn mark</p>
-            <SignPad value={drawnPng} onChange={setDrawnPng} />
-          </div>
-          <label htmlFor="consent-checkbox" className="grid grid-cols-[20px_1fr] items-start gap-2 py-1 text-[11px] font-medium text-status-green-fg">
-            <Checkbox id="consent-checkbox" checked={consent} onCheckedChange={setConsent} />
-            <span>{consentCopy()}</span>
-          </label>
-          <div className="sticky bottom-0 z-10 -mx-4 mt-2 grid grid-cols-1 gap-2 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex sm:justify-end sm:border-0 sm:bg-transparent sm:px-0 sm:py-1">
-            <Button variant="danger" size="lg" className="w-full sm:w-auto" disabled={saving} onClick={() => void onSign("decline")}>
-              Decline
-            </Button>
-            <Button type="submit" size="lg" className="w-full sm:min-w-48 sm:w-auto" disabled={saving}>
-              {saving ? "Saving…" : "Record typed signature"}
-            </Button>
-          </div>
-        </form>
+            <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
+              Typed legal name
+              <input
+                value={typedName}
+                onChange={(event) => setTypedName(event.target.value)}
+                required
+                autoComplete="off"
+                placeholder="Type the name on the staff list exactly"
+                className="min-h-11 rounded-md border border-line bg-ground/50 px-3 text-sm font-normal text-ink"
+              />
+            </label>
+            <div>
+              <p className="mb-1.5 text-[10px] font-extrabold text-muted uppercase">Drawn mark</p>
+              <SignPad value={drawnPng} onChange={setDrawnPng} />
+            </div>
+            <label htmlFor="consent-checkbox" className="grid grid-cols-[20px_1fr] items-start gap-2 py-1 text-[11px] font-medium text-status-green-fg">
+              <Checkbox id="consent-checkbox" checked={consent} onCheckedChange={setConsent} />
+              <span>{consentCopy()}</span>
+            </label>
+            <div className="sticky bottom-0 z-10 -mx-4 mt-2 grid grid-cols-1 gap-2 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex sm:justify-end sm:border-0 sm:bg-transparent sm:px-0 sm:py-1">
+              <Button type="button" variant="danger" size="lg" className="w-full sm:w-auto" disabled={saving} onClick={() => void onSign("decline")}>
+                Decline
+              </Button>
+              <Button type="submit" size="lg" className="w-full sm:min-w-48 sm:w-auto" disabled={saving}>
+                {saving ? "Saving…" : "Record typed signature"}
+              </Button>
+            </div>
+          </form>
+        </>
       )}
         </div>
       )}

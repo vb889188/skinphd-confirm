@@ -10,6 +10,27 @@ export function employeeMailHref(mail: EmployeeMail) {
   return `mailto:${encodeURIComponent(mail.to)}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`;
 }
 
+export function confirmSiteUrl() {
+  const configured = (import.meta.env.VITE_CONFIRM_PUBLIC_URL as string | undefined)?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window === "undefined") return "https://confirm.relpdev.uk";
+  const host = window.location.hostname;
+  if (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "confirm.relpdev.uk" ||
+    host.endsWith(".skinphd.co.za") ||
+    host.endsWith("grok-sandbox.com")
+  ) {
+    return window.location.origin;
+  }
+  return "https://confirm.relpdev.uk";
+}
+
+export function packSignUrl(token: string) {
+  return `${confirmSiteUrl()}?sign=${encodeURIComponent(token)}`;
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "\u0026amp;")
