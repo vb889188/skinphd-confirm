@@ -2,7 +2,7 @@
 
 A PIN is **workspace sign-in only**. It is not a signature and it is not a pack code.
 
-Therapists and witnesses do not collect a PIN. They sign at the salon table (typed legal name + consent, optional drawn mark) or they open a personal link Head Office emailed if they have already left.
+Therapists and witnesses do not collect a PIN. They use a personal link, or they sign on the salon tablet.
 
 Confirm stores a hash, not the PIN. Head Office cannot look up an old number.
 
@@ -22,10 +22,15 @@ Confirm stores a hash, not the PIN. Head Office cannot look up an old number.
 ## Staff change their own PIN
 Settings → current PIN + new PIN.
 
-## Signing a pack
-- Default: pass the tablet. The signer types their own name. Head Office never types it for them. There is no 6-digit pack code.
-- If they left: Agreements → If they left — send a personal link. That link is not a PIN.
-- Head Office can void an open pack (with a reason) and reissue a new freeze. Completed packs stay.
+## How an employee signs and later opens their copy
+
+Therapists do not log into the Head Office workspace.
+
+1. **At the table.** Pass the tablet. They type their own legal name, tick consent, optional drawn mark. Head Office never types it for them.
+2. **From home / before they come in.** Head Office opens the pack → **If they are at home — send to their phone**. That email is a personal link, not a PIN. They read the frozen wording and sign on their phone.
+3. **Their copy later.** The same personal link stays valid after they sign. It opens the frozen pack they put their name on. When the pack completes, Confirm emails that copy link with the signed record. Head Office can also tap **Email the employee their copy**.
+
+There is no 6-digit pack code.
 
 ## Rules
 - Do not reuse 2468 after the pilot.

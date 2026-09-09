@@ -47,18 +47,20 @@ export function buildWelcomeMail(input: {
 export function buildSignCodeMail(input: { fullName: string; email: string; title: string; code: string; siteUrl: string }): EmployeeMail {
   return {
     to: input.email,
-    subject: `SkinPhD Confirm — your pack is ready to sign`,
+    subject: `SkinPhD Confirm — your pack`,
     body: [
       `Hello ${input.fullName},`,
       "",
-      "Head Office sent you a personal link for one frozen pack. This is not a PIN and not a 6-digit code.",
+      "This is your personal link for one frozen SkinPhD Confirm pack. It is not a PIN and not a 6-digit code.",
       "",
       `Pack: ${input.title}`,
-      "Open this link on your phone, type your legal name as it appears on the staff list, tick the box, and record your signature.",
+      "",
+      "Open it on your phone. If you have not signed yet, type your legal name as it appears on the staff list, tick the box, and record your signature — from home or before you come in.",
+      "If you have already signed, the same link opens your copy of the frozen pack.",
       "",
       `${input.siteUrl}?sign=${input.code}`,
       "",
-      "If you are still in the salon, you can ignore this and sign on the tablet at the table.",
+      "If you are in the salon, you can still sign on the tablet at the table instead.",
       "",
       "SkinPhD Confirm",
     ].join("\n"),
@@ -82,7 +84,7 @@ export function buildFranchiseeIssuedMail(input: {
       `Employee: ${input.employeeName}`,
       `Agreement: ${input.title}`,
       "",
-      "The employee should sign first, at the salon table if they are still there. You sign after that name is recorded. Nobody collects a 6-digit code.",
+      "The employee should sign first. They can do that at the salon table, or from home on the personal link Head Office emailed. You sign after that name is recorded. Nobody collects a 6-digit code.",
       input.siteUrl,
       "",
       "SkinPhD Confirm",
@@ -107,9 +109,8 @@ export function buildNextSignerMail(input: {
       `${input.previousSigner} has recorded a typed signature.`,
       `SkinPhD Confirm is waiting for you as ${input.role}.`,
       "",
+      "Sign at the salon table, or open the personal link Head Office emailed. There is no PIN and no 6-digit code.",
       input.siteUrl,
-      "",
-      "Open the pack, request a sign code if needed, then type your name.",
       "",
       "SkinPhD Confirm",
     ].join("\n"),
@@ -137,7 +138,7 @@ export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, s
       "Sign in",
       siteUrl,
       `Email: ${employee?.email ?? ""}`,
-      pin ? `PIN: ${pin}` : "Use the PIN Head Office last issued. That PIN does not expire.",
+      pin ? `PIN: ${pin}` : "Therapists do not collect a PIN. Use the personal link Head Office emailed to sign or to open your copy.",
       pin ? "This PIN does not expire. Head Office can issue a new one if it is lost." : "",
       "",
       "SkinPhD Confirm",
@@ -165,7 +166,7 @@ export function buildReminderMail(state: WorkspaceState, agreement: Agreement, s
   };
 }
 
-export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
+export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreement, siteUrl: string, recordUrl?: string): EmployeeMail {
   const employee = state.people.find((person) => person.id === agreement.employeeId);
   const manager = state.people.find((person) => person.id === agreement.managerId);
   return {
@@ -176,7 +177,11 @@ export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreemen
       `Employee: ${employee?.fullName ?? "Not set"}`,
       `Franchisee: ${manager?.fullName ?? "Not set"}`,
       `Snapshot: ${agreement.snapshotHash}`,
-      siteUrl,
+      "",
+      recordUrl
+        ? "The employee can open their copy on this personal link (not a PIN):"
+        : "Ask Head Office to email the employee their copy link if they need to open the pack from home.",
+      recordUrl ?? siteUrl,
       "",
       "SkinPhD Confirm",
     ].join("\n"),

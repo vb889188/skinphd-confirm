@@ -410,10 +410,18 @@ export function Workspace() {
             : "Saved. Signature recorded on the frozen snapshot.",
       );
       if (action === "sign" && latest?.status === "completed") {
-        const mail = buildSignedRecordMail(useWorkspace.getState(), latest, window.location.origin);
+        const origin = window.location.origin;
+        let recordUrl = origin;
+        try {
+          const copy = await useWorkspace.getState().issueSignCode(latest.id, "employee");
+          recordUrl = `${origin}?sign=${copy.token}`;
+        } catch {
+          /* pack email still goes out without a copy link */
+        }
+        const mail = buildSignedRecordMail(useWorkspace.getState(), latest, origin, recordUrl);
         if (mail.to) {
           const sent = await deliverMail(mail);
-          toast.success(sent === "sent" ? "Signed pack emailed." : "Finish the signed-pack email in your mail app.");
+          toast.success(sent === "sent" ? "Signed pack emailed, including the employee copy link." : "Finish the signed-pack email in your mail app.");
         }
       } else if (action === "sign" && latest) {
         const snapshot = useWorkspace.getState();
@@ -445,7 +453,7 @@ export function Workspace() {
       );
       if (action === "sign" && nextRole && current?.role === "manager") {
         setActiveRole(nextRole.role);
-        setTypedName(nextRole.name);
+        setTypedName("");
       } else {
         setActiveRole("");
       }
@@ -462,20 +470,32 @@ export function Workspace() {
     setSaving(true);
     setError("");
     try {
+      const alreadySigned = useWorkspace
+        .getState()
+        .signatures.some((item) => item.agreementId === selected.id && item.role === role && item.outcome === "signed");
       const result = await store.issueSignCode(selected.id, role);
       setActiveRole(role);
       setIssuedToken(result.token);
       const signer = selected.snapshot.signers.find((item) => item.role === role);
+      const origin = window.location.origin;
       const sent = await deliverMail(
-        buildSignCodeMail({
-          fullName: signer?.name ?? "",
-          email: result.email,
-          title: selected.title,
-          code: result.token,
-          siteUrl: window.location.origin,
-        }),
+        alreadySigned
+          ? buildSignedRecordMail(useWorkspace.getState(), selected, origin, `${origin}?sign=${result.token}`)
+          : buildSignCodeMail({
+              fullName: signer?.name ?? "",
+              email: result.email,
+              title: selected.title,
+              code: result.token,
+              siteUrl: origin,
+            }),
       );
-      toast.success(sent === "sent" ? `Personal link emailed to ${result.email}.` : `Personal link ready for ${result.email}. Finish the email in your mail app.`);
+      toast.success(
+        sent === "sent"
+          ? alreadySigned
+            ? `Copy link emailed to ${result.email}.`
+            : `Personal link emailed to ${result.email}.`
+          : `Personal link ready for ${result.email}. Finish the email in your mail app.`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not email the sign code");
     } finally {
@@ -2377,13 +2397,12 @@ function Detail({
         <Modal onClose={() => setPackPreview(false)} title="Send employee pack?" eyebrow="Confirm mail">
           <div className="grid gap-3 px-5 py-5">
             <p className="text-[13px] leading-relaxed text-muted">
-              This emails the pack from info@relpdev.uk. The current PIN stays valid.
+              This emails the pack from info@relpdev.uk. Therapists open their copy from the personal link, not a PIN.
             </p>
             <div className="rounded-md border border-line bg-ground px-3 py-3 text-[13px]">
               <p><strong>To</strong> {employee?.email || "No email on file"}</p>
               <p className="mt-1"><strong>Name</strong> {employee?.fullName || "Employee"}</p>
               <p className="mt-1"><strong>Pack</strong> {agreement.title}</p>
-              <p className="mt-1"><strong>PIN</strong> Not changed. Use Email new PIN on Staff only if they lost it.</p>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setPackPreview(false)}>Cancel</Button>
@@ -2421,6 +2440,16 @@ function Detail({
         >
           Email employee pack
         </Button>
+        {actor?.role === "manager" && (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={saving}
+            onClick={() => void onIssueCode("employee")}
+          >
+            Email the employee their copy
+          </Button>
+        )}
         {open && (
           <Button
             size="sm"
@@ -2574,13 +2603,13 @@ function Detail({
               void onIssueCode(signingRole as Role);
             }}
           >
-            If they left — send a personal link
+            If they are at home — send to their phone
           </Button>
           {actor?.role === "manager" && issuedToken && (
             <div className="rounded-md border border-line bg-paper px-3 py-3">
               <p className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">Personal link</p>
               <p className="mt-1 break-all text-[12px] text-ink">{typeof window !== "undefined" ? `${window.location.origin}?sign=${issuedToken}` : issuedToken}</p>
-              <p className="mt-1 text-[11px] text-muted">Not a PIN. Not a 6-digit code. The pack itself, on their phone.</p>
+              <p className="mt-1 text-[11px] text-muted">Same link to sign from home and to open their copy later. Not a PIN. Not a 6-digit code.</p>
             </div>
           )}
           <label className="grid gap-1.5 text-[10px] font-extrabold text-muted">
@@ -2691,18 +2720,40 @@ function PersonalLinkSign({ token }: { token: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [linkKey, setLinkKey] = useState("");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     void sha256Hex(token).then(setLinkKey);
   }, [token]);
 
-  const link = store.links.find((item) => item.tokenHash === linkKey && item.status === "pending");
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        await useWorkspace.getState().hydrateRemote();
+      } catch {
+        /* local records still used */
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const link = store.links.find((item) => item.tokenHash === linkKey && item.status !== "revoked" && item.status !== "declined");
   const agreement = link ? store.agreements.find((item) => item.id === link.agreementId) : null;
   const signer = agreement?.snapshot.signers.find((item) => item.role === link?.role);
+  const already = Boolean(
+    link &&
+      agreement &&
+      store.signatures.some((item) => item.agreementId === agreement.id && item.role === link.role && item.outcome === "signed"),
+  );
 
   useEffect(() => {
     if (agreement) useWorkspace.getState().openAgreement(agreement.id, "personal_link");
-  }, [agreement]);
+  }, [agreement, already]);
 
   async function onSign() {
     if (!agreement || !link) return;
@@ -2719,7 +2770,7 @@ function PersonalLinkSign({ token }: { token: string }) {
         drawnPng,
         surface: "personal_link",
       });
-      toast.success("Saved. Your name is on the frozen pack.");
+      toast.success("Saved. Your name is on the frozen pack. Keep this link — it is your copy.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not record the signature");
     } finally {
@@ -2727,18 +2778,7 @@ function PersonalLinkSign({ token }: { token: string }) {
     }
   }
 
-  if (linkKey && !link) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-ground px-4">
-        <Card className="max-w-md p-6">
-          <h1 className="font-display text-2xl">This personal link is no longer valid.</h1>
-          <p className="mt-2 text-sm text-muted">Ask Head Office to send it again, or sign on the salon tablet if you are still there.</p>
-        </Card>
-      </main>
-    );
-  }
-
-  if (!agreement || !signer) {
+  if (!ready || !linkKey) {
     return (
       <main className="grid min-h-screen place-items-center bg-ground text-muted">
         Opening your pack…
@@ -2746,16 +2786,54 @@ function PersonalLinkSign({ token }: { token: string }) {
     );
   }
 
-  if (!link) {
-    return null;
-  }
-  const already = store.signatures.some((item) => item.agreementId === agreement.id && item.role === link.role && item.outcome === "signed");
-  if (already) {
+  if (!link || !agreement || !signer) {
     return (
       <main className="grid min-h-screen place-items-center bg-ground px-4">
         <Card className="max-w-md p-6">
-          <h1 className="font-display text-2xl">This name is already on the pack.</h1>
-          <p className="mt-2 text-sm text-muted">{signer.name} · {packTitle(agreement.title)}</p>
+          <h1 className="font-display text-2xl">This personal link is no longer valid.</h1>
+          <p className="mt-2 text-sm text-muted">Ask Head Office to email your copy again, or sign on the salon tablet if you are still there.</p>
+        </Card>
+      </main>
+    );
+  }
+
+  if (already) {
+    const marks = store.signatures.filter((item) => item.agreementId === agreement.id && item.outcome === "signed");
+    return (
+      <main className="min-h-screen bg-ground px-4 py-8">
+        <Card className="mx-auto max-w-xl p-6">
+          <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Your copy · not a PIN</p>
+          <h1 className="mt-2 font-display text-3xl">{packTitle(agreement.title)}</h1>
+          <p className="mt-2 text-sm text-muted">
+            {signer.name} · {roleLabel(link.role)} · {STATUS_LABEL[agreement.status]}
+          </p>
+          <p className="mt-4 text-[11px] leading-relaxed text-muted">
+            This is the frozen pack that carries your typed name. Head Office keeps the same record. You can print this page.
+          </p>
+          <dl className="mt-4 grid gap-2 text-[12px] sm:grid-cols-2">
+            <div><dt className="text-muted">Employee</dt><dd>{personName(store, agreement.employeeId)}</dd></div>
+            <div><dt className="text-muted">Franchisee</dt><dd>{personName(store, agreement.managerId)}</dd></div>
+            <div><dt className="text-muted">SkinPhD branch</dt><dd>{branchLabel(store, agreement.branchId)}</dd></div>
+            <div><dt className="text-muted">Snapshot</dt><dd className="break-all font-mono text-[10px]">{agreement.snapshotHash.slice(0, 16)}…</dd></div>
+          </dl>
+          <ul className="mt-4 grid gap-2 text-[12px]">
+            {marks.map((item) => (
+              <li key={item.id} className="rounded-md border border-line bg-paper px-3 py-2">
+                <strong>{item.typedName}</strong>
+                <span className="mt-0.5 block text-[11px] text-muted">{roleLabel(item.role)} · {shortTime(item.signedAt)}</span>
+              </li>
+            ))}
+          </ul>
+          <article className="print-document mt-5 rounded-md border border-line bg-paper p-4">
+            <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
+              {agreement.status === "completed" ? "SkinPhD Confirm · certificate of record" : "SkinPhD Confirm · issued document"}
+            </p>
+            <p className="mt-3 whitespace-pre-wrap text-[12px] leading-relaxed">{agreement.snapshot.template.content}</p>
+            <p className="mt-4 text-[10px] text-muted">Snapshot {agreement.snapshotHash}</p>
+          </article>
+          <Button className="mt-4 no-print" variant="secondary" onClick={() => window.print()}>
+            Print my copy
+          </Button>
         </Card>
       </main>
     );
@@ -2767,7 +2845,7 @@ function PersonalLinkSign({ token }: { token: string }) {
         <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Personal link · not a PIN</p>
         <h1 className="mt-2 font-display text-3xl">{packTitle(agreement.title)}</h1>
         <p className="mt-2 text-sm text-muted">
-          {roleLabel(link.role)} · type {signer.name} exactly as it appears on the staff list.
+          {roleLabel(link.role)} · type {signer.name} exactly as it appears on the staff list. You can do this from home, before you come in, or after you leave.
         </p>
         {error && <p className="mt-3 rounded-md bg-danger-bg px-3 py-2 text-[11px] text-danger-fg">{error}</p>}
         <div className="mt-5 grid gap-3">

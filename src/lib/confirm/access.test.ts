@@ -51,3 +51,10 @@ test("requireCapability blocks employee directory writes", () => {
   assert.doesNotThrow(() => requireCapability(office, "staff", "Edit staff"));
   assert.throws(() => requireCapability(employee, "staff", "Edit staff"));
 });
+
+test("employee can still view a completed pack they signed", () => {
+  const pack = { employeeId: "e1", managerId: "m1", witnessId: "w1", branchId: "branch-brooklyn", status: "completed" } as Agreement;
+  assert.equal(canViewAgreement(employee, employee.id, pack), true);
+  const stranger = { ...employee, id: "e2" };
+  assert.equal(canViewAgreement(stranger, stranger.id, pack), false);
+});

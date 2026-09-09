@@ -687,7 +687,9 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const state = get();
         const agreement = state.agreements.find((item) => item.id === agreementId);
         if (!agreement) throw new Error("Agreement not found");
-        if (!canSign(agreement.status)) throw new Error("A personal link cannot be issued for this status");
+        if (agreement.status === "declined" || agreement.status === "superseded") {
+          throw new Error("This pack is closed. Head Office can reissue a new freeze.");
+        }
         const signer = agreement.snapshot.signers.find((item) => item.role === role);
         if (!signer) throw new Error("That role is not required on this agreement");
         const current = actor(state);
@@ -697,8 +699,9 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         }
         const person = state.people.find((item) => item.id === signer.id);
         if (!person?.email) throw new Error("That signer has no work email");
-        if (state.signatures.some((item) => item.agreementId === agreementId && item.role === role && item.outcome === "signed")) {
-          throw new Error("This role has already signed");
+        const alreadySigned = state.signatures.some((item) => item.agreementId === agreementId && item.role === role && item.outcome === "signed");
+        if (!alreadySigned && !canSign(agreement.status)) {
+          throw new Error("A personal link cannot be issued for this status");
         }
         const now = new Date();
         const token = randomToken();
@@ -717,9 +720,9 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               signerId: signer.id,
               role,
               tokenHash,
-              status: "pending",
+              status: alreadySigned ? ("consumed" as const) : ("pending" as const),
               expiresAt,
-              consumedAt: null,
+              consumedAt: alreadySigned ? now.toISOString() : null,
               createdBy: ACTOR,
               createdAt: now.toISOString(),
             },
@@ -730,8 +733,10 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               id: randomId("AUD"),
               agreementId,
               actor: ACTOR,
-              action: "Personal link issued",
-              detail: `A personal signing link was prepared for ${signer.name} (${role}). This is not a PIN and not a 6-digit code.`,
+              action: alreadySigned ? "Personal copy link issued" : "Personal link issued",
+              detail: alreadySigned
+                ? `A copy link was prepared for ${signer.name} so they can open the pack they signed. This is not a PIN.`
+                : `A personal link was prepared for ${signer.name} (${role}). They can sign from home, or open this same link later for their copy. This is not a PIN.`,
               createdAt: now.toISOString(),
             },
             ...state.audit,
