@@ -17,6 +17,8 @@ export function SignPad({ value, onChange }: { value: string | null; onChange: (
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.scale(ratio, ratio);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.strokeStyle = "#16382c";
@@ -65,6 +67,8 @@ export function SignPad({ value, onChange }: { value: string | null; onChange: (
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     setDirty(false);
     onChange(null);
   }

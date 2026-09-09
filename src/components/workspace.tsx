@@ -15,7 +15,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
-import type { Agreement, Role, WorkspaceState } from "@/lib/confirm/types";
+import type { Agreement, Role, Signature, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { sha256Hex } from "@/lib/confirm/crypto";
 import { can, canViewAgreement } from "@/lib/confirm/access";
@@ -154,6 +154,36 @@ function shortTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function fullStamp(value: string) {
+  return new Intl.DateTimeFormat("en-ZA", {
+    weekday: "short",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function signatureEvidence(signature: Signature) {
+  try {
+    const evidence = JSON.parse(signature.evidence) as { drawnPng?: string | null; identityAssurance?: string };
+    return {
+      drawnPng: evidence.drawnPng || null,
+      surface: evidence.identityAssurance || "",
+    };
+  } catch {
+    return { drawnPng: null, surface: "" };
+  }
+}
+
+function surfaceLabel(surface: string) {
+  if (surface === "salon_table") return "Signed at the salon table";
+  if (surface === "personal_link") return "Signed from a personal link";
+  if (surface === "workspace") return "Signed at the Confirm desk";
+  return "Signed";
 }
 
 function rands(cents: number) {
@@ -2581,6 +2611,7 @@ function Detail({
         {agreement.snapshot.signers.map((signer) => {
           const signature = state.signatures.find((item) => item.agreementId === agreement.id && item.role === signer.role);
           const isCurrent = signingRole === signer.role;
+          const mark = signature?.outcome === "signed" ? signatureEvidence(signature) : null;
           return (
             <article key={signer.role} className={cn("relative rounded-[10px] border bg-paper p-3", isCurrent ? "border-accent shadow-sm" : "border-line")}>
               {isCurrent && <span className="absolute top-3 right-3 size-2 rounded-full bg-accent live-dot" />}
@@ -2595,6 +2626,19 @@ function Detail({
                       ? " · signing now"
                       : " · waiting"}
               </small>
+              {signature?.outcome === "signed" && (
+                <div className="signature-mark mt-2 h-14 overflow-hidden rounded border border-line bg-white">
+                  {mark?.drawnPng ? (
+                    <img
+                      src={mark.drawnPng}
+                      alt={`Signature of ${signature.typedName}`}
+                      className="h-full w-full object-contain object-left"
+                    />
+                  ) : (
+                    <p className="flex h-full items-end px-2 pb-1 font-display text-lg italic">{signature.typedName}</p>
+                  )}
+                </div>
+              )}
             </article>
           );
         })}
@@ -2663,7 +2707,14 @@ function Detail({
       )}
         </div>
       )}
-      {!open && <div className="rounded-xl border border-line bg-ground/60 px-4 py-5 text-[12px] text-muted">Signing is closed for this record. Review the recorded signatures in the document.</div>}
+      {!open && (
+        <div className="my-4">
+          <p className="mb-3 rounded-xl border border-line bg-ground/60 px-4 py-3 text-[12px] text-muted">
+            Signing is closed for this record. The signatures below are the stored marks.
+          </p>
+          <RecordedSignatures state={state} agreement={agreement} />
+        </div>
+      )}
       </TabsContent>
       <TabsContent value="document">
       <Row label="Deemed cost" value={rands(agreement.costCents)} />
@@ -2687,11 +2738,16 @@ function Detail({
         </TabsList>
         <TabsContent value="pack">
       <article className="print-document my-4 rounded-md border border-line bg-paper p-5">
-        <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
-          {agreement.status === "completed" ? "SkinPhD Confirm · certificate of record" : "SkinPhD Confirm · issued document"}
-        </p>
-        <h3 className="mt-2 font-display text-xl">{agreement.title}</h3>
-        <p className="mt-1 text-[12px] text-muted">{agreement.snapshot.template.module}</p>
+        <div className="flex items-center gap-3 border-b border-line pb-4">
+          <img src="/skinphd-mark.svg" alt="" className="size-10" />
+          <div>
+            <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
+              {agreement.status === "completed" ? "SkinPhD Confirm · certificate of record" : "SkinPhD Confirm · issued document"}
+            </p>
+            <h3 className="mt-1 font-display text-xl leading-tight">{packTitle(agreement.title)}</h3>
+          </div>
+        </div>
+        <p className="mt-3 text-[12px] text-muted">{agreement.snapshot.template.module}</p>
         <dl className="mt-4 grid gap-2 text-[12px] sm:grid-cols-2">
           <div><dt className="text-muted">Employee</dt><dd>{personName(state, agreement.employeeId)}</dd></div>
           <div><dt className="text-muted">Franchisee</dt><dd>{personName(state, agreement.managerId)}</dd></div>
@@ -2701,7 +2757,8 @@ function Detail({
           <div><dt className="text-muted">Completion</dt><dd>{agreement.endsOn || "Not set"}</dd></div>
         </dl>
         <p className="mt-4 whitespace-pre-wrap text-[12px] leading-relaxed">{agreement.snapshot.template.content}</p>
-        <p className="mt-4 text-[10px] text-muted">Snapshot {agreement.snapshotHash}</p>
+        <RecordedSignatures state={state} agreement={agreement} />
+        <p className="mt-5 text-[10px] text-muted">Snapshot {agreement.snapshotHash}. This printed copy matches the stored record.</p>
       </article>
         </TabsContent>
         <TabsContent value="wording">
@@ -2800,6 +2857,55 @@ function FrozenPackRead({
   );
 }
 
+function SignatureBlock({ signature }: { signature: Signature }) {
+  const mark = signatureEvidence(signature);
+  return (
+    <figure className="signature-block break-inside-avoid rounded-md border border-line bg-paper p-3">
+      <figcaption className="text-[10px] font-extrabold tracking-[0.12em] text-muted uppercase">
+        {roleLabel(signature.role)}
+      </figcaption>
+      <div className="signature-mark mt-2 flex min-h-[5.5rem] items-end border-b border-ink/50 bg-white px-2 py-1">
+        {mark.drawnPng ? (
+          <img
+            src={mark.drawnPng}
+            alt={`Handwritten signature of ${signature.typedName}`}
+            className="max-h-24 w-full object-contain object-left"
+          />
+        ) : (
+          <p className="pb-1 font-display text-[1.65rem] leading-none text-ink italic">{signature.typedName}</p>
+        )}
+      </div>
+      <p className="mt-2 text-[13px] font-semibold text-ink">{signature.typedName}</p>
+      <p className="text-[11px] text-muted">
+        {surfaceLabel(mark.surface)} · {fullStamp(signature.signedAt)}
+      </p>
+    </figure>
+  );
+}
+
+function RecordedSignatures({ state, agreement }: { state: WorkspaceState; agreement: Agreement }) {
+  const marks = state.signatures.filter((item) => item.agreementId === agreement.id && item.outcome === "signed");
+  if (!marks.length) return null;
+  return (
+    <section className="mt-6">
+      <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Signatures on this record</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {agreement.snapshot.signers.map((signer) => {
+          const signature = marks.find((item) => item.role === signer.role);
+          if (!signature) {
+            return (
+              <div key={signer.role} className="rounded-md border border-dashed border-line px-3 py-4 text-[12px] text-muted">
+                {roleLabel(signer.role)} · not yet signed
+              </div>
+            );
+          }
+          return <SignatureBlock key={signature.id} signature={signature} />;
+        })}
+      </div>
+    </section>
+  );
+}
+
 function PersonalLinkSign({ token }: { token: string }) {
   const store = useWorkspace();
   const [typedName, setTypedName] = useState("");
@@ -2886,7 +2992,6 @@ function PersonalLinkSign({ token }: { token: string }) {
   }
 
   if (already) {
-    const marks = store.signatures.filter((item) => item.agreementId === agreement.id && item.outcome === "signed");
     return (
       <main className="min-h-screen bg-ground px-4 py-8">
         <Card className="mx-auto max-w-xl p-6">
@@ -2896,28 +3001,26 @@ function PersonalLinkSign({ token }: { token: string }) {
             {signer.name} · {roleLabel(link.role)} · {STATUS_LABEL[agreement.status]}
           </p>
           <p className="mt-4 text-[11px] leading-relaxed text-muted">
-            This is the frozen pack that carries your typed name. Head Office keeps the same record. You can print this page.
+            This is the frozen pack that carries your signature. Head Office keeps the same record. You can print this page.
           </p>
-          <dl className="mt-4 grid gap-2 text-[12px] sm:grid-cols-2">
-            <div><dt className="text-muted">Employee</dt><dd>{personName(store, agreement.employeeId)}</dd></div>
-            <div><dt className="text-muted">Franchisee</dt><dd>{personName(store, agreement.managerId)}</dd></div>
-            <div><dt className="text-muted">SkinPhD branch</dt><dd>{branchLabel(store, agreement.branchId)}</dd></div>
-            <div><dt className="text-muted">Snapshot</dt><dd className="break-all font-mono text-[10px]">{agreement.snapshotHash.slice(0, 16)}…</dd></div>
-          </dl>
-          <ul className="mt-4 grid gap-2 text-[12px]">
-            {marks.map((item) => (
-              <li key={item.id} className="rounded-md border border-line bg-paper px-3 py-2">
-                <strong>{item.typedName}</strong>
-                <span className="mt-0.5 block text-[11px] text-muted">{roleLabel(item.role)} · {shortTime(item.signedAt)}</span>
-              </li>
-            ))}
-          </ul>
           <article className="print-document mt-5 rounded-md border border-line bg-paper p-4">
-            <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
-              {agreement.status === "completed" ? "SkinPhD Confirm · certificate of record" : "SkinPhD Confirm · issued document"}
-            </p>
-            <p className="mt-3 whitespace-pre-wrap text-[12px] leading-relaxed">{agreement.snapshot.template.content}</p>
-            <p className="mt-4 text-[10px] text-muted">Snapshot {agreement.snapshotHash}</p>
+            <div className="flex items-center gap-3 border-b border-line pb-3">
+              <img src="/skinphd-mark.svg" alt="" className="size-9" />
+              <div>
+                <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
+                  {agreement.status === "completed" ? "SkinPhD Confirm · certificate of record" : "SkinPhD Confirm · issued document"}
+                </p>
+                <h2 className="mt-1 font-display text-xl leading-tight">{packTitle(agreement.title)}</h2>
+              </div>
+            </div>
+            <dl className="mt-4 grid gap-2 text-[12px] sm:grid-cols-2">
+              <div><dt className="text-muted">Employee</dt><dd>{personName(store, agreement.employeeId)}</dd></div>
+              <div><dt className="text-muted">Franchisee</dt><dd>{personName(store, agreement.managerId)}</dd></div>
+              <div><dt className="text-muted">SkinPhD branch</dt><dd>{branchLabel(store, agreement.branchId)}</dd></div>
+            </dl>
+            <p className="mt-4 whitespace-pre-wrap text-[12px] leading-relaxed">{agreement.snapshot.template.content}</p>
+            <RecordedSignatures state={store} agreement={agreement} />
+            <p className="mt-4 text-[10px] text-muted">Snapshot {agreement.snapshotHash}. This printed copy matches the stored record.</p>
           </article>
           <Button className="mt-4 no-print" variant="secondary" onClick={() => window.print()}>
             Print my copy
