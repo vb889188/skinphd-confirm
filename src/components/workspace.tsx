@@ -1135,112 +1135,7 @@ export function Workspace() {
                 </article>
               ))}
             </div>
-            {current.role === "manager" && (
-              <form
-                className="h-fit rounded-3xl border border-line bg-paper p-5"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const form = event.currentTarget;
-                  const values = Object.fromEntries(new FormData(form).entries());
-                  void store.addTemplate({
-                      name: String(values.name),
-                      category: String(values.category) as "training" | "equipment" | "internal_waiver",
-                      module: String(values.module),
-                      sourceFile: String(values.sourceFile),
-                      content: String(values.content),
-                      dailyRateRands: values.dailyRateRands ? Number(values.dailyRateRands) : null,
-                      defaultDays: values.defaultDays ? Number(values.defaultDays) : null,
-                      passPercent: values.passPercent ? Number(values.passPercent) : null,
-                      mandatoryMonths: values.mandatoryMonths ? Number(values.mandatoryMonths) : null,
-                      hasWaiver: values.hasWaiver === "on",
-                      equipmentLabel: String(values.equipmentLabel || "") || null,
-                      fileBase64: String(values.fileBase64 || "") || undefined,
-                      mimeType: String(values.mimeType || "") || undefined,
-                      byteSize: values.byteSize ? Number(values.byteSize) : undefined,
-                    }).then(() => {
-                    form.reset();
-                    setError("");
-                  }).catch((err) => {
-                    setError(err instanceof Error ? err.message : "Could not add the document");
-                  });
-                }}
-              >
-                <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">New source document</p>
-                <h2 className="mb-3 font-display text-xl font-medium">Upload wording</h2>
-                <p className="mb-3 text-[11px] leading-relaxed text-muted">
-                  Keep the original file name. Paste the exact source wording. Do not invent clauses, rates, or waiver text.
-                </p>
-                <div className="grid gap-2.5">
-                  <input
-                    type="file"
-                    accept=".txt,.pptx,.pdf,.docx"
-                    className="min-h-10 rounded-md border border-line px-2.5 py-2 text-sm"
-                    onChange={(event) => {
-                      const file = event.currentTarget.files?.[0];
-                      const form = event.currentTarget.form;
-                      if (!file || !form) return;
-                      const setValue = (name: string, value: string) => {
-                        const field = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
-                        if (field) field.value = value;
-                      };
-                      setValue("sourceFile", file.name);
-                      if (file.size > 6_000_000) {
-                        setError("Keep source files under 6 MB");
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const result = String(reader.result || "");
-                        const base64 = result.includes(",") ? result.split(",")[1] : result;
-                        setValue("fileBase64", base64);
-                        setValue("mimeType", file.type || "application/octet-stream");
-                        setValue("byteSize", String(file.size));
-                      };
-                      reader.readAsDataURL(file);
-                      void extractSourceDocument(file)
-                        .then((extracted) => {
-                          setValue("sourceFile", extracted.fileName);
-                          setValue("name", extracted.name);
-                          setValue("module", extracted.module);
-                          setValue("category", extracted.category);
-                          setValue("content", extracted.content);
-                          setValue("dailyRateRands", extracted.dailyRateRands ? String(extracted.dailyRateRands) : "");
-                          setValue("defaultDays", extracted.defaultDays ? String(extracted.defaultDays) : "");
-                          setValue("passPercent", extracted.passPercent ? String(extracted.passPercent) : "");
-                          setValue("mandatoryMonths", extracted.mandatoryMonths ? String(extracted.mandatoryMonths) : "");
-                          setValue("equipmentLabel", extracted.equipmentLabel ?? "");
-                          const waiver = form.elements.namedItem("hasWaiver") as HTMLInputElement | null;
-                          if (waiver) waiver.checked = extracted.hasWaiver;
-                          setError("");
-                        })
-                        .catch((err) => setError(err instanceof Error ? err.message : "Could not read that file"));
-                    }}
-                  />
-                  <input name="sourceFile" required placeholder="Original file name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <input type="hidden" name="fileBase64" />
-                  <input type="hidden" name="mimeType" />
-                  <input type="hidden" name="byteSize" />
-                  <input name="name" required placeholder="Template name as printed" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <input name="module" placeholder="Module / machine name" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <select name="category" required className="min-h-10 rounded-md border border-line px-2.5 text-sm">
-                    <option value="training">Training cost agreement</option>
-                    <option value="equipment">Equipment cost agreement</option>
-                    <option value="internal_waiver">Employee waiver addendum</option>
-                  </select>
-                  <input name="dailyRateRands" type="number" min={0} placeholder="Daily rate if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <input name="defaultDays" type="number" min={0} placeholder="Days if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <input name="passPercent" type="number" min={0} max={100} placeholder="Pass % if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <input name="mandatoryMonths" type="number" min={0} placeholder="Mandatory months if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <input name="equipmentLabel" placeholder="Equipment label if printed (optional)" className="min-h-10 rounded-md border border-line px-2.5 text-sm" />
-                  <label className="flex items-center gap-2 text-[11px] text-muted">
-                    <input name="hasWaiver" type="checkbox" />
-                    Source file includes a waiver addendum
-                  </label>
-                  <textarea name="content" required rows={10} placeholder="Paste the exact source wording here" className="rounded-md border border-line px-2.5 py-2 text-sm" />
-                  <Button type="submit">Save source template</Button>
-                </div>
-              </form>
-            )}
+            {current.role === "manager" && <SourceUploadForm />}
           </div>
         )}
 
@@ -2485,6 +2380,197 @@ function AgreementQueue({
         </div>
       )}
     </section>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="grid gap-1.5 text-[10px] font-extrabold tracking-[0.06em] text-muted uppercase">
+      {label}
+      {children}
+      {hint ? <span className="font-medium normal-case tracking-normal text-muted">{hint}</span> : null}
+    </label>
+  );
+}
+
+function SourceUploadForm() {
+  const addTemplate = useWorkspace((store) => store.addTemplate);
+  const [reading, setReading] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function onFile(file: File, form: HTMLFormElement) {
+    const setValue = (name: string, value: string) => {
+      const field = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+      if (field) field.value = value;
+    };
+    setFileName(file.name);
+    setValue("sourceFile", file.name);
+    setError("");
+    setNotice("");
+    if (file.size > 6_000_000) {
+      setError("Keep source files under 6 MB.");
+      return;
+    }
+    setReading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      setValue("fileBase64", result.includes(",") ? result.split(",")[1] : result);
+      setValue("mimeType", file.type || "application/octet-stream");
+      setValue("byteSize", String(file.size));
+    };
+    reader.readAsDataURL(file);
+    try {
+      const extracted = await extractSourceDocument(file);
+      setValue("sourceFile", extracted.fileName);
+      setValue("name", extracted.name);
+      setValue("module", extracted.module);
+      setValue("category", extracted.category);
+      setValue("content", extracted.content);
+      setValue("dailyRateRands", extracted.dailyRateRands ? String(extracted.dailyRateRands) : "");
+      setValue("defaultDays", extracted.defaultDays ? String(extracted.defaultDays) : "");
+      setValue("passPercent", extracted.passPercent ? String(extracted.passPercent) : "");
+      setValue("mandatoryMonths", extracted.mandatoryMonths ? String(extracted.mandatoryMonths) : "");
+      setValue("equipmentLabel", extracted.equipmentLabel ?? "");
+      const waiver = form.elements.namedItem("hasWaiver") as HTMLInputElement | null;
+      if (waiver) waiver.checked = extracted.hasWaiver;
+      setNotice(`Read ${extracted.content.length} characters from ${extracted.fileName}. Check the wording, then save.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not read that file.");
+    } finally {
+      setReading(false);
+    }
+  }
+
+  return (
+    <form
+      className="h-fit rounded-3xl border border-line bg-paper p-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const values = Object.fromEntries(new FormData(form).entries());
+        setSaving(true);
+        setError("");
+        void addTemplate({
+          name: String(values.name),
+          category: String(values.category) as "training" | "equipment" | "internal_waiver",
+          module: String(values.module),
+          sourceFile: String(values.sourceFile),
+          content: String(values.content),
+          dailyRateRands: values.dailyRateRands ? Number(values.dailyRateRands) : null,
+          defaultDays: values.defaultDays ? Number(values.defaultDays) : null,
+          passPercent: values.passPercent ? Number(values.passPercent) : null,
+          mandatoryMonths: values.mandatoryMonths ? Number(values.mandatoryMonths) : null,
+          hasWaiver: values.hasWaiver === "on",
+          requiresWitness: values.requiresWitness === "on",
+          equipmentLabel: String(values.equipmentLabel || "") || null,
+          fileBase64: String(values.fileBase64 || "") || undefined,
+          mimeType: String(values.mimeType || "") || undefined,
+          byteSize: values.byteSize ? Number(values.byteSize) : undefined,
+        })
+          .then(() => {
+            form.reset();
+            setFileName("");
+            setNotice("");
+            toast.success("Source form saved. Issued packs will freeze this wording.");
+          })
+          .catch((err) => {
+            setError(err instanceof Error ? err.message : "Could not add the document");
+          })
+          .finally(() => setSaving(false));
+      }}
+    >
+      <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">New source document</p>
+      <h2 className="mb-2 font-display text-xl font-medium">Upload the SkinPhD file</h2>
+      <p className="mb-4 text-[12px] leading-relaxed text-muted">
+        Choose the original PowerPoint, PDF or Word file. Confirm reads the wording. Check it. Do not type new legal clauses.
+      </p>
+      <div className="grid gap-3">
+        <label className="grid cursor-pointer gap-1 rounded-xl border border-dashed border-line bg-ground/50 px-4 py-5 text-center hover:border-accent">
+          <input
+            type="file"
+            accept=".pptx,.pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              const form = event.currentTarget.form;
+              if (!file || !form) return;
+              void onFile(file, form);
+            }}
+          />
+          <span className="text-sm font-semibold text-ink">{fileName || "Choose the original file"}</span>
+          <span className="text-[11px] text-muted">
+            {reading ? "Reading the wording…" : "PowerPoint, PDF or Word. Under 6 MB."}
+          </span>
+        </label>
+        {notice && <p className="rounded-md border border-line bg-sage/70 px-3 py-2 text-[12px] text-status-green-fg">{notice}</p>}
+        {error && <p role="alert" className="rounded-md border border-danger-line bg-danger-bg px-3 py-2 text-[12px] text-danger-fg">{error}</p>}
+        <input type="hidden" name="fileBase64" />
+        <input type="hidden" name="mimeType" />
+        <input type="hidden" name="byteSize" />
+        <Field label="Original file name">
+          <input name="sourceFile" required className="min-h-11 rounded-md border border-line px-3 text-sm font-normal normal-case tracking-normal text-ink" />
+        </Field>
+        <Field label="Name as printed on the form">
+          <input name="name" required className="min-h-11 rounded-md border border-line px-3 text-sm font-normal normal-case tracking-normal text-ink" />
+        </Field>
+        <Field label="Module or machine">
+          <input name="module" className="min-h-11 rounded-md border border-line px-3 text-sm font-normal normal-case tracking-normal text-ink" />
+        </Field>
+        <Field label="Type of pack">
+          <select name="category" required className="min-h-11 rounded-md border border-line px-3 text-sm font-normal normal-case tracking-normal text-ink">
+            <option value="training">Training cost agreement</option>
+            <option value="equipment">Equipment cost agreement</option>
+            <option value="internal_waiver">Employee waiver addendum</option>
+          </select>
+        </Field>
+        <Field label="Wording from the file" hint="This is what the employee will read before they sign. Fix only if the read missed a slide.">
+          <textarea name="content" required rows={12} className="rounded-md border border-line px-3 py-2 text-sm font-normal normal-case tracking-normal text-ink" />
+        </Field>
+        <details className="rounded-xl border border-line bg-ground/40 px-3 py-2">
+          <summary className="cursor-pointer text-[12px] font-semibold text-ink">Printed numbers on the form (optional)</summary>
+          <div className="mt-3 grid gap-3">
+            <Field label="Daily rate (R)">
+              <input name="dailyRateRands" type="number" min={0} className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm font-normal normal-case tracking-normal text-ink" />
+            </Field>
+            <Field label="Days">
+              <input name="defaultDays" type="number" min={0} className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm font-normal normal-case tracking-normal text-ink" />
+            </Field>
+            <Field label="Pass %">
+              <input name="passPercent" type="number" min={0} max={100} className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm font-normal normal-case tracking-normal text-ink" />
+            </Field>
+            <Field label="Mandatory months">
+              <input name="mandatoryMonths" type="number" min={0} className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm font-normal normal-case tracking-normal text-ink" />
+            </Field>
+            <Field label="Equipment label">
+              <input name="equipmentLabel" className="min-h-11 rounded-md border border-line bg-paper px-3 text-sm font-normal normal-case tracking-normal text-ink" />
+            </Field>
+          </div>
+        </details>
+        <label className="flex items-start gap-2 text-[12px] text-ink">
+          <input name="hasWaiver" type="checkbox" className="mt-0.5" />
+          Source file includes a waiver addendum
+        </label>
+        <label className="flex items-start gap-2 text-[12px] text-ink">
+          <input name="requiresWitness" type="checkbox" defaultChecked className="mt-0.5" />
+          Witness must also sign this pack
+        </label>
+        <Button type="submit" disabled={reading || saving}>
+          {saving ? "Saving…" : "Save source form"}
+        </Button>
+      </div>
+    </form>
   );
 }
 

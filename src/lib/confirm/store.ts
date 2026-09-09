@@ -83,6 +83,7 @@ type Actions = {
     mandatoryMonths: number | null;
     hasWaiver: boolean;
     equipmentLabel: string | null;
+    requiresWitness?: boolean;
     fileBase64?: string;
     mimeType?: string;
     byteSize?: number;
@@ -391,7 +392,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           defaultDays: input.defaultDays,
           passPercent: input.passPercent,
           mandatoryMonths: input.mandatoryMonths,
-          requiresWitness: true,
+          requiresWitness: input.requiresWitness ?? true,
           hasWaiver: input.hasWaiver,
           equipmentLabel: input.equipmentLabel,
           content,

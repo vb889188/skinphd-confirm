@@ -17,21 +17,28 @@ export async function extractSourceDocument(file: File): Promise<ExtractedSource
   let raw = "";
   if (lower.endsWith(".txt") || file.type.startsWith("text/")) raw = await file.text();
   else if (lower.endsWith(".pptx") || lower.endsWith(".zip")) raw = await extractPptxText(await file.arrayBuffer());
+  else if (lower.endsWith(".docx")) raw = await extractDocxText(await file.arrayBuffer());
   else if (lower.endsWith(".pdf")) raw = await extractPdfText(await file.arrayBuffer());
-  else throw new Error("Use a .pptx, .txt, or .pdf source file. Paste wording if the file cannot be read.");
+  else throw new Error("Use the original SkinPhD PowerPoint, PDF, or Word file.");
 
   const content = cleanExtractedText(raw);
-  if (content.length < 80) throw new Error("Could not read enough source wording from that file. Paste the printed text.");
+  if (content.length < 80) {
+    throw new Error("Could not read enough wording from that file. The file is still attached — paste the printed text below so we do not invent clauses.");
+  }
   return annotateSource(file.name, content);
 }
 
 export function annotateSource(fileName: string, content: string): ExtractedSource {
   const lines = content.split("\n").map((line) => line.trim()).filter(Boolean);
-  const heading = lines.find((line) => /agreement|waiver/i.test(line)) ?? lines[0] ?? fileName;
-  const module = lines.find((line) => /training module|hydroderm|diode|oneskin|deluxe|sales|dermaplan|algae|product & retail/i.test(line)) ?? heading;
-  const category: ExtractedSource["category"] = /waiver/i.test(heading) && !/training|equipment/i.test(heading)
+  const fromFile = fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  const heading = lines.find((line) => /agreement|waiver/i.test(line)) ?? lines[0] ?? fromFile;
+  const module =
+    lines.find((line) => /training module|hydroderm|diode|oneskin|deluxe|sales|dermaplan|algae|product & retail|step\s*[45]/i.test(line)) ??
+    fromFile ??
+    heading;
+  const category: ExtractedSource["category"] = /waiver/i.test(`${heading} ${fromFile}`) && !/training|equipment/i.test(`${heading} ${fromFile}`)
     ? "internal_waiver"
-    : /equipment/i.test(content.slice(0, 400))
+    : /equipment/i.test(`${fileName} ${content.slice(0, 500)}`)
       ? "equipment"
       : "training";
   const rate = content.match(/R\s*([0-9][0-9\s]*)\s*(?:per day|for the day)/i);
@@ -49,7 +56,7 @@ export function annotateSource(fileName: string, content: string): ExtractedSour
     defaultDays: days ? Number(days[1]) : null,
     passPercent: pass ? Number(pass[1]) : null,
     mandatoryMonths: months ? Number(months[1]) : null,
-    hasWaiver: /waiver & release of liability/i.test(content),
+    hasWaiver: /waiver & release of liability|waiver addendum/i.test(content) || /waiver/i.test(fileName),
     equipmentLabel: equipment ? equipment[1].trim() : null,
   };
 }
@@ -70,12 +77,18 @@ async function extractPptxText(buffer: ArrayBuffer) {
   const slides = Object.keys(files)
     .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  const chunks = slides.map((name) => xmlText(files[name] ?? ""));
+  const chunks = slides.map((name) => xmlText(files[name] ?? "", /<a:t[^>]*>([^<]*)<\/a:t>/g));
   return chunks.filter(Boolean).join("\n\n");
 }
 
-function xmlText(xml: string) {
-  return [...xml.matchAll(/<a:t[^>]*>([^<]*)<\/a:t>/g)]
+async function extractDocxText(buffer: ArrayBuffer) {
+  const files = await unzip(new Uint8Array(buffer));
+  const xml = files["word/document.xml"] ?? "";
+  return xmlText(xml, /<w:t[^>]*>([^<]*)<\/w:t>/g);
+}
+
+function xmlText(xml: string, pattern: RegExp) {
+  return [...xml.matchAll(pattern)]
     .map((match) => decodeXml(match[1]))
     .join(" ")
     .replace(/\s+/g, " ")
@@ -92,6 +105,22 @@ function decodeXml(value: string) {
 }
 
 async function extractPdfText(buffer: ArrayBuffer) {
+  try {
+    const pdfjs = await import("pdfjs-dist");
+    pdfjs.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
+    const pages: string[] = [];
+    const count = Math.min(doc.numPages, 20);
+    for (let index = 1; index <= count; index += 1) {
+      const page = await doc.getPage(index);
+      const content = await page.getTextContent();
+      pages.push(content.items.map((item) => ("str" in item ? item.str : "")).join(" "));
+    }
+    const text = pages.join("\n\n").replace(/\s+\n/g, "\n").trim();
+    if (text.replace(/\s/g, "").length > 40) return text;
+  } catch {
+    /* fall through to the naive scrape */
+  }
   const raw = new TextDecoder("latin1").decode(buffer);
   const matches = [...raw.matchAll(/\((?:\\\)|[^)]){4,}\)/g)].map((match) =>
     match[0].slice(1, -1).replace(/\\n/g, "\n").replace(/\\\)/g, ")").replace(/\\\(/g, "("),
