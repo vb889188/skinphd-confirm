@@ -8,6 +8,8 @@ SkinPhD Confirm issues employee training and equipment agreements from SkinPhD s
 
 It does **not** decide competence, treatment authorisation, payroll deductions, or client consent.
 
+Signing is a salon-table ceremony. Therapists do not collect a PIN or a 6-digit pack code. Head Office / franchisee still use a workspace PIN. If a signer has left, Head Office can email a personal link.
+
 ## Included source forms
 
 Equipment: Multi Functional Laser Diode & Pico, OneSkin Pen, HydroDerm MD.
@@ -34,10 +36,10 @@ HOST=0.0.0.0 PORT=8080 npm start
 
 ## First sign-in
 
-The franchisee signs in with the issued email and PIN, then changes the PIN under Settings. Add real staff in People. Do not store live ID numbers until SkinPhD legal has approved the source wording.
+The franchisee signs in with the issued email and PIN, then changes the PIN under Settings. Add real staff in People. Therapists do not need a PIN. Do not store live ID numbers until SkinPhD legal has approved the source wording.
 
 ## Still required from SkinPhD
 
 - Approval of source wording, including 80%/90% mismatches and payroll-deduction sentences
-- Confirmation that typed-name signatures are accepted for v1
+- Confirmation that typed-name signatures (with optional drawn mark) are accepted for v1
 - Remaining clinic names, if any

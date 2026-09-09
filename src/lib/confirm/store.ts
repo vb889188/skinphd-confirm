@@ -44,7 +44,10 @@ export type CreateInput = {
 type Actions = {
   createAgreement: (input: CreateInput) => Promise<string>;
   issueLink: (agreementId: string, role: Role) => Promise<{ token: string; expiresAt: string }>;
-  issueSignCode: (agreementId: string, role: Role) => Promise<{ code: string; email: string; expiresAt: string }>;
+  issueSignCode: (agreementId: string, role: Role) => Promise<{ token: string; email: string; expiresAt: string }>;
+  openAgreement: (agreementId: string, surface?: "salon_table" | "personal_link" | "workspace") => void;
+  voidAgreement: (agreementId: string, reason: string) => void;
+  reissueAgreement: (agreementId: string) => Promise<string>;
   captureSignature: (input: {
     agreementId: string;
     role: Role;
@@ -52,6 +55,8 @@ type Actions = {
     consentAccepted: boolean;
     action: "sign" | "decline";
     token?: string;
+    drawnPng?: string | null;
+    surface?: "salon_table" | "personal_link" | "workspace";
   }) => Promise<string>;
   resetWorkspace: () => void;
   signIn: (personId: string) => void;
@@ -127,6 +132,12 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const code = pin.trim();
         const person = get().people.find((item) => item.email.toLowerCase() === normalized && item.status === "active");
         if (!person || !person.pinHash) throw new Error("No active staff record for that email.");
+        if (person.role === "employee" || person.role === "witness") {
+          throw new Error("Therapists and witnesses do not collect a PIN. Sign at the salon table, or open the personal link Head Office sent.");
+        }
+        if (person.role === "employee" || person.role === "witness") {
+          throw new Error("Therapists and witnesses do not collect a PIN. Sign at the salon table, or open the personal link Head Office sent.");
+        }
         const hash = await sha256Hex(`${normalized}|${code}`);
         const alt = await sha256Hex(`${person.email}|${code}`);
         if (hash !== person.pinHash && alt !== person.pinHash) {
@@ -260,13 +271,17 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (!fullName) throw new Error("Name is required");
         if (!email) throw new Error("Email is required");
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid work email");
-        if (!/^\d{4,8}$/.test(pin)) throw new Error("Choose a 4 to 8 digit PIN");
+        if (input.role === "manager") {
+          if (!/^\d{4,8}$/.test(pin)) throw new Error("Franchisees need a 4 to 8 digit workspace PIN");
+        } else if (pin && !/^\d{4,8}$/.test(pin)) {
+          throw new Error("If you set a PIN, use 4 to 8 digits");
+        }
         const state = get();
         if (!state.branches.some((branch) => branch.id === input.branchId)) throw new Error("Choose a SkinPhD branch");
         if (state.people.some((person) => person.email === email)) throw new Error("That email is already in the directory");
         const id = randomId("PER");
         const now = new Date().toISOString();
-        const pinHash = await sha256Hex(`${email}|${pin}`);
+        const pinHash = pin ? await sha256Hex(`${email}|${pin}`) : null;
         const created = { id, branchId: input.branchId, fullName, email, role: input.role, status: "active" as const, pinHash, scope: input.role === "manager" ? "clinic" as const : "self" as const, createdAt: now };
         set({
           people: [...state.people, created],
@@ -675,13 +690,13 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const state = get();
         const agreement = state.agreements.find((item) => item.id === agreementId);
         if (!agreement) throw new Error("Agreement not found");
-        if (!canSign(agreement.status)) throw new Error("A sign code cannot be issued for this status");
+        if (!canSign(agreement.status)) throw new Error("A personal link cannot be issued for this status");
         const signer = agreement.snapshot.signers.find((item) => item.role === role);
         if (!signer) throw new Error("That role is not required on this agreement");
         const current = actor(state);
         if (!current) throw new Error("Sign in first");
         if (current.id !== signer.id && current.role !== "manager") {
-          throw new Error("Only the assigned signer or Head Office can email this code");
+          throw new Error("Only the assigned signer or Head Office can send this personal link");
         }
         const person = state.people.find((item) => item.id === signer.id);
         if (!person?.email) throw new Error("That signer has no work email");
@@ -689,8 +704,8 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           throw new Error("This role has already signed");
         }
         const now = new Date();
-        const code = String(100000 + Math.floor(Math.random() * 900000));
-        const tokenHash = await sha256Hex(code);
+        const token = randomToken();
+        const tokenHash = await sha256Hex(token);
         const expiresAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
         const links = state.links.map((link) =>
           link.agreementId === agreementId && link.role === role && link.status === "pending"
@@ -718,15 +733,96 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               id: randomId("AUD"),
               agreementId,
               actor: ACTOR,
-              action: "Sign code emailed",
-              detail: `A sign code was prepared for ${signer.name} (${role}). Codes do not expire during this pilot.`,
+              action: "Personal link issued",
+              detail: `A personal signing link was prepared for ${signer.name} (${role}). This is not a PIN and not a 6-digit code.`,
               createdAt: now.toISOString(),
             },
             ...state.audit,
           ],
         });
         void persistWorkspace(get()).catch(() => undefined);
-        return { code, email: person.email, expiresAt };
+        return { token, email: person.email, expiresAt };
+      },
+      openAgreement: (agreementId, surface = "workspace") => {
+        const state = get();
+        const agreement = state.agreements.find((item) => item.id === agreementId);
+        if (!agreement) return;
+        if (state.audit.some((item) => item.agreementId === agreementId && item.action === "Pack opened")) return;
+        const now = new Date().toISOString();
+        set({
+          audit: [
+            {
+              id: randomId("AUD"),
+              agreementId,
+              actor: actor(state)?.fullName ?? ACTOR,
+              action: "Pack opened",
+              detail: `Opened on ${surface.replace("_", " ")}.`,
+              createdAt: now,
+            },
+            ...state.audit,
+          ],
+        });
+        void persistWorkspace(get()).catch(() => undefined);
+      },
+      voidAgreement: (agreementId, reason) => {
+        const state = get();
+        const agreement = state.agreements.find((item) => item.id === agreementId);
+        if (!agreement) throw new Error("Agreement not found");
+        requireCapability(actor(state), "issue", "Void a pack", agreement.branchId);
+        if (agreement.status === "completed") throw new Error("A completed pack cannot be voided. Reissue if you need a new freeze.");
+        const trimmed = reason.trim();
+        if (!trimmed) throw new Error("Give a reason so the history is honest");
+        const now = new Date().toISOString();
+        set({
+          agreements: state.agreements.map((item) =>
+            item.id === agreementId ? { ...item, status: "superseded" as const, updatedAt: now } : item,
+          ),
+          links: state.links.map((link) =>
+            link.agreementId === agreementId && link.status === "pending" ? { ...link, status: "revoked" as const, consumedAt: now } : link,
+          ),
+          audit: [
+            {
+              id: randomId("AUD"),
+              agreementId,
+              actor: actor(state)?.fullName ?? ACTOR,
+              action: "Pack voided",
+              detail: trimmed,
+              createdAt: now,
+            },
+            ...state.audit,
+          ],
+        });
+        void persistWorkspace(get()).catch(() => undefined);
+      },
+      reissueAgreement: async (agreementId) => {
+        const state = get();
+        const agreement = state.agreements.find((item) => item.id === agreementId);
+        if (!agreement) throw new Error("Agreement not found");
+        requireCapability(actor(state), "issue", "Reissue a pack", agreement.branchId);
+        if (agreement.status !== "completed" && agreement.status !== "superseded" && agreement.status !== "declined") {
+          get().voidAgreement(agreementId, "Replaced by a new freeze");
+        }
+        return get().createAgreement({
+          title: agreement.title,
+          activity: agreement.activity,
+          branchId: agreement.branchId,
+          employeeId: agreement.employeeId,
+          managerId: agreement.managerId,
+          witnessId: agreement.witnessId ?? undefined,
+          templateId: agreement.templateId,
+          costRands: agreement.costCents / 100,
+          startsOn: agreement.startsOn ?? undefined,
+          endsOn: agreement.endsOn ?? undefined,
+          days: agreement.snapshot.fields.days ?? undefined,
+          contractEndOn: agreement.snapshot.fields.contractEndOn ?? undefined,
+          employeeIdNumber: agreement.snapshot.fields.employeeIdNumber ?? undefined,
+          employeePhone: agreement.snapshot.fields.employeePhone ?? undefined,
+          employeeTitle: agreement.snapshot.fields.employeeTitle ?? undefined,
+          equipmentMake: agreement.snapshot.fields.equipmentMake ?? undefined,
+          equipmentModel: agreement.snapshot.fields.equipmentModel ?? undefined,
+          equipmentSerial: agreement.snapshot.fields.equipmentSerial ?? undefined,
+          additionalDescription: agreement.snapshot.fields.additionalDescription ?? undefined,
+        });
       },
       captureSignature: async (input) => {
         const state = get();
@@ -742,15 +838,18 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const now = new Date().toISOString();
         let linkId: string | null = null;
         let links = state.links;
-        if (input.action === "sign") {
-          if (!input.token?.trim()) throw new Error("Enter the 6-digit code emailed for this signature");
+        const current = actor(state);
+        const tableCeremony = current?.role === "manager" || current?.id === signer.id;
+        const surface = input.surface ?? (input.token ? "personal_link" : "salon_table");
+        if (input.action === "sign" && !tableCeremony && !input.token?.trim()) {
+          throw new Error("Sign at the salon table with Head Office, or open the personal link they sent. There is no 6-digit code.");
         }
         if (input.token) {
           const tokenHash = await sha256Hex(input.token);
           const link = links.find((item) => item.tokenHash === tokenHash);
           if (!link || link.agreementId !== agreement.id || link.role !== input.role) {
             const who = input.role === "manager" ? "franchisee" : input.role;
-            throw new Error(`This code is not valid for the ${who}. Email a new 6-digit code for that signer.`);
+            throw new Error(`This personal link is not valid for the ${who}. Head Office can send a new one.`);
           }
           if (link.status === "consumed") throw new Error("This signing link has already been used");
           if (link.status === "revoked" || link.status === "declined") throw new Error("This signing link is no longer valid");
@@ -776,10 +875,12 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
                 consentAccepted: input.consentAccepted,
                 evidence: JSON.stringify({
                   consentAccepted: input.consentAccepted,
-                  method: "typed_name",
+                  method: input.drawnPng ? "typed_name_and_mark" : "typed_name",
                   snapshotHash: agreement.snapshotHash,
                   linkId,
-                  identityAssurance: "workspace_typed_name_only",
+                  identityAssurance: surface,
+                  drawn: Boolean(input.drawnPng),
+                  drawnPng: input.drawnPng || null,
                   capturedAt: now,
                 }),
                 outcome: "declined",
@@ -829,10 +930,12 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             consentAccepted: true,
             evidence: JSON.stringify({
               consentAccepted: true,
-              method: "typed_name",
+              method: input.drawnPng ? "typed_name_and_mark" : "typed_name",
               snapshotHash: agreement.snapshotHash,
               linkId,
-              identityAssurance: "workspace_typed_name_only",
+              identityAssurance: surface,
+              drawn: Boolean(input.drawnPng),
+              drawnPng: input.drawnPng || null,
               capturedAt: now,
             }),
             outcome: "signed" as const,
@@ -856,7 +959,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               agreementId: agreement.id,
               actor: ACTOR,
               action: "Signature recorded",
-              detail: `${signer.name} signed as ${input.role} by typed name. Identity remains workspace-captured, not OTP-verified.`,
+              detail: `${signer.name} signed as ${input.role} on ${surface.replace("_", " ")}. Typed name recorded${input.drawnPng ? " with a drawn mark" : ""}.`,
               createdAt: now,
             },
             ...state.audit,
