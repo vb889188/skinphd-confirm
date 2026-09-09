@@ -10,13 +10,59 @@ import {
   requiredFieldErrors,
   requiredSignatureCount,
 } from "./rules";
-import type { Agreement, EmployeeRecord, Role, Snapshot, WorkspaceState } from "./types";
+import type { Agreement, AuditEvent, EmployeeRecord, Person, Role, Signature, SigningLink, Snapshot, Template, WorkspaceState } from "./types";
 import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile } from "./remote";
 import { requireCapability } from "./access";
 import { recognizeDocument } from "./ocr";
 
 function actor(state: WorkspaceState) {
   return state.people.find((person) => person.id === state.currentPersonId);
+}
+
+function stamp(value?: string | null) {
+  return value ? new Date(value).getTime() : 0;
+}
+
+function mergeById<T extends { id: string }>(local: T[], remote: T[], pick: (localItem: T, remoteItem: T) => T): T[] {
+  const map = new Map<string, T>();
+  for (const item of local) map.set(item.id, item);
+  for (const item of remote) {
+    const previous = map.get(item.id);
+    map.set(item.id, previous ? pick(previous, item) : item);
+  }
+  return [...map.values()];
+}
+
+function mergeRemote(local: WorkspaceState, remote: Pick<WorkspaceState, "branches" | "people" | "templates" | "agreements" | "signatures" | "links" | "audit" | "records">) {
+  return {
+    branches: remote.branches.length ? mergeById(local.branches, remote.branches, (_a, b) => b) : local.branches,
+    people: remote.people.length ? mergeById(local.people, remote.people, (_a, b) => ({ ...b, pinHash: null })) : local.people,
+    templates: remote.templates.length ? mergeById(local.templates, remote.templates, (_a, b) => b) : local.templates,
+    agreements: mergeById(local.agreements, remote.agreements, (a, b) => (stamp(a.updatedAt) >= stamp(b.updatedAt) ? a : b)).sort(
+      (a, b) => stamp(b.updatedAt) - stamp(a.updatedAt),
+    ),
+    signatures: mergeById(local.signatures, remote.signatures, (a, b) => {
+      if (a.outcome === "signed" && b.outcome !== "signed") return a;
+      if (b.outcome === "signed" && a.outcome !== "signed") return b;
+      return stamp(a.signedAt) >= stamp(b.signedAt) ? a : b;
+    }),
+    links: mergeById(local.links, remote.links, (a, b) => {
+      const rank = (status: SigningLink["status"]) => (status === "consumed" ? 3 : status === "pending" ? 2 : 1);
+      return rank(a.status) >= rank(b.status) ? a : b;
+    }),
+    audit: mergeById(local.audit, remote.audit, (a, b) => (stamp(a.createdAt) >= stamp(b.createdAt) ? a : b))
+      .sort((a, b) => stamp(b.createdAt) - stamp(a.createdAt))
+      .slice(0, 200),
+    records: mergeById(local.records ?? [], remote.records ?? [], (a) => a),
+  };
+}
+
+function persistLive(state: WorkspaceState) {
+  void persistWorkspace(state)
+    .then(() => {
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("confirm-live"));
+    })
+    .catch(() => undefined);
 }
 
 export type CreateInput = {
@@ -238,17 +284,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (me) setRemoteActor(me);
         try {
           const remote = await loadRemoteWorkspace();
-          const state = get();
-          set({
-            branches: remote.branches.length ? remote.branches : state.branches,
-            people: remote.people.length ? remote.people : state.people,
-            templates: remote.templates,
-            agreements: remote.agreements,
-            signatures: remote.signatures,
-            links: remote.links,
-            audit: remote.audit.length ? remote.audit : state.audit,
-            records: remote.records ?? state.records ?? [],
-          });
+          set(mergeRemote(get(), remote));
           return "remote";
         } catch {
           return "unavailable";
@@ -430,7 +466,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
         if (fileId && input.fileBase64) {
           const digest = await sha256Hex(input.fileBase64);
           void upsertSourceFile({
@@ -497,7 +533,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
       },
       addBranch: (input) => {
         requireCapability(actor(get()), "clinics", "Add clinics");
@@ -515,7 +551,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
         return id;
       },
       noteEmailSent: (agreementId, toEmail) => {
@@ -530,7 +566,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
       },
       markReminded: (agreementId) => {
         const state = get();
@@ -545,7 +581,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
       },
       createAgreement: async (input) => {
         requireCapability(actor(get()), "issue", "Issue agreements", input.branchId);
@@ -642,7 +678,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
         return id;
       },
       issueLink: async (agreementId, role) => {
@@ -693,7 +729,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
         return { token, expiresAt };
       },
       issueSignCode: async (agreementId, role) => {
@@ -755,7 +791,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
         return { token, email: person.email, expiresAt };
       },
       openAgreement: (agreementId, surface = "workspace") => {
@@ -777,7 +813,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
       },
       voidAgreement: (agreementId, reason) => {
         const state = get();
@@ -807,7 +843,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
       },
       reissueAgreement: async (agreementId) => {
         const state = get();
@@ -922,7 +958,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               ...state.audit,
             ],
           });
-          void persistWorkspace(get()).catch(() => undefined);
+          persistLive(get());
           return "declined";
         }
 
@@ -980,7 +1016,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
         return status;
       },
       addEmployeeRecord: async (input) => {
@@ -1022,7 +1058,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           ],
         });
         void upsertEmployeeRecord({ ...record, contentBase64: input.contentBase64 }).catch(() => undefined);
-        void persistWorkspace(get()).catch(() => undefined);
+        persistLive(get());
         return id;
       },
     }),

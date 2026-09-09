@@ -268,6 +268,24 @@ export function Workspace() {
   }, [expireSessionIfNeeded, hydrateRemote]);
 
   useEffect(() => {
+    if (!current || !remoteEnabled()) return;
+    const tick = () => {
+      if (document.hidden) return;
+      void hydrateRemote().then(setConnectionStatus);
+    };
+    const timer = window.setInterval(tick, 8000);
+    window.addEventListener("focus", tick);
+    window.addEventListener("confirm-live", tick);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", tick);
+      window.removeEventListener("confirm-live", tick);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [current?.id, hydrateRemote]);
+
+  useEffect(() => {
     setToken("");
     setIssuedToken("");
     setConsent(false);
@@ -405,6 +423,7 @@ export function Workspace() {
       });
       form.reset();
       setShowCreate(false);
+      setView("agreements");
       setSelectedId(id);
       const created = useWorkspace.getState().agreements.find((item) => item.id === id);
       const franchisee = store.people.find((person) => person.id === String(values.managerId));
@@ -3155,7 +3174,7 @@ function PersonalLinkSign({ token }: { token: string }) {
   useEffect(() => {
     let cancelled = false;
     setLinkToken(token);
-    void (async () => {
+    const pull = async () => {
       try {
         await useWorkspace.getState().hydrateRemote();
       } catch {
@@ -3163,9 +3182,14 @@ function PersonalLinkSign({ token }: { token: string }) {
       } finally {
         if (!cancelled) setReady(true);
       }
-    })();
+    };
+    void pull();
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void pull();
+    }, 8000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
   }, [token]);
 
