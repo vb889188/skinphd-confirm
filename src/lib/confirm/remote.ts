@@ -1,7 +1,7 @@
 import type { Agreement, AuditEvent, Branch, EmployeeRecord, Person, Signature, SigningLink, Template, WorkspaceState } from "./types";
 import { SOURCE_TEMPLATES } from "./templates";
 import { CONFIRM_TENANT_ID } from "./remote-shared";
-import { confirmChangePinFn, confirmConfiguredFn, confirmRestFn, confirmSignInFn } from "./gate.server";
+import { confirmChangePinFn, confirmConfiguredFn, confirmRestFn, confirmSignInFn } from "./confirm-rpc";
 
 export { CONFIRM_TENANT_ID };
 

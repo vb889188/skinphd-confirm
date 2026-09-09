@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { allowConfirmLive } from "@/lib/confirm/gate.server";
-import { liveStamp, onConfirmLive } from "@/lib/confirm/live-bus.server";
+import { allowConfirmLive } from "@/lib/confirm/confirm-rpc";
+import { liveStamp, onConfirmLive } from "@/lib/confirm/live-bus";
 
 export const Route = createFileRoute("/api/confirm-live")({
   server: {

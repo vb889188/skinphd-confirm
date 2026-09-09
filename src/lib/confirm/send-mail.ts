@@ -3,7 +3,7 @@ import type { EmployeeMail } from "./email";
 import { brandedHtml, employeeMailHref } from "./email";
 
 export const sendMailFn = createServerFn({ method: "POST" })
-  .inputValidator((data: EmployeeMail) => data)
+  .validator((data: EmployeeMail) => data)
   .handler(async ({ data }) => {
     const host = process.env.SMTP_HOST || process.env.MAIL_HOST;
     const user = process.env.SMTP_USER || process.env.MAIL_USERNAME;

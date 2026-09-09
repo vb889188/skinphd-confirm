@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { sha256Hex } from "./crypto";
-import { bumpConfirmLive } from "./live-bus.server";
+import { bumpConfirmLive } from "./live-bus";
 import type { Person } from "./types";
 
 type SessionPayload = {
@@ -141,7 +141,7 @@ export const confirmConfiguredFn = createServerFn({ method: "POST" }).handler(as
 });
 
 export const confirmSignInFn = createServerFn({ method: "POST" })
-  .inputValidator((data: { email: string; pin: string }) => data)
+  .validator((data: { email: string; pin: string }) => data)
   .handler(async ({ data }) => {
     const email = data.email.trim().toLowerCase();
     const pin = data.pin.trim();
@@ -195,7 +195,7 @@ export const confirmSignInFn = createServerFn({ method: "POST" })
   });
 
 export const confirmChangePinFn = createServerFn({ method: "POST" })
-  .inputValidator((data: { session: string; currentPin: string; nextPin: string }) => data)
+  .validator((data: { session: string; currentPin: string; nextPin: string }) => data)
   .handler(async ({ data }) => {
     const session = await verifySession(data.session, supabaseConfig().secret);
     if (!session) return { ok: false as const, error: "Sign in before changing the PIN." };
@@ -219,7 +219,7 @@ export const confirmChangePinFn = createServerFn({ method: "POST" })
   });
 
 export const confirmRestFn = createServerFn({ method: "POST" })
-  .inputValidator((data: { path: string; method?: string; body?: string; prefer?: string; session?: string; linkToken?: string }) => data)
+  .validator((data: { path: string; method?: string; body?: string; prefer?: string; session?: string; linkToken?: string }) => data)
   .handler(async ({ data }) => {
     const { url, key, workspace, secret } = supabaseConfig();
     if (!url || !key || !workspace) return { ok: false as const, error: "not_configured" };
