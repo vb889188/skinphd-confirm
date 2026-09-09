@@ -17,4 +17,9 @@ services:
       PORT: 8080
       VITE_AUTH_ENABLED: "false"
       MAIL_FROM: ${MAIL_FROM:-SkinPhD Confirm <info@relpdev.uk>}
+      SUPABASE_URL: ${VITE_SUPABASE_URL:-https://nncecsszisodfnaibjyw.supabase.co}
+      SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-sb_publishable_Awm7V0LMYhv7l8nEqoVfOQ_4xqV-Sqs}
+      CONFIRM_WORKSPACE_KEY: ${VITE_CONFIRM_WORKSPACE_KEY:-sph-confirm-7f3a9c2e-brooklyn}
+      CONFIRM_SESSION_SECRET: ${CONFIRM_SESSION_SECRET:-sph-confirm-7f3a9c2e-brooklyn}
+      CONFIRM_PUBLIC_URL: ${CONFIRM_PUBLIC_URL:-https://confirm.relpdev.uk}
     restart: unless-stopped

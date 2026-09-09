@@ -11,23 +11,13 @@ type SessionPayload = {
   exp: number;
 };
 
-function readEnv(name: string) {
-  const fromProcess = process.env[name]?.trim();
-  if (fromProcess) return fromProcess;
-  try {
-    const vite = (import.meta as { env?: Record<string, string> }).env?.[name];
-    return vite?.trim() || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 function supabaseConfig() {
+  const vite = import.meta.env as Record<string, string | undefined>;
   return {
-    url: readEnv("SUPABASE_URL") || readEnv("VITE_SUPABASE_URL"),
-    key: readEnv("SUPABASE_ANON_KEY") || readEnv("VITE_SUPABASE_ANON_KEY") || readEnv("SUPABASE_KEY"),
-    workspace: readEnv("CONFIRM_WORKSPACE_KEY") || readEnv("VITE_CONFIRM_WORKSPACE_KEY"),
-    secret: readEnv("CONFIRM_SESSION_SECRET") || readEnv("CONFIRM_WORKSPACE_KEY") || readEnv("VITE_CONFIRM_WORKSPACE_KEY") || "confirm-dev-session",
+    url: (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || vite.VITE_SUPABASE_URL || "").trim(),
+    key: (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || vite.VITE_SUPABASE_ANON_KEY || "").trim(),
+    workspace: (process.env.CONFIRM_WORKSPACE_KEY || process.env.VITE_CONFIRM_WORKSPACE_KEY || vite.VITE_CONFIRM_WORKSPACE_KEY || "").trim(),
+    secret: (process.env.CONFIRM_SESSION_SECRET || process.env.CONFIRM_WORKSPACE_KEY || process.env.VITE_CONFIRM_WORKSPACE_KEY || vite.VITE_CONFIRM_WORKSPACE_KEY || "confirm-dev-session").trim(),
   };
 }
 

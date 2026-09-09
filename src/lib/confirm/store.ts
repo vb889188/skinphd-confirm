@@ -285,6 +285,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         try {
           const remote = await loadRemoteWorkspace();
           set(mergeRemote(get(), remote));
+          if (get().currentPersonId) persistLive(get());
           return "remote";
         } catch {
           return "unavailable";
