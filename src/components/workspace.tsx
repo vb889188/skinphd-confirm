@@ -15,7 +15,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { consentCopy, STATUS_LABEL, STATUS_TONE } from "@/lib/confirm/rules";
-import type { Agreement, Role, Signature, WorkspaceState } from "@/lib/confirm/types";
+import type { Agreement, AuditEvent, Role, Signature, WorkspaceState } from "@/lib/confirm/types";
 import { useWorkspace } from "@/lib/confirm/store";
 import { sha256Hex } from "@/lib/confirm/crypto";
 import { can, canViewAgreement } from "@/lib/confirm/access";
@@ -231,6 +231,7 @@ export function Workspace() {
   const [statusFilter, setStatusFilter] = useState("");
   const [clinicFilter, setClinicFilter] = useState("");
   const [templateFilter, setTemplateFilter] = useState("");
+  const [auditQuery, setAuditQuery] = useState("");
   const [peopleQuery, setPeopleQuery] = useState("");
   const [peopleStatus, setPeopleStatus] = useState<"all" | "active" | "inactive">("active");
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
@@ -311,14 +312,33 @@ export function Workspace() {
     };
   }, [visibleAgreements, approvedTemplates.length, store.signatures]);
 
-  const filtered = visibleAgreements.filter((item) => {
-    const haystack = `${item.title} ${item.activity} ${personName(store, item.employeeId)}`.toLowerCase();
-    return (
-      (!query || haystack.includes(query.toLowerCase())) &&
-      (!statusFilter || item.status === statusFilter) &&
-      (!clinicFilter || item.branchId === clinicFilter) &&
-      (!templateFilter || item.templateId === templateFilter)
-    );
+  const filtered = visibleAgreements
+    .filter((item) => {
+      const haystack = [
+        item.title,
+        item.activity,
+        item.id,
+        STATUS_LABEL[item.status],
+        personName(store, item.employeeId),
+        personName(store, item.managerId),
+        branchLabel(store, item.branchId),
+        store.templates.find((template) => template.id === item.templateId)?.name ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      const matchesQuery = !query || haystack.includes(query.trim().toLowerCase());
+      const matchesStatus =
+        !statusFilter ||
+        item.status === statusFilter ||
+        (statusFilter === "needs_action" && (item.status === "awaiting_signatures" || item.status === "partially_signed"));
+      return matchesQuery && matchesStatus && (!clinicFilter || item.branchId === clinicFilter) && (!templateFilter || item.templateId === templateFilter);
+    })
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+  const filteredAudit = store.audit.filter((item) => {
+    if (!auditQuery.trim()) return true;
+    const haystack = `${item.action} ${item.detail} ${item.actor} ${item.agreementId ?? ""}`.toLowerCase();
+    return haystack.includes(auditQuery.trim().toLowerCase());
   });
 
   const dashboardItems = useMemo(() => {
@@ -933,16 +953,30 @@ export function Workspace() {
           <>
             <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-md border border-line bg-paper" aria-label="Agreement summary">
               <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-4 sm:divide-y-0">
-                {[
-                  [stats.completed, "Completed"],
-                  [stats.needsAction, "Needs action"],
-                  [stats.awaiting, "Awaiting names"],
-                  [stats.templates, "Source forms"],
-                ].map(([value, label]) => (
-                  <div key={String(label)} className="px-4 py-4">
+                {([
+                  [stats.completed, "Completed", "completed"],
+                  [stats.needsAction, "Needs action", "needs_action"],
+                  [stats.awaiting, "Awaiting names", "awaiting_signatures"],
+                  [stats.templates, "Source forms", ""],
+                ] as const).map(([value, label, filter]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className={cn(
+                      "px-4 py-4 text-left",
+                      filter && statusFilter === filter && "bg-sage/70",
+                    )}
+                    onClick={() => {
+                      if (!filter) {
+                        setView("templates");
+                        return;
+                      }
+                      setStatusFilter((currentFilter) => (currentFilter === filter ? "" : filter));
+                    }}
+                  >
                     <strong className="block font-display text-2xl font-medium tabular-nums">{value}</strong>
                     <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </section>
@@ -961,6 +995,7 @@ export function Workspace() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="needs_action">Needs action</SelectItem>
                   {Object.entries(STATUS_LABEL).map(([value, label]) => (
                     <SelectItem key={value} value={value}>{label}</SelectItem>
                   ))}
@@ -999,7 +1034,8 @@ export function Workspace() {
               <AgreementQueue
                 state={store}
                 items={filtered}
-                 hasFilters={Boolean(query || statusFilter || clinicFilter || templateFilter)}
+                hasFilters={Boolean(query || statusFilter || clinicFilter || templateFilter)}
+                filterKey={`${query}|${statusFilter}|${clinicFilter}|${templateFilter}`}
                 canCreate={isManager}
                 onOpen={(id) => {
                   setSelectedId(id);
@@ -1435,29 +1471,7 @@ export function Workspace() {
         )}
 
         {view === "audit" && can(current, "audit") && (
-          <section className="mx-auto max-w-7xl overflow-hidden rounded-3xl border border-line bg-paper">
-            <div className="border-b border-line px-5 py-4">
-              <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Control</p>
-              <h2 className="font-display text-xl font-medium">Full audit history</h2>
-            </div>
-            <div className="px-5">
-              {store.audit.map((item) => (
-                <article key={item.id} className="grid grid-cols-[34px_1fr] gap-3 border-b border-line py-3.5">
-                  <span className="grid size-8 place-items-center rounded-full bg-ground text-[10px] font-extrabold text-muted">
-                    {initials(item.actor)}
-                  </span>
-                  <p className="m-0">
-                    <strong className="block text-[11px]">{item.action}</strong>
-                    <span className="mt-1 block text-[10px] leading-relaxed text-muted">{item.detail}</span>
-                    <small className="mt-1 block text-[9px] text-muted">
-                      {shortTime(item.createdAt)} · {item.actor}
-                      {item.agreementId ? ` · ${item.agreementId}` : ""}
-                    </small>
-                  </p>
-                </article>
-              ))}
-            </div>
-          </section>
+          <AuditHistory items={filteredAudit} query={auditQuery} onQuery={setAuditQuery} />
         )}
 
         {view === "settings" && (
@@ -2253,11 +2267,130 @@ function Stat({ icon, tone, label, value, note, onClick, active }: { icon: React
   );
 }
 
+const PAGE_SIZE = 20;
+
+function pageSlice<T>(items: T[], page: number) {
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const safe = Math.min(Math.max(1, page), totalPages);
+  const start = (safe - 1) * PAGE_SIZE;
+  return {
+    page: safe,
+    totalPages,
+    total: items.length,
+    from: items.length === 0 ? 0 : start + 1,
+    to: Math.min(start + PAGE_SIZE, items.length),
+    items: items.slice(start, start + PAGE_SIZE),
+  };
+}
+
+function PageControls({
+  page,
+  totalPages,
+  total,
+  from,
+  to,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  from: number;
+  to: number;
+  onPage: (page: number) => void;
+}) {
+  if (total === 0) return null;
+  return (
+    <div className="flex flex-col gap-2 border-t border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <p className="text-[11px] text-muted">
+        Showing {from}–{to} of {total}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          Previous
+        </Button>
+        <span className="min-w-24 text-center text-[11px] font-semibold text-ink">
+          Page {page} of {totalPages}
+        </span>
+        <Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>
+          Next page
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AuditHistory({
+  items,
+  query,
+  onQuery,
+}: {
+  items: AuditEvent[];
+  query: string;
+  onQuery: (value: string) => void;
+}) {
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
+  const paged = pageSlice(items, page);
+  return (
+    <section className="mx-auto max-w-7xl overflow-hidden rounded-3xl border border-line bg-paper">
+      <div className="flex flex-col gap-3 border-b border-line px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Control</p>
+          <h2 className="font-display text-xl font-medium">Full audit history</h2>
+        </div>
+        <input
+          value={query}
+          onChange={(event) => onQuery(event.target.value)}
+          placeholder="Search action, person or pack"
+          aria-label="Search audit history"
+          className="min-h-10 w-full max-w-sm rounded-md border border-line bg-paper px-3 text-sm sm:w-72"
+        />
+      </div>
+      {items.length === 0 ? (
+        <p className="px-5 py-10 text-center text-[13px] text-muted">
+          {query.trim() ? "No audit rows match that search." : "No audit yet."}
+        </p>
+      ) : (
+        <>
+          <div className="px-5">
+            {paged.items.map((item) => (
+              <article key={item.id} className="grid grid-cols-[34px_1fr] gap-3 border-b border-line py-3.5">
+                <span className="grid size-8 place-items-center rounded-full bg-ground text-[10px] font-extrabold text-muted">
+                  {initials(item.actor)}
+                </span>
+                <p className="m-0">
+                  <strong className="block text-[11px]">{item.action}</strong>
+                  <span className="mt-1 block text-[10px] leading-relaxed text-muted">{item.detail}</span>
+                  <small className="mt-1 block text-[9px] text-muted">
+                    {shortTime(item.createdAt)} · {item.actor}
+                    {item.agreementId ? ` · ${item.agreementId}` : ""}
+                  </small>
+                </p>
+              </article>
+            ))}
+          </div>
+          <PageControls
+            page={paged.page}
+            totalPages={paged.totalPages}
+            total={paged.total}
+            from={paged.from}
+            to={paged.to}
+            onPage={setPage}
+          />
+        </>
+      )}
+    </section>
+  );
+}
+
 function AgreementQueue({
   state,
   items,
   hasFilters,
   canCreate,
+  filterKey,
   onOpen,
   onCreate,
 }: {
@@ -2265,9 +2398,15 @@ function AgreementQueue({
   items: Agreement[];
   hasFilters: boolean;
   canCreate: boolean;
+  filterKey: string;
   onOpen: (id: string) => void;
   onCreate: () => void;
 }) {
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [filterKey]);
+  const paged = pageSlice(items, page);
   return (
     <section className="confirm-card overflow-hidden rounded-xl border border-line bg-paper">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
@@ -2302,7 +2441,7 @@ function AgreementQueue({
             <span>Signatures</span>
             <span />
           </div>
-           {items.map((item) => (
+           {paged.items.map((item) => (
             <div key={item.id} className="group grid grid-cols-1 items-center gap-3 border-t border-line px-4 py-4 transition-colors hover:bg-sage/40 md:grid-cols-[minmax(220px,1.7fr)_minmax(140px,0.85fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)] md:px-5">
               <div className="flex min-w-0 items-center gap-2.5">
                 <span className="grid h-10 w-8 shrink-0 place-items-center rounded-md border border-line bg-sage font-display text-sm font-bold text-accent">
@@ -2335,6 +2474,14 @@ function AgreementQueue({
               </Button>
             </div>
           ))}
+          <PageControls
+            page={paged.page}
+            totalPages={paged.totalPages}
+            total={paged.total}
+            from={paged.from}
+            to={paged.to}
+            onPage={setPage}
+          />
         </div>
       )}
     </section>
