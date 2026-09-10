@@ -1,6 +1,8 @@
 # SkinPhD Confirm schema
 
-Tenant `49937a9c-4c8c-420f-bac7-f2ff3f22f43e`. Tables stay named `confirm_*`. `clinic_id` is the SkinPhD branch id.
+Tables stay named `confirm_*`. `clinic_id` is the SkinPhD branch id.
+
+Live cabinets sit in Postgres on the Confirm droplet (`DATABASE_URL`). The desk never talks to the database from the browser.
 
 ## Tables
 - `confirm_clinics` — SkinPhD branches (name, code)
@@ -11,5 +13,6 @@ Tenant `49937a9c-4c8c-420f-bac7-f2ff3f22f43e`. Tables stay named `confirm_*`. `c
 - `confirm_signatures` — typed signature payload
 - `confirm_signing_links` — hashed one-time tokens
 - `confirm_audit` — issue, sign, reminder, directory actions
+- `confirm_employee_records` — staff file copies
 
-RLS requires header `x-confirm-workspace` on the **server**. The Head Office desk keeps a live line open (`/api/confirm-live`). A pack issued or a name recorded on one tablet is pushed to the others. Polling every 30 seconds is only the backup if that line drops.
+The Head Office desk keeps a live line open (`/api/confirm-live`). A pack issued or a name recorded on one tablet is pushed to the others. Polling every 30 seconds is only the backup if that line drops.

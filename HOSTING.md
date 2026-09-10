@@ -9,27 +9,22 @@ This app is an employee-agreement workspace. Host it on a private network.
 - Frozen snapshots with SHA-256 hashes
 - Employee, franchisee and witness typed signatures
 - Email + PIN sign-in with 8-hour sessions
-- Sync to the SkinPhD Supabase tenant (`confirm_*` tables only)
-- Workspace key required on every database request
+- Postgres on the same droplet (`confirm_*` tables)
+- Head Office live line (`/api/confirm-live`)
 
 Client contacts and WhatsApp tables are not used by this app.
 
 ## Environment
 
-Set these at **build** time.
-
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_CONFIRM_WORKSPACE_KEY` — required header for Confirm tables
-- `VITE_CONFIRM_MODE=production`
-- `VITE_AUTH_ENABLED=false`
-- `CONFIRM_WORKSPACE_KEY` — server only (do not rely on the VITE_ copy in the browser)
+- `CONFIRM_DB_PASSWORD` — Postgres password (not public)
+- `DATABASE_URL` — set by Docker to the local Postgres
 - `CONFIRM_SESSION_SECRET` — HMAC for desk sessions (8 hours)
 - `CONFIRM_PUBLIC_URL` — public site used for the mail logo
+- `VITE_CONFIRM_MODE=production`
 
-The workspace key and anon key stay on the server. Head Office signs in with email + PIN; that issues a desk session. Personal links only load that one pack.
+Head Office signs in with email + PIN; that issues a desk session. Personal links only load that one pack.
 
-Do not put a Supabase service-role key in this app.
+Postgres is not published to the internet.
 
 ## Docker
 
@@ -37,15 +32,7 @@ Do not put a Supabase service-role key in this app.
 docker compose up --build -d
 ```
 
-The service listens on port 8080. Put HTTPS in front of it.
-
-## Node without Docker
-
-```bash
-npm ci
-npm run build:server
-HOST=0.0.0.0 PORT=8080 npm start
-```
+The app listens on port 8080 behind nginx. Put HTTPS in front of it.
 
 ## Before live staff
 

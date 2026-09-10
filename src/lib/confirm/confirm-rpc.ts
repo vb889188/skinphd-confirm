@@ -56,6 +56,14 @@ async function verifySession(token: string | undefined, secret: string): Promise
   }
 }
 
+async function dataRest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (process.env.DATABASE_URL?.trim()) {
+    const { localRest } = await import("./confirm-db");
+    return localRest<T>(path, init);
+  }
+  return supabaseRest<T>(path, init);
+}
+
 async function supabaseRest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const { url, key, workspace } = supabaseConfig();
   if (!url || !key || !workspace) throw new Error("Confirm database is not configured on the server");
@@ -84,10 +92,10 @@ type AgreementRow = { id: string; clinic_id: string; employee_id: string; manage
 
 async function resolveLink(token: string) {
   const hash = await sha256Hex(token);
-  const rows = await supabaseRest<LinkRow[]>("confirm_signing_links?select=id,agreement_id,payload");
+  const rows = await dataRest<LinkRow[]>("confirm_signing_links?select=id,agreement_id,payload");
   const row = rows.find((item) => item.payload?.tokenHash === hash);
   if (!row) return null;
-  const agreements = await supabaseRest<AgreementRow[]>(`confirm_agreements?id=eq.${encodeURIComponent(row.agreement_id)}&select=id,clinic_id,employee_id,manager_id,witness_id,template_id`);
+  const agreements = await dataRest<AgreementRow[]>(`confirm_agreements?id=eq.${encodeURIComponent(row.agreement_id)}&select=id,clinic_id,employee_id,manager_id,witness_id,template_id`);
   return { row, agreement: agreements[0] ?? null, hash };
 }
 
@@ -126,6 +134,7 @@ function bodyAgreementId(body?: string) {
 }
 
 export const confirmConfiguredFn = createServerFn({ method: "POST" }).handler(async () => {
+  if (process.env.DATABASE_URL?.trim()) return { ok: true };
   const { url, key, workspace } = supabaseConfig();
   return { ok: Boolean(url && key && workspace) };
 });
@@ -136,7 +145,7 @@ export const confirmSignInFn = createServerFn({ method: "POST" })
     const email = data.email.trim().toLowerCase();
     const pin = data.pin.trim();
     if (!email || !pin) return { ok: false as const, error: "Enter the Head Office email and PIN." };
-    const people = await supabaseRest<Array<{
+    const people = await dataRest<Array<{
       id: string;
       clinic_id: string;
       full_name: string;
@@ -190,7 +199,7 @@ export const confirmChangePinFn = createServerFn({ method: "POST" })
     const session = await verifySession(data.session, supabaseConfig().secret);
     if (!session) return { ok: false as const, error: "Sign in before changing the PIN." };
     if (!/^\d{4,8}$/.test(data.nextPin.trim())) return { ok: false as const, error: "Choose a 4 to 8 digit PIN." };
-    const people = await supabaseRest<Array<{ id: string; email: string; pin_hash: string | null; full_name: string }>>(
+    const people = await dataRest<Array<{ id: string; email: string; pin_hash: string | null; full_name: string }>>(
       `confirm_people?id=eq.${encodeURIComponent(session.personId)}&select=id,email,pin_hash,full_name`,
     );
     const person = people[0];
@@ -201,7 +210,7 @@ export const confirmChangePinFn = createServerFn({ method: "POST" })
       return { ok: false as const, error: "Current PIN is not correct." };
     }
     const pinHash = await sha256Hex(`${person.email.trim().toLowerCase()}|${data.nextPin.trim()}`);
-    await supabaseRest(`confirm_people?id=eq.${encodeURIComponent(person.id)}`, {
+    await dataRest(`confirm_people?id=eq.${encodeURIComponent(person.id)}`, {
       method: "PATCH",
       body: JSON.stringify({ pin_hash: pinHash, updated_at: new Date().toISOString() }),
     });
@@ -212,7 +221,7 @@ export const confirmRestFn = createServerFn({ method: "POST" })
   .validator((data: { path: string; method?: string; body?: string; prefer?: string; session?: string; linkToken?: string }) => data)
   .handler(async ({ data }) => {
     const { url, key, workspace, secret } = supabaseConfig();
-    if (!url || !key || !workspace) return { ok: false as const, error: "not_configured" };
+    if (!process.env.DATABASE_URL?.trim() && (!url || !key || !workspace)) return { ok: false as const, error: "not_configured" };
     const method = (data.method || "GET").toUpperCase();
     const path = data.path.replace(/^\/+/, "");
     if (!path.startsWith("confirm_")) return { ok: false as const, error: "That path is not a Confirm table." };
@@ -244,7 +253,7 @@ export const confirmRestFn = createServerFn({ method: "POST" })
     }
 
     try {
-      const rows = await supabaseRest<unknown>(path, {
+      const rows = await dataRest<unknown>(path, {
         method,
         headers,
         body: data.body && method !== "GET" ? data.body : undefined,

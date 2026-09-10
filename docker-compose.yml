@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: confirm
+      POSTGRES_USER: confirm
+      POSTGRES_PASSWORD: ${CONFIRM_DB_PASSWORD:-confirm-local-db}
+    volumes:
+      - confirm-pgdata:/var/lib/postgresql/data
+      - ./deploy/confirm.sql:/docker-entrypoint-initdb.d/001_confirm.sql:ro
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=40"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U confirm -d confirm"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   confirm:
     build:
       context: .
@@ -17,9 +34,16 @@ services:
       PORT: 8080
       VITE_AUTH_ENABLED: "false"
       MAIL_FROM: ${MAIL_FROM:-SkinPhD Confirm <info@relpdev.uk>}
-      SUPABASE_URL: ${VITE_SUPABASE_URL:-https://nncecsszisodfnaibjyw.supabase.co}
-      SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-sb_publishable_Awm7V0LMYhv7l8nEqoVfOQ_4xqV-Sqs}
+      DATABASE_URL: postgres://confirm:${CONFIRM_DB_PASSWORD:-confirm-local-db}@postgres:5432/confirm
       CONFIRM_WORKSPACE_KEY: ${VITE_CONFIRM_WORKSPACE_KEY:-sph-confirm-7f3a9c2e-brooklyn}
       CONFIRM_SESSION_SECRET: ${CONFIRM_SESSION_SECRET:-sph-confirm-7f3a9c2e-brooklyn}
       CONFIRM_PUBLIC_URL: ${CONFIRM_PUBLIC_URL:-https://confirm.relpdev.uk}
+      SUPABASE_URL: ${VITE_SUPABASE_URL:-https://nncecsszisodfnaibjyw.supabase.co}
+      SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-sb_publishable_Awm7V0LMYhv7l8nEqoVfOQ_4xqV-Sqs}
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  confirm-pgdata:
