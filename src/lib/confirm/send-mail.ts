@@ -24,21 +24,29 @@ export const sendMailFn = createServerFn({ method: "POST" })
     });
     const publicUrl = (process.env.CONFIRM_PUBLIC_URL || process.env.MAIL_LOGO_URL || "https://confirm.relpdev.uk").replace(/\/$/, "");
     const hostedLogo = `${publicUrl}/skinphd-logo.png`;
-    const logoPath = [
-      join(process.cwd(), ".output/public/skinphd-logo.png"),
-      join(process.cwd(), "public/skinphd-logo.png"),
-      "/app/.output/public/skinphd-logo.png",
-    ].find((path) => existsSync(path));
-    const embedded = logoPath ? readFileSync(logoPath) : null;
+    const publicRoots = [join(process.cwd(), ".output/public"), join(process.cwd(), "public"), "/app/.output/public"];
+    const readPublic = (name: string) => {
+      const path = publicRoots.map((root) => join(root, name)).find((item) => existsSync(item));
+      return path ? readFileSync(path) : null;
+    };
+    const embedded = readPublic("skinphd-logo.png");
+    const heartbeat = readPublic("skinphd-heartbeat.png");
+    const attachments = [
+      embedded ? { filename: "skinphd-logo.png", content: embedded, cid: "skinphd-logo", contentType: "image/png" } : null,
+      heartbeat ? { filename: "skinphd-heartbeat.png", content: heartbeat, cid: "skinphd-heartbeat", contentType: "image/png" } : null,
+    ].filter((item): item is NonNullable<typeof item> => Boolean(item));
     await transport.sendMail({
       from: process.env.SMTP_FROM || process.env.MAIL_FROM || `SkinPhD Confirm <${user}>`,
       to: data.to,
       subject: data.subject,
       text: data.body,
-      html: brandedHtml(data.subject, data.body, embedded ? "cid:skinphd-logo" : hostedLogo),
-      attachments: embedded
-        ? [{ filename: "skinphd-logo.png", content: embedded, cid: "skinphd-logo", contentType: "image/png" }]
-        : [],
+      html: brandedHtml(
+        data.subject,
+        data.body,
+        embedded ? "cid:skinphd-logo" : hostedLogo,
+        heartbeat ? "cid:skinphd-heartbeat" : `${publicUrl}/skinphd-heartbeat.png`,
+      ),
+      attachments,
     });
     return { ok: true as const };
   });

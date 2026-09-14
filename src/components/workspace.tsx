@@ -687,12 +687,10 @@ export function Workspace({ signToken }: { signToken?: string }) {
     <TooltipProvider>
     <main className="confirm-shell min-h-[100dvh] bg-transparent text-ink lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="confirm-sidebar relative hidden flex-col px-3 py-4 text-sidebar-text shadow-[8px_0_40px_rgba(10,36,29,0.18)] lg:sticky lg:top-0 lg:h-screen lg:px-4 lg:py-7 lg:flex">
-        <div className="mb-7 flex items-center gap-3 border-b border-white/10 px-2 pb-6">
-          <img src="/skinphd-mark.png" alt="SkinPhD" className="size-10 rounded-full bg-paper/5 object-contain" />
-          <span>
-            <strong className="block font-display text-lg font-semibold tracking-tight text-paper">Confirm</strong>
-            <small className="confirm-kicker mt-0.5 block text-[10px] text-sidebar-soft uppercase">Head Office workspace</small>
-          </span>
+        <div className="mb-7 border-b border-white/10 px-2 pb-6">
+          <img src="/skinphd-logo-on-dark.png" alt="SkinPhD" className="h-8 w-auto max-w-[168px] object-contain object-left" />
+          <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-2 h-3 w-auto max-w-[168px] object-contain object-left" />
+          <small className="confirm-kicker mt-3 block text-[10px] text-sidebar-soft uppercase">Confirm · Head Office</small>
         </div>
         <nav aria-label="Primary navigation" className="flex gap-2 lg:block lg:overflow-visible">
           <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Work</p>
@@ -2753,16 +2751,6 @@ function Detail({
         >
           Email employee pack
         </Button>
-        {actor?.role === "manager" && (
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={saving}
-            onClick={() => void onIssueCode("employee")}
-          >
-            Email the employee their copy
-          </Button>
-        )}
         {open && (
           <Button
             size="sm"
@@ -3031,7 +3019,10 @@ function Detail({
         <TabsContent value="pack">
       <article className="print-document my-4 rounded-md border border-line bg-paper p-5">
         <div className="flex items-center gap-3 border-b border-line pb-4">
-          <img src="/skinphd-logo.png" alt="SkinPhD" className="h-9 w-auto max-w-[180px] object-contain object-left" />
+          <div>
+            <img src="/skinphd-logo.png" alt="SkinPhD" className="h-9 w-auto max-w-[180px] object-contain object-left" />
+            <img src="/skinphd-heartbeat.png" alt="" className="mt-1 h-3 w-auto max-w-[180px] object-contain object-left" />
+          </div>
           <div>
             <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
               {agreement.status === "completed" ? "SkinPhD Confirm · certificate of record" : "SkinPhD Confirm · issued document"}
@@ -3313,7 +3304,10 @@ function PersonalLinkSign({ token }: { token: string }) {
           </p>
           <article className="print-document mt-5 rounded-md border border-line bg-paper p-4">
             <div className="flex items-center gap-3 border-b border-line pb-3">
-              <img src="/skinphd-logo.png" alt="SkinPhD" className="h-8 w-auto max-w-[160px] object-contain object-left" />
+              <div>
+                <img src="/skinphd-logo.png" alt="SkinPhD" className="h-8 w-auto max-w-[160px] object-contain object-left" />
+                <img src="/skinphd-heartbeat.png" alt="" className="mt-1 h-2.5 w-auto max-w-[160px] object-contain object-left" />
+              </div>
               <div>
                 <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
                   {agreement.status === "completed" ? "SkinPhD Confirm · certificate of record" : "SkinPhD Confirm · issued document"}
@@ -3383,8 +3377,9 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
           className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-paper/5 blur-[100px]"
         />
         <div className="mb-10">
-          <img src="/skinphd-logo.png" alt="SkinPhD" className="h-11 w-auto max-w-[220px] object-contain object-left brightness-125" />
-          <small className="mt-3 block text-[11px] tracking-[0.16em] text-sidebar-soft uppercase">Confirm</small>
+          <img src="/skinphd-logo-on-dark.png" alt="SkinPhD" className="h-12 w-auto max-w-[240px] object-contain object-left" />
+          <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-3 h-4 w-auto max-w-[240px] object-contain object-left" />
+          <small className="mt-4 block text-[11px] tracking-[0.16em] text-sidebar-soft uppercase">Confirm</small>
         </div>
         <div className="relative">
           <p className="text-[11px] font-extrabold tracking-[0.18em] text-sage uppercase">Employee records</p>
@@ -3408,8 +3403,9 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
       <Card radius="tile" elevation="lg" className="w-full max-w-md">
         <div className="border-b border-line px-6 py-6">
           <div className="mb-4">
-            <img src="/skinphd-logo.png" alt="SkinPhD" className="h-9 w-auto max-w-[180px] object-contain object-left" />
-            <small className="mt-2 block text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Confirm</small>
+            <img src="/skinphd-logo.png" alt="SkinPhD" className="h-10 w-auto max-w-[200px] object-contain object-left" />
+            <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-2 h-3.5 w-auto max-w-[200px] object-contain object-left" />
+            <small className="mt-3 block text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Confirm</small>
           </div>
           <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Staff sign-in</p>
           <h2 className="mt-2 font-display text-3xl font-medium">Head Office and franchisee desk</h2>

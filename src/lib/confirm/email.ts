@@ -47,8 +47,9 @@ function bodyToHtml(body: string) {
     .join("");
 }
 
-export function brandedHtml(subject: string, body: string, logoUrl?: string) {
+export function brandedHtml(subject: string, body: string, logoUrl?: string, heartbeatUrl?: string) {
   const logo = logoUrl || "https://confirm.relpdev.uk/skinphd-logo.png";
+  const heartbeat = heartbeatUrl || "https://confirm.relpdev.uk/skinphd-heartbeat.png";
   return `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#edf3ef;">
@@ -59,6 +60,7 @@ export function brandedHtml(subject: string, body: string, logoUrl?: string) {
           <tr>
             <td style="background:#fbfcfa;padding:22px 28px 16px;border-bottom:4px solid #b8863a;">
               <img src="${escapeHtml(logo)}" alt="SkinPhD" width="200" style="display:block;height:auto;max-width:200px;border:0;">
+              <img src="${escapeHtml(heartbeat)}" alt="Heartbeat of skincare" width="180" style="display:block;height:auto;max-width:180px;margin-top:8px;border:0;">
               <p style="margin:10px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#0f3329;">Confirm</p>
             </td>
           </tr>
