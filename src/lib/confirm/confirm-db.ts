@@ -1,4 +1,8 @@
 import pg from "pg";
+import { clinicReadSql, clinicWriteError, type ClinicActor } from "./clinic-scope";
+import { CONFIRM_TENANT_ID } from "./remote-shared";
+import { assertSigningOrder, canSign, nextStatus } from "./rules";
+import type { AgreementStatus, Signature, Snapshot } from "./types";
 
 const TABLES = new Set([
   "confirm_clinics",
@@ -120,21 +124,12 @@ function headerMap(init: RequestInit): Record<string, string> {
   return raw as Record<string, string>;
 }
 
-function clinicScope(init: RequestInit): { org: boolean; branchId: string } | null {
-  const headers = headerMap(init);
-  const scope = (headers["x-confirm-scope"] || headers["X-Confirm-Scope"] || "").trim();
-  const branchId = (headers["x-confirm-branch"] || headers["X-Confirm-Branch"] || "").trim();
-  if (!scope || !branchId) return null;
-  return { org: scope === "organisation", branchId };
-}
-
-export async function localRest<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function localRest<T>(path: string, init: RequestInit = {}, actor?: ClinicActor | null): Promise<T> {
   await ensureConfirmSchema();
   const method = (init.method || "GET").toUpperCase();
   const parsed = parsePath(path);
   const client = getPool();
   const prefer = headerMap(init).Prefer || headerMap(init).prefer || "";
-  const clinic = clinicScope(init);
 
   if (method === "GET") {
     const values: unknown[] = [];
@@ -142,22 +137,11 @@ export async function localRest<T>(path: string, init: RequestInit = {}): Promis
       values.push(filter.value);
       return `${ident(filter.col)} = $${values.length}`;
     });
-    if (clinic && !clinic.org) {
-      if (parsed.table === "confirm_agreements" || parsed.table === "confirm_people") {
-        values.push(clinic.branchId);
-        where.push(`${ident("clinic_id")} = $${values.length}`);
-      } else if (parsed.table === "confirm_clinics") {
-        values.push(clinic.branchId);
-        where.push(`${ident("id")} = $${values.length}`);
-      } else if (parsed.table === "confirm_signatures" || parsed.table === "confirm_signing_links" || parsed.table === "confirm_audit") {
-        values.push(clinic.branchId);
-        where.push(`agreement_id IN (SELECT id FROM confirm_agreements WHERE clinic_id = $${values.length})`);
-      } else if (parsed.table === "confirm_employee_records") {
-        values.push(clinic.branchId);
-        where.push(`person_id IN (SELECT id FROM confirm_people WHERE clinic_id = $${values.length})`);
-      } else if (parsed.table === "confirm_source_files") {
-        values.push(clinic.branchId);
-        where.push(`(agreement_id IS NULL OR agreement_id IN (SELECT id FROM confirm_agreements WHERE clinic_id = $${values.length}))`);
+    if (actor) {
+      const extra = clinicReadSql(parsed.table, actor, values.length + 1);
+      if (extra) {
+        values.push(extra.value);
+        where.push(extra.sql);
       }
     }
     const sql = `SELECT ${parsed.columns} FROM ${ident(parsed.table)}${where.length ? ` WHERE ${where.join(" AND ")}` : ""}${orderSql(parsed.order)}`;
@@ -169,8 +153,23 @@ export async function localRest<T>(path: string, init: RequestInit = {}): Promis
   const keys = Object.keys(body).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key));
   if (!keys.length) return undefined as T;
 
-  if (clinic && !clinic.org) {
-    await assertClinicMutation(client, parsed.table, parsed.filters, body, clinic.branchId);
+  if (actor) {
+    let existingClinicId: string | null = null;
+    if (parsed.table === "confirm_agreements" || parsed.table === "confirm_people") {
+      const id = String(body.id ?? parsed.filters.find((item) => item.col === "id")?.value ?? "");
+      if (id) {
+        const existing = await client.query(`SELECT clinic_id FROM ${ident(parsed.table)} WHERE id = $1`, [id]);
+        existingClinicId = existing.rows[0]?.clinic_id ?? null;
+      }
+    } else if (parsed.table === "confirm_signatures" || parsed.table === "confirm_signing_links" || parsed.table === "confirm_audit") {
+      const agreementId = String(body.agreement_id ?? parsed.filters.find((item) => item.col === "agreement_id")?.value ?? "");
+      if (agreementId) {
+        const existing = await client.query("SELECT clinic_id FROM confirm_agreements WHERE id = $1", [agreementId]);
+        existingClinicId = existing.rows[0]?.clinic_id ?? null;
+      }
+    }
+    const denied = clinicWriteError(parsed.table, actor, body, existingClinicId);
+    if (denied) throw new Error(denied);
   }
 
   if (method === "PATCH") {
@@ -183,8 +182,8 @@ export async function localRest<T>(path: string, init: RequestInit = {}): Promis
       values.push(filter.value);
       return `${ident(filter.col)} = $${values.length}`;
     });
-    if (clinic && !clinic.org && parsed.table === "confirm_agreements") {
-      values.push(clinic.branchId);
+    if (actor && !isOrg(actor) && parsed.table === "confirm_agreements") {
+      values.push(actor.branchId);
       where.push(`${ident("clinic_id")} = $${values.length}`);
     }
     await client.query(
@@ -208,45 +207,84 @@ export async function localRest<T>(path: string, init: RequestInit = {}): Promis
   return undefined as T;
 }
 
-async function assertClinicMutation(
-  client: pg.Pool,
-  table: string,
-  filters: { col: string; value: string }[],
-  body: Record<string, unknown>,
-  branchId: string,
-) {
-  if (table === "confirm_templates" || table === "confirm_clinics") {
-    throw new Error("That change is limited to Head Office.");
-  }
-  if (table === "confirm_agreements") {
-    const clinicId = String(body.clinic_id ?? "");
-    if (clinicId && clinicId !== branchId) throw new Error("That pack belongs to another clinic.");
-    const id = String(body.id ?? filters.find((item) => item.col === "id")?.value ?? "");
-    if (id) {
-      const existing = await client.query("SELECT clinic_id FROM confirm_agreements WHERE id = $1", [id]);
-      if (existing.rows[0] && existing.rows[0].clinic_id !== branchId) {
-        throw new Error("That pack belongs to another clinic.");
+function isOrg(actor: ClinicActor) {
+  return actor.scope === "organisation";
+}
+
+export async function recordDurableSignature(input: {
+  actor: ClinicActor | null;
+  agreementId: string;
+  signature: Signature;
+  action: "sign" | "decline";
+  consumeLinkId?: string | null;
+  audit: { id: string; actor: string; action: string; detail: string; createdAt: string };
+}): Promise<{ status: string; signedCount: number; required: number; signature: Signature }> {
+  await ensureConfirmSchema();
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const agr = await client.query(
+      "SELECT id, clinic_id, status, required_signatures, snapshot, snapshot_json FROM confirm_agreements WHERE id = $1 FOR UPDATE",
+      [input.agreementId],
+    );
+    const row = agr.rows[0] as
+      | { id: string; clinic_id: string; status: string; required_signatures: number; snapshot: Snapshot | null; snapshot_json?: string }
+      | undefined;
+    if (!row) throw new Error("That pack is not on the server.");
+    if (input.actor) {
+      const denied = clinicWriteError("confirm_agreements", input.actor, { clinic_id: row.clinic_id }, row.clinic_id);
+      if (denied) throw new Error(denied);
+    }
+    if (!canSign(row.status as AgreementStatus)) {
+      throw new Error("This pack is not open for signatures");
+    }
+    const snapshot = (row.snapshot ?? (row.snapshot_json ? JSON.parse(row.snapshot_json) : { signers: [] })) as Snapshot;
+    const sigs = await client.query("SELECT payload FROM confirm_signatures WHERE agreement_id = $1", [input.agreementId]);
+    const existing = sigs.rows.map((item) => item.payload as Signature);
+    if (existing.some((item) => item.role === input.signature.role && item.outcome === "signed")) {
+      throw new Error(`${input.signature.role} has already signed this agreement`);
+    }
+    const requiredRoles = (snapshot.signers ?? []).map((item) => item.role);
+    const signedRoles = existing.filter((item) => item.outcome === "signed").map((item) => item.role);
+    if (input.action === "sign") assertSigningOrder(input.signature.role, requiredRoles, signedRoles);
+
+    await client.query(
+      "INSERT INTO confirm_signatures (id, tenant_id, agreement_id, payload, created_at) VALUES ($1, $2, $3, $4::jsonb, $5)",
+      [input.signature.id, CONFIRM_TENANT_ID, input.agreementId, JSON.stringify(input.signature), input.signature.signedAt],
+    );
+
+    const links = await client.query("SELECT id, payload FROM confirm_signing_links WHERE agreement_id = $1", [input.agreementId]);
+    for (const link of links.rows as Array<{ id: string; payload: { status?: string; consumedAt?: string | null } }>) {
+      const payload = { ...link.payload };
+      if (payload.status !== "pending") continue;
+      if (input.action === "decline") {
+        payload.status = link.id === input.consumeLinkId ? "declined" : "revoked";
+        payload.consumedAt = input.signature.signedAt;
+        await client.query("UPDATE confirm_signing_links SET payload = $1::jsonb WHERE id = $2", [JSON.stringify(payload), link.id]);
+      } else if (input.consumeLinkId && link.id === input.consumeLinkId) {
+        payload.status = "consumed";
+        payload.consumedAt = input.signature.signedAt;
+        await client.query("UPDATE confirm_signing_links SET payload = $1::jsonb WHERE id = $2", [JSON.stringify(payload), link.id]);
       }
     }
-  }
-  if (table === "confirm_people") {
-    const clinicId = String(body.clinic_id ?? "");
-    if (clinicId && clinicId !== branchId) throw new Error("That staff record belongs to another clinic.");
-    const id = String(body.id ?? filters.find((item) => item.col === "id")?.value ?? "");
-    if (id) {
-      const existing = await client.query("SELECT clinic_id FROM confirm_people WHERE id = $1", [id]);
-      if (existing.rows[0] && existing.rows[0].clinic_id !== branchId) {
-        throw new Error("That staff record belongs to another clinic.");
-      }
-    }
-  }
-  if (table === "confirm_signatures" || table === "confirm_signing_links" || table === "confirm_audit") {
-    const agreementId = String(body.agreement_id ?? filters.find((item) => item.col === "agreement_id")?.value ?? "");
-    if (agreementId) {
-      const existing = await client.query("SELECT clinic_id FROM confirm_agreements WHERE id = $1", [agreementId]);
-      if (existing.rows[0] && existing.rows[0].clinic_id !== branchId) {
-        throw new Error("That pack belongs to another clinic.");
-      }
-    }
+
+    const signedCount = signedRoles.length + (input.action === "sign" ? 1 : 0);
+    const status = input.action === "decline" ? "declined" : nextStatus(signedCount, row.required_signatures);
+    await client.query("UPDATE confirm_agreements SET status = $1, updated_at = $2 WHERE id = $3", [
+      status,
+      input.signature.signedAt,
+      input.agreementId,
+    ]);
+    await client.query(
+      "INSERT INTO confirm_audit (id, tenant_id, agreement_id, actor, action, detail, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [input.audit.id, CONFIRM_TENANT_ID, input.agreementId, input.audit.actor, input.audit.action, input.audit.detail, input.audit.createdAt],
+    );
+    await client.query("COMMIT");
+    return { status, signedCount, required: row.required_signatures, signature: input.signature };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
 }

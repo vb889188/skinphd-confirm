@@ -289,6 +289,8 @@ export function Workspace({ signToken }: { signToken?: string }) {
       window.removeEventListener("confirm-live", pull);
       document.removeEventListener("visibilitychange", pull);
     };
+    // Re-subscribe when the signed-in person changes, not on every store snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, hydrateRemote]);
 
   useEffect(() => {
@@ -298,10 +300,6 @@ export function Workspace({ signToken }: { signToken?: string }) {
     setDrawnPng(null);
     if (selectedId) useWorkspace.getState().openAgreement(selectedId, "salon_table");
   }, [selectedId]);
-
-  useEffect(() => {
-    if (current?.role === "manager") void store.ensurePilotPack();
-  }, [current?.role, store]);
 
   const selected = store.agreements.find((item) => item.id === selectedId) ?? null;
   const editingPerson = store.people.find((person) => person.id === editingPersonId) ?? null;
@@ -2672,17 +2670,17 @@ function Detail({
   agreement,
   activeRole,
   typedName,
-  token,
+  token: _token,
   consent,
   issuedToken,
   drawnPng,
   saving,
   setActiveRole,
   setTypedName,
-  setToken,
+  setToken: _setToken,
   setConsent,
   setDrawnPng,
-  onIssue,
+  onIssue: _onIssue,
   onIssueCode,
   onSign,
   error,
@@ -2722,7 +2720,6 @@ function Detail({
     setActiveRole(signingRole);
     setTypedName("");
   }, [signingRole, activeRole, setActiveRole, setTypedName]);
-  const mail = buildEmployeeMail(state, agreement, confirmSiteUrl());
   const recordEmail = useWorkspace((store) => store.noteEmailSent);
   const [packPreview, setPackPreview] = useState(false);
   const employee = state.people.find((person) => person.id === agreement.employeeId);
@@ -3287,6 +3284,8 @@ function PersonalLinkSign({ token }: { token: string }) {
         if (!document.hidden) void useWorkspace.getState().hydrateRemote();
       },
     });
+    // Token + link id identify the live stream; `link` is read inside the subscription.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, link?.id]);
 
   useEffect(() => {

@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
+import { canIssueLinkForClinic } from "./clinic-scope";
 import { randomId, randomToken, sha256Hex } from "./crypto";
 import { bumpConfirmLive } from "./live-bus";
 import { CONFIRM_TENANT_ID } from "./remote-shared";
-import type { Person } from "./types";
+import { resolveSessionSecret } from "./session-secret";
+import type { Person, Role, Signature } from "./types";
 
 type SessionPayload = {
   personId: string;
@@ -18,12 +20,13 @@ function supabaseConfig() {
     url: (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || vite.VITE_SUPABASE_URL || "").trim(),
     key: (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || vite.VITE_SUPABASE_ANON_KEY || "").trim(),
     workspace: (process.env.CONFIRM_WORKSPACE_KEY || process.env.VITE_CONFIRM_WORKSPACE_KEY || vite.VITE_CONFIRM_WORKSPACE_KEY || "").trim(),
-    secret: (
-      process.env.CONFIRM_SESSION_SECRET ||
-      process.env.SESSION_SECRET ||
-      (process.env.DATABASE_URL ? `confirm-db:${process.env.DATABASE_URL}` : "") ||
-      ""
-    ).trim(),
+    secret: (() => {
+      try {
+        return resolveSessionSecret(process.env);
+      } catch {
+        return "";
+      }
+    })(),
   };
 }
 
@@ -40,9 +43,9 @@ function decodeJson<T>(value: string): T {
 }
 
 async function signPayload(payload: SessionPayload, secret: string) {
-  if (!secret) throw new Error("CONFIRM_SESSION_SECRET is not configured");
+  const resolved = secret || resolveSessionSecret(process.env);
   const body = encodeJson(payload);
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(resolved), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
   return `${body}.${toHex(new Uint8Array(sig))}`;
 }
@@ -63,10 +66,10 @@ async function verifySession(token: string | undefined, secret: string): Promise
   }
 }
 
-async function dataRest<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function dataRest<T>(path: string, init: RequestInit = {}, actor?: SessionPayload | null): Promise<T> {
   if (process.env.DATABASE_URL?.trim()) {
     const { localRest } = await import("./confirm-db");
-    return localRest<T>(path, init);
+    return localRest<T>(path, init, actor ? { scope: actor.scope, branchId: actor.branchId } : null);
   }
   return supabaseRest<T>(path, init);
 }
@@ -130,16 +133,6 @@ function filterLinkRows(path: string, rows: unknown, link: { agreement: Agreemen
   return [];
 }
 
-function sessionHeaders(session: SessionPayload, extra?: Record<string, string>): Record<string, string> {
-  return {
-    "x-confirm-person": session.personId,
-    "x-confirm-role": session.role,
-    "x-confirm-scope": session.scope,
-    "x-confirm-branch": session.branchId,
-    ...(extra ?? {}),
-  };
-}
-
 function filterSessionRows(path: string, rows: unknown, session: SessionPayload) {
   if (!Array.isArray(rows) || session.scope === "organisation") return rows;
   if (path.startsWith("confirm_agreements")) return rows.filter((row) => (row as { clinic_id?: string }).clinic_id === session.branchId);
@@ -201,7 +194,7 @@ export const confirmSignInFn = createServerFn({ method: "POST" })
         branchId: person.clinic_id,
         exp: Date.now() + 8 * 60 * 60 * 1000,
       },
-      supabaseConfig().secret,
+      resolveSessionSecret(process.env),
     );
     return {
       ok: true as const,
@@ -240,7 +233,7 @@ export const confirmChangePinFn = createServerFn({ method: "POST" })
     await dataRest(`confirm_people?id=eq.${encodeURIComponent(person.id)}`, {
       method: "PATCH",
       body: JSON.stringify({ pin_hash: pinHash, updated_at: new Date().toISOString() }),
-    });
+    }, session);
     return { ok: true as const, pinHash };
   });
 
@@ -272,14 +265,13 @@ export const confirmRestFn = createServerFn({ method: "POST" })
 
     const headers: Record<string, string> = {};
     if (data.prefer) headers.Prefer = data.prefer;
-    if (session) Object.assign(headers, sessionHeaders(session));
 
     try {
       const rows = await dataRest<unknown>(path, {
         method,
         headers,
         body: data.body && method !== "GET" ? data.body : undefined,
-      });
+      }, session);
       if (method !== "GET") bumpConfirmLive();
       let body: unknown = rows;
       if (method === "GET" && path.startsWith("confirm_people")) body = stripPeople(rows);
@@ -301,7 +293,6 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const session = await verifySession(data.session, supabaseConfig().secret);
     if (!session) return { ok: false as const, error: "Sign in first." };
-    const scoped = sessionHeaders(session, { Prefer: "resolution=merge-duplicates,return=minimal" });
     if (data.pack?.id === data.agreementId) {
       if (session.scope !== "organisation" && data.pack.clinic_id && data.pack.clinic_id !== session.branchId) {
         return { ok: false as const, error: "That pack belongs to another clinic." };
@@ -309,9 +300,9 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
       try {
         await dataRest("confirm_agreements?on_conflict=id", {
           method: "POST",
-          headers: scoped,
+          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           body: JSON.stringify(data.pack),
-        });
+        }, session);
       } catch (err) {
         return { ok: false as const, error: err instanceof Error ? `The pack was not stored: ${err.message}` : "The pack was not stored." };
       }
@@ -324,11 +315,11 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
       witness_id: string | null;
       status: string;
     }>>(`confirm_agreements?id=eq.${encodeURIComponent(data.agreementId)}&select=id,clinic_id,employee_id,manager_id,witness_id,status`, {
-      headers: sessionHeaders(session),
-    });
+      headers: {},
+    }, session);
     const agreement = agreements[0];
     if (!agreement) return { ok: false as const, error: "That pack is not on the server." };
-    if (session.scope !== "organisation" && agreement.clinic_id !== session.branchId) {
+    if (!canIssueLinkForClinic({ scope: session.scope, branchId: session.branchId }, agreement.clinic_id)) {
       return { ok: false as const, error: "That pack belongs to another clinic." };
     }
     if (agreement.status === "declined" || agreement.status === "superseded") {
@@ -361,7 +352,7 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
     try {
       await dataRest("confirm_signing_links?on_conflict=id", {
         method: "POST",
-        headers: scoped,
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
         body: JSON.stringify({
           id: link.id,
           tenant_id: CONFIRM_TENANT_ID,
@@ -369,10 +360,10 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
           payload: link,
           created_at: now,
         }),
-      });
+      }, session);
       await dataRest("confirm_audit?on_conflict=id", {
         method: "POST",
-        headers: scoped,
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
         body: JSON.stringify({
           id: randomId("AUD"),
           tenant_id: CONFIRM_TENANT_ID,
@@ -382,12 +373,91 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
           detail: `A personal link was stored for ${person.full_name} (${data.role}).`,
           created_at: now,
         }),
-      });
+      }, session);
     } catch (err) {
       return { ok: false as const, error: err instanceof Error ? err.message : "The personal link could not be stored." };
     }
     bumpConfirmLive();
     return { ok: true as const, token, email: person.email, expiresAt, link };
+  });
+
+export const recordSignatureFn = createServerFn({ method: "POST" })
+  .validator((data: {
+    session?: string;
+    linkToken?: string;
+    agreementId: string;
+    role: Role;
+    typedName: string;
+    action: "sign" | "decline";
+    consentAccepted: boolean;
+    drawnPng?: string | null;
+    surface?: string;
+    snapshotHash: string;
+    signerId: string;
+    signerName: string;
+    linkId?: string | null;
+  }) => data)
+  .handler(async ({ data }) => {
+    const secret = supabaseConfig().secret;
+    if (!secret) return { ok: false as const, error: "Session secret is not configured. Set SESSION_SECRET or CONFIRM_SESSION_SECRET on the server." };
+    const session = data.session ? await verifySession(data.session, secret) : null;
+    const link = data.linkToken ? await resolveLink(data.linkToken) : null;
+    if (!session && !link?.agreement) return { ok: false as const, error: "Sign in, or open a personal pack link." };
+    if (link?.agreement && link.agreement.id !== data.agreementId) {
+      return { ok: false as const, error: "This personal link can only update its own pack." };
+    }
+    const actor = session ? { scope: session.scope, branchId: session.branchId } : null;
+    const now = new Date().toISOString();
+    const signature: Signature = {
+      id: randomId("SIG"),
+      agreementId: data.agreementId,
+      signerId: data.signerId,
+      role: data.role,
+      typedName: data.typedName.trim() || data.signerName,
+      method: "typed_name",
+      signedAt: now,
+      consentAccepted: data.consentAccepted,
+      evidence: JSON.stringify({
+        consentAccepted: data.consentAccepted,
+        method: data.drawnPng ? "typed_name_and_mark" : "typed_name",
+        snapshotHash: data.snapshotHash,
+        linkId: data.linkId ?? null,
+        identityAssurance: data.surface ?? (data.linkToken ? "personal_link" : "salon_table"),
+        drawn: Boolean(data.drawnPng),
+        drawnPng: data.drawnPng || null,
+        capturedAt: now,
+      }),
+      outcome: data.action === "decline" ? "declined" : "signed",
+      linkId: data.linkId ?? null,
+    };
+    const audit = {
+      id: randomId("AUD"),
+      actor: data.signerName,
+      action: data.action === "decline" ? "Agreement declined" : "Signature recorded",
+      detail:
+        data.action === "decline"
+          ? `${data.signerName} declined as ${data.role}. Remaining signing links were revoked.`
+          : `${data.signerName} signed as ${data.role}.`,
+      createdAt: now,
+    };
+    try {
+      if (!process.env.DATABASE_URL?.trim()) {
+        return { ok: false as const, error: "Confirm database is not configured on the server" };
+      }
+      const { recordDurableSignature } = await import("./confirm-db");
+      const recorded = await recordDurableSignature({
+        actor,
+        agreementId: data.agreementId,
+        signature,
+        action: data.action,
+        consumeLinkId: data.linkId,
+        audit,
+      });
+      bumpConfirmLive();
+      return { ok: true as const, ...recorded };
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : "The signature was not stored." };
+    }
   });
 
 export async function allowConfirmLive(session?: string, linkToken?: string) {

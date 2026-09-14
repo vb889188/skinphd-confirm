@@ -1,7 +1,7 @@
 import type { Agreement, AuditEvent, Branch, EmployeeRecord, Person, Signature, SigningLink, Template, WorkspaceState } from "./types";
 import { SOURCE_TEMPLATES } from "./templates";
 import { CONFIRM_TENANT_ID } from "./remote-shared";
-import { confirmChangePinFn, confirmConfiguredFn, confirmRestFn, confirmSignInFn, issuePersonalLinkFn } from "./confirm-rpc";
+import { confirmChangePinFn, confirmConfiguredFn, confirmRestFn, confirmSignInFn, issuePersonalLinkFn, recordSignatureFn } from "./confirm-rpc";
 
 export { CONFIRM_TENANT_ID };
 
@@ -98,6 +98,30 @@ export async function issuePersonalLinkOnServer(
     : undefined;
   const result = await issuePersonalLinkFn({
     data: { session: getSessionToken(), agreementId, role, pack },
+  });
+  if (!result.ok) throw new Error(result.error);
+  return result;
+}
+
+export async function recordSignatureOnServer(input: {
+  agreementId: string;
+  role: "employee" | "manager" | "witness";
+  typedName: string;
+  action: "sign" | "decline";
+  consentAccepted: boolean;
+  drawnPng?: string | null;
+  surface?: string;
+  snapshotHash: string;
+  signerId: string;
+  signerName: string;
+  linkId?: string | null;
+}) {
+  const result = await recordSignatureFn({
+    data: {
+      ...input,
+      session: getSessionToken() || undefined,
+      linkToken: linkToken || undefined,
+    },
   });
   if (!result.ok) throw new Error(result.error);
   return result;

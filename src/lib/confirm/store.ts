@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { ACTOR, createSeed } from "./seed";
+import { canVoidOriginalAfterReissue } from "./integrity";
 import { randomId, sha256Hex } from "./crypto";
 import {
   assertAssigned,
@@ -12,7 +13,7 @@ import {
   requiredSignatureCount,
 } from "./rules";
 import type { Agreement, Role, Snapshot, WorkspaceState } from "./types";
-import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile, issuePersonalLinkOnServer, upsertAgreement, upsertSignature } from "./remote";
+import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile, issuePersonalLinkOnServer, upsertAgreement, recordSignatureOnServer } from "./remote";
 import { requireCapability } from "./access";
 import { recognizeDocument } from "./ocr";
 
@@ -806,7 +807,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           additionalDescription: agreement.snapshot.fields.additionalDescription ?? undefined,
         });
         const latest = get().agreements.find((item) => item.id === agreementId);
-        if (latest && latest.status !== "completed" && latest.status !== "superseded" && latest.status !== "declined") {
+        if (latest && canVoidOriginalAfterReissue(latest.status, nextId)) {
           get().voidAgreement(agreementId, "Replaced by a new freeze");
         }
         return nextId;
@@ -848,6 +849,45 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
 
         if (input.action === "decline") {
           if (!canSign(agreement.status)) throw new Error("This agreement can no longer be declined");
+          if (remoteEnabled()) {
+            const recorded = await recordSignatureOnServer({
+              agreementId: agreement.id,
+              role: input.role,
+              typedName: input.typedName.trim() || signer.name,
+              action: "decline",
+              consentAccepted: input.consentAccepted,
+              drawnPng: input.drawnPng,
+              surface,
+              snapshotHash: agreement.snapshotHash,
+              signerId: signer.id,
+              signerName: signer.name,
+              linkId,
+            });
+            set({
+              signatures: [...state.signatures.filter((item) => !(item.agreementId === agreement.id && item.role === input.role)), recorded.signature],
+              agreements: state.agreements.map((item) =>
+                item.id === agreement.id ? { ...item, status: "declined", updatedAt: recorded.signature.signedAt } : item,
+              ),
+              links: links.map((link) =>
+                link.agreementId === agreement.id && link.status === "pending"
+                  ? { ...link, status: link.id === linkId ? ("declined" as const) : ("revoked" as const), consumedAt: recorded.signature.signedAt }
+                  : link,
+              ),
+              audit: [
+                {
+                  id: randomId("AUD"),
+                  agreementId: agreement.id,
+                  actor: ACTOR,
+                  action: "Agreement declined",
+                  detail: `${signer.name} declined as ${input.role}. Remaining signing links were revoked.`,
+                  createdAt: recorded.signature.signedAt,
+                },
+                ...state.audit,
+              ],
+            });
+            persistLive(get());
+            return "declined";
+          }
           set({
             signatures: [
               ...state.signatures,
@@ -894,17 +934,6 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               ...state.audit,
             ],
           });
-          if (remoteEnabled()) {
-            const latest = get();
-            const recorded = latest.signatures.find((item) => item.agreementId === agreement.id && item.role === input.role);
-            const pack = latest.agreements.find((item) => item.id === agreement.id);
-            try {
-              if (recorded) await upsertSignature(recorded);
-              if (pack) await upsertAgreement(pack);
-            } catch (err) {
-              throw new Error(err instanceof Error ? `The signature was not stored: ${err.message}` : "The signature was not stored.");
-            }
-          }
           persistLive(get());
           return "declined";
         }
@@ -920,6 +949,44 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           .filter((item) => item.agreementId === agreement.id && item.outcome === "signed")
           .map((item) => item.role);
         assertSigningOrder(input.role, requiredRoles, signedRoles);
+        if (remoteEnabled()) {
+          const recorded = await recordSignatureOnServer({
+            agreementId: agreement.id,
+            role: input.role,
+            typedName: input.typedName.trim(),
+            action: "sign",
+            consentAccepted: true,
+            drawnPng: input.drawnPng,
+            surface,
+            snapshotHash: agreement.snapshotHash,
+            signerId: signer.id,
+            signerName: signer.name,
+            linkId,
+          });
+          const status = recorded.status as Agreement["status"];
+          set({
+            signatures: [...state.signatures.filter((item) => !(item.agreementId === agreement.id && item.role === input.role)), recorded.signature],
+            links: linkId
+              ? links.map((item) => (item.id === linkId ? { ...item, status: "consumed" as const, consumedAt: recorded.signature.signedAt } : item))
+              : links,
+            agreements: state.agreements.map((item) =>
+              item.id === agreement.id ? { ...item, status, updatedAt: recorded.signature.signedAt } : item,
+            ),
+            audit: [
+              {
+                id: randomId("AUD"),
+                agreementId: agreement.id,
+                actor: ACTOR,
+                action: "Signature recorded",
+                detail: `${signer.name} signed as ${input.role} on ${surface.replace("_", " ")}. Typed name recorded${input.drawnPng ? " with a drawn mark" : ""}.`,
+                createdAt: recorded.signature.signedAt,
+              },
+              ...state.audit,
+            ],
+          });
+          persistLive(get());
+          return status;
+        }
         const signatures = [
           ...state.signatures,
           {
@@ -968,17 +1035,6 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
-        if (remoteEnabled()) {
-          const latest = get();
-          const recorded = latest.signatures.find((item) => item.agreementId === agreement.id && item.role === input.role);
-          const pack = latest.agreements.find((item) => item.id === agreement.id);
-          try {
-            if (recorded) await upsertSignature(recorded);
-            if (pack) await upsertAgreement(pack);
-          } catch (err) {
-            throw new Error(err instanceof Error ? `The signature was not stored: ${err.message}` : "The signature was not stored.");
-          }
-        }
         persistLive(get());
         return status;
       },
