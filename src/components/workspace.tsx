@@ -688,8 +688,10 @@ export function Workspace({ signToken }: { signToken?: string }) {
     <main className="confirm-shell min-h-[100dvh] bg-transparent text-ink lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="confirm-sidebar relative hidden flex-col px-3 py-4 text-sidebar-text shadow-[8px_0_40px_rgba(10,36,29,0.18)] lg:sticky lg:top-0 lg:h-screen lg:px-4 lg:py-7 lg:flex">
         <div className="mb-7 border-b border-white/10 px-2 pb-6">
-          <img src="/skinphd-logo-on-dark.png" alt="SkinPhD" className="h-8 w-auto max-w-[168px] object-contain object-left" />
-          <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-2 h-3 w-auto max-w-[168px] object-contain object-left" />
+          <div className="rounded-lg bg-paper px-3 py-2.5">
+            <img src="/skinphd-logo.png" alt="SkinPhD" className="h-8 w-auto max-w-[168px] object-contain object-left" />
+            <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-1.5 h-3 w-auto max-w-[168px] object-contain object-left" />
+          </div>
           <small className="confirm-kicker mt-3 block text-[10px] text-sidebar-soft uppercase">Confirm · Head Office</small>
         </div>
         <nav aria-label="Primary navigation" className="flex gap-2 lg:block lg:overflow-visible">
@@ -3377,8 +3379,10 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
           className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-paper/5 blur-[100px]"
         />
         <div className="mb-10">
-          <img src="/skinphd-logo-on-dark.png" alt="SkinPhD" className="h-12 w-auto max-w-[240px] object-contain object-left" />
-          <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-3 h-4 w-auto max-w-[240px] object-contain object-left" />
+          <div className="inline-block rounded-xl bg-paper px-4 py-3">
+            <img src="/skinphd-logo.png" alt="SkinPhD" className="h-12 w-auto max-w-[240px] object-contain object-left" />
+            <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-2 h-4 w-auto max-w-[240px] object-contain object-left" />
+          </div>
           <small className="mt-4 block text-[11px] tracking-[0.16em] text-sidebar-soft uppercase">Confirm</small>
         </div>
         <div className="relative">
