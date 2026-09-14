@@ -11,7 +11,7 @@ import {
   requiredSignatureCount,
 } from "./rules";
 import type { Agreement, AuditEvent, EmployeeRecord, Person, Role, Signature, SigningLink, Snapshot, Template, WorkspaceState } from "./types";
-import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile, issuePersonalLinkOnServer, upsertAgreement } from "./remote";
+import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile, issuePersonalLinkOnServer, upsertAgreement, upsertSignature } from "./remote";
 import { requireCapability } from "./access";
 import { recognizeDocument } from "./ocr";
 
@@ -57,8 +57,10 @@ function mergeRemote(local: WorkspaceState, remote: Pick<WorkspaceState, "branch
   };
 }
 
+let persistQueue: Promise<void> = Promise.resolve();
 function persistLive(state: WorkspaceState) {
-  void persistWorkspace(state)
+  persistQueue = persistQueue
+    .then(() => persistWorkspace(state))
     .then(() => {
       if (typeof window !== "undefined") window.dispatchEvent(new Event("confirm-live"));
     })
@@ -919,6 +921,17 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               ...state.audit,
             ],
           });
+          if (remoteEnabled()) {
+            const latest = get();
+            const recorded = latest.signatures.find((item) => item.agreementId === agreement.id && item.role === input.role);
+            const pack = latest.agreements.find((item) => item.id === agreement.id);
+            try {
+              if (recorded) await upsertSignature(recorded);
+              if (pack) await upsertAgreement(pack);
+            } catch (err) {
+              throw new Error(err instanceof Error ? `The signature was not stored: ${err.message}` : "The signature was not stored.");
+            }
+          }
           persistLive(get());
           return "declined";
         }
@@ -977,6 +990,17 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
+        if (remoteEnabled()) {
+          const latest = get();
+          const recorded = latest.signatures.find((item) => item.agreementId === agreement.id && item.role === input.role);
+          const pack = latest.agreements.find((item) => item.id === agreement.id);
+          try {
+            if (recorded) await upsertSignature(recorded);
+            if (pack) await upsertAgreement(pack);
+          } catch (err) {
+            throw new Error(err instanceof Error ? `The signature was not stored: ${err.message}` : "The signature was not stored.");
+          }
+        }
         persistLive(get());
         return status;
       },

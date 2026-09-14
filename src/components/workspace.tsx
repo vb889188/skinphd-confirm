@@ -500,48 +500,6 @@ export function Workspace({ signToken }: { signToken?: string }) {
             ? "Saved. The signed pack is now the kept copy."
             : "Saved. Signature recorded on the frozen snapshot.",
       );
-      if (action === "sign" && latest?.status === "completed") {
-        const origin = confirmSiteUrl();
-        try {
-          const copy = await useWorkspace.getState().issueSignCode(latest.id, "employee");
-          const mail = buildSignedRecordMail(useWorkspace.getState(), latest, origin, packSignUrl(copy.token));
-          if (mail.to) {
-            const sent = await deliverMail(mail);
-            toast.success(sent === "sent" ? "Signed pack emailed, including the employee copy link." : "Finish the signed-pack email in your mail app.");
-          }
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Signed pack stored, but the copy email was not sent.");
-        }
-      } else if (action === "sign" && latest) {
-        const snapshot = useWorkspace.getState();
-        const next = latest.snapshot.signers.find(
-          (signer) => !snapshot.signatures.some((item) => item.agreementId === latest.id && item.role === signer.role && item.outcome === "signed"),
-        );
-        const person = next ? snapshot.people.find((item) => item.id === next.id) : null;
-        if (person?.email && next) {
-          try {
-            let packUrl: string | undefined;
-            if (next.role !== "manager") {
-              const copy = await useWorkspace.getState().issueSignCode(latest.id, next.role);
-              packUrl = packSignUrl(copy.token);
-            }
-            const sent = await deliverMail(
-              buildNextSignerMail({
-                toName: person.fullName,
-                toEmail: person.email,
-                title: latest.title,
-                role: next.role === "manager" ? "franchisee" : next.role,
-                previousSigner: typedName,
-                siteUrl: confirmSiteUrl(),
-                packUrl,
-              }),
-            );
-            if (sent !== "sent") toast.message("Finish the next-signer email in your mail app.");
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Next signer was not emailed.");
-          }
-        }
-      }
       setConsent(false);
       setIssuedToken("");
       setToken("");
@@ -557,6 +515,49 @@ export function Workspace({ signToken }: { signToken?: string }) {
       } else {
         setActiveRole("");
       }
+      setSaving(false);
+      const packId = latest?.id;
+      const previousName = typedName;
+      void (async () => {
+        if (action !== "sign" || !latest || !packId) return;
+        try {
+          if (latest.status === "completed") {
+            const copy = await useWorkspace.getState().issueSignCode(packId, "employee");
+            const mail = buildSignedRecordMail(useWorkspace.getState(), latest, confirmSiteUrl(), packSignUrl(copy.token));
+            if (mail.to) {
+              const sent = await deliverMail(mail, { compose: false });
+              toast.success(sent === "sent" ? "Signed pack emailed, including the employee copy link." : "Signed pack stored. Email the copy from Email employee pack if needed.");
+            }
+            return;
+          }
+          const snapshot = useWorkspace.getState();
+          const next = latest.snapshot.signers.find(
+            (signer) => !snapshot.signatures.some((item) => item.agreementId === latest.id && item.role === signer.role && item.outcome === "signed"),
+          );
+          const person = next ? snapshot.people.find((item) => item.id === next.id) : null;
+          if (!person?.email || !next) return;
+          let packUrl: string | undefined;
+          if (next.role !== "manager") {
+            const copy = await useWorkspace.getState().issueSignCode(latest.id, next.role);
+            packUrl = packSignUrl(copy.token);
+          }
+          await deliverMail(
+            buildNextSignerMail({
+              toName: person.fullName,
+              toEmail: person.email,
+              title: latest.title,
+              role: next.role === "manager" ? "franchisee" : next.role,
+              previousSigner: previousName,
+              siteUrl: confirmSiteUrl(),
+              packUrl,
+            }),
+            { compose: false },
+          );
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Saved. The follow-up email was not sent.");
+        }
+      })();
+      return;
     } catch (err) {
       haptic("warn");
       setError(err instanceof Error ? err.message : "Could not record the signature");

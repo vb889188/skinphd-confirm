@@ -429,13 +429,10 @@ export async function persistWorkspace(state: WorkspaceState) {
   const me = state.people.find((item) => item.id === state.currentPersonId);
   if (me) setRemoteActor(me);
   const jobs = [
-    ...state.branches.map(upsertClinic),
-    ...state.people.map(upsertPerson),
-    ...state.templates.map(upsertTemplate),
     ...state.agreements.map(upsertAgreement),
     ...state.signatures.filter((item) => item?.id).map(upsertSignature),
     ...state.links.filter((item) => item?.id && item.tokenHash).map(upsertLink),
-    ...state.audit.slice(0, 40).filter((item) => item?.id).map(upsertAudit),
+    ...state.audit.slice(0, 20).filter((item) => item?.id).map(upsertAudit),
   ];
   const results = await Promise.allSettled(jobs);
   const failed = results.find((item) => item.status === "rejected");
