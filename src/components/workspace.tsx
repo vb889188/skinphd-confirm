@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Reveal, staggerContainer, staggerItem } from "@/components/ui/motion-surface";
+import { motion, useReducedMotion } from "framer-motion";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectIcon, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -220,6 +222,7 @@ const toneClass: Record<string, string> = {
 
 export function Workspace() {
   const store = useWorkspace();
+  const reduceMotion = useReducedMotion();
   const { expireSessionIfNeeded, hydrateRemote } = store;
   const current = store.people.find((person) => person.id === store.currentPersonId) ?? null;
   const [view, setView] = useState<View>("overview");
@@ -800,7 +803,14 @@ export function Workspace() {
         )}
         {view === "overview" && (
           <div className="mx-auto grid max-w-7xl gap-4">
-            <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Head Office summary">
+            <motion.section
+              className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+              aria-label="Head Office summary"
+              initial={reduceMotion ? false : "hidden"}
+              whileInView={reduceMotion ? undefined : "show"}
+              viewport={{ once: true, amount: 0.2 }}
+              variants={staggerContainer}
+            >
               <Stat
                 icon={<Clock3 className="size-4" />}
                 tone="amber"
@@ -829,9 +839,9 @@ export function Workspace() {
                 value={stats.completed}
                 note="Frozen signed records retained"
               />
-            </section>
+            </motion.section>
             {isManager && (
-              <section className="confirm-card overflow-hidden rounded-xl border border-line bg-paper" aria-label="Head Office desk">
+              <Reveal as="section" className="confirm-card overflow-hidden rounded-xl border border-line bg-paper" aria-label="Head Office desk">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
                   <div>
                     <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Signature queue</p>
@@ -866,9 +876,9 @@ export function Workspace() {
                     </button>
                   ))}
                 </div>
-              </section>
+              </Reveal>
             )}
-            <section className="confirm-card overflow-hidden rounded-xl border border-line bg-paper">
+            <Reveal as="section" className="confirm-card overflow-hidden rounded-xl border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Queue</p>
                 <h2 className="font-display text-xl font-medium">
@@ -923,9 +933,9 @@ export function Workspace() {
                   </p>
                 )}
               </div>
-            </section>
+            </Reveal>
             {deskFilter !== "completed" && recentCompleted.length > 0 && (
-              <section className="confirm-card overflow-hidden rounded-xl border border-line bg-paper" aria-labelledby="recent-completed-title">
+              <Reveal as="section" className="confirm-card overflow-hidden rounded-xl border border-line bg-paper" aria-labelledby="recent-completed-title">
                 <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
                   <div>
                     <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Kept records</p>
@@ -944,10 +954,10 @@ export function Workspace() {
                     </button>
                   ))}
                 </div>
-              </section>
+              </Reveal>
             )}
             {isManager && (
-            <section className="confirm-card overflow-hidden rounded-2xl border border-line bg-paper">
+            <Reveal as="section" className="confirm-card overflow-hidden rounded-2xl border border-line bg-paper">
               <div className="border-b border-line px-5 py-4">
                 <p className="text-[10px] font-extrabold tracking-[0.1em] text-muted uppercase">Why this exists</p>
                 <h2 className="font-display text-xl font-medium">Paper can go missing. This copy stays.</h2>
@@ -965,14 +975,14 @@ export function Workspace() {
                   </li>
                 ))}
               </ol>
-            </section>
+            </Reveal>
             )}
           </div>
         )}
 
         {view === "agreements" && (
           <>
-            <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-md border border-line bg-paper" aria-label="Agreement summary">
+            <Reveal as="section" className="confirm-card mx-auto mb-4 max-w-7xl overflow-hidden rounded-md border border-line bg-paper" aria-label="Agreement summary">
               <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-4 sm:divide-y-0">
                 {([
                   [stats.completed, "Completed", "completed"],
@@ -1000,7 +1010,7 @@ export function Workspace() {
                   </button>
                 ))}
               </div>
-            </section>
+            </Reveal>
             <div className="mx-auto mb-3.5 flex max-w-7xl flex-wrap gap-2 no-print">
               <input
                 value={query}
@@ -1163,7 +1173,7 @@ export function Workspace() {
         {view === "people" && can(current, "staff") && (
           <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1.4fr)_320px]">
             <div className="grid gap-3">
-              <div className="confirm-card rounded-xl border border-line bg-paper p-3 shadow-sm">
+              <Reveal className="confirm-card rounded-xl border border-line bg-paper p-3 shadow-sm">
                 <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <input
                     value={peopleQuery}
@@ -1184,7 +1194,7 @@ export function Workspace() {
                     ))}
                   </div>
                 </div>
-              </div>
+              </Reveal>
               <div className="grid gap-3 sm:grid-cols-2">
               {store.people
                 .filter((person) => {
@@ -1193,7 +1203,7 @@ export function Workspace() {
                   return (!peopleQuery || haystack.includes(peopleQuery.toLowerCase())) && (peopleStatus === "all" || person.status === peopleStatus);
                 })
                  .map((person) => (
-                <Card key={person.id} radius="section" elevation="sm" padding="md" className="confirm-card overflow-visible transition hover:-translate-y-0.5 hover:shadow-md">
+                <Card key={person.id} radius="section" elevation="sm" padding="md" className="confirm-card overflow-visible">
                   <div className="flex items-start justify-between gap-3">
                     <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => setProfilePersonId(person.id)}>
                       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-sage text-[11px] font-extrabold text-accent">{initials(person.fullName)}</span>
@@ -2165,9 +2175,11 @@ function Stat({ icon, tone, label, value, note, onClick, active }: { icon: React
     slate: "bg-status-slate-bg text-status-slate-fg",
     violet: "bg-status-violet-bg text-status-violet-fg",
   }[tone];
+  const reduce = useReducedMotion();
   return (
-    <article
-      className={cn("confirm-card confirm-stat min-h-32 rounded-2xl border border-line bg-paper p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5", onClick && "cursor-pointer", active && "border-accent bg-sage/50 ring-1 ring-accent/20")}
+    <motion.article
+      variants={reduce ? undefined : staggerItem}
+      className={cn("confirm-card confirm-stat min-h-32 rounded-2xl border border-line bg-paper p-4 shadow-sm sm:p-5", onClick && "cursor-pointer", active && "border-accent bg-sage/50 ring-1 ring-accent/20")}
       onClick={onClick}
       onKeyDown={(event) => { if (onClick && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onClick(); } }}
       role={onClick ? "button" : undefined}
@@ -2179,7 +2191,7 @@ function Stat({ icon, tone, label, value, note, onClick, active }: { icon: React
       </div>
       <p className="mt-4 text-[11px] font-bold text-ink">{label}</p>
       <small className="mt-1 block text-[10px] leading-relaxed text-muted">{note}</small>
-    </article>
+    </motion.article>
   );
 }
 
@@ -2324,7 +2336,7 @@ function AgreementQueue({
   }, [filterKey]);
   const paged = pageSlice(items, page);
   return (
-    <section className="confirm-card overflow-hidden rounded-xl border border-line bg-paper">
+    <Reveal as="section" className="confirm-card overflow-hidden rounded-xl border border-line bg-paper">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
           <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Records</p>
@@ -2400,7 +2412,7 @@ function AgreementQueue({
           />
         </div>
       )}
-    </section>
+    </Reveal>
   );
 }
 
