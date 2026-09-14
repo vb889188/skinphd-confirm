@@ -700,7 +700,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (state.signatures.some((item) => item.agreementId === agreementId && item.role === role && item.outcome === "signed")) {
           throw new Error("This role has already signed");
         }
-        const issued = await issuePersonalLinkOnServer(agreementId, role, agreement);
+        const issued = await issuePersonalLinkOnServer(agreementId, role);
         const event = {
           id: randomId("AUD"),
           agreementId,
@@ -740,7 +740,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             throw new Error(err instanceof Error ? `The pack was not stored: ${err.message}` : "The pack was not stored on the server.");
           }
         }
-        const issued = await issuePersonalLinkOnServer(agreementId, role, agreement);
+        const issued = await issuePersonalLinkOnServer(agreementId, role);
         const event = {
           id: randomId("AUD"),
           agreementId,

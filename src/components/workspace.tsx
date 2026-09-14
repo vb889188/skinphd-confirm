@@ -431,29 +431,39 @@ export function Workspace({ signToken }: { signToken?: string }) {
       setShowCreate(false);
       setView("agreements");
       setSelectedId(id);
+      setSaving(false);
       const created = useWorkspace.getState().agreements.find((item) => item.id === id);
       const franchisee = store.people.find((person) => person.id === String(values.managerId));
       const employee = store.people.find((person) => person.id === String(values.employeeId));
-      const notes: string[] = ["Pack issued."];
-      if (employee?.email && created) {
-        const copy = await useWorkspace.getState().issueSignCode(id, "employee");
-        const pack = buildEmployeeMail(useWorkspace.getState(), created, confirmSiteUrl(), packSignUrl(copy.token));
-        const sent = await deliverMail(pack);
-        notes.push(sent === "sent" ? `Employee emailed at ${employee.email}.` : "Finish the employee email in your mail app.");
-      }
-      if (franchisee?.email && created) {
-        const sent = await deliverMail(
-          buildFranchiseeIssuedMail({
-            toName: franchisee.fullName,
-            toEmail: franchisee.email,
-            title: created.title,
-            employeeName: employee?.fullName ?? "Employee",
-            siteUrl: confirmSiteUrl(),
-          }),
-        );
-        if (sent === "sent") notes.push("Franchisee notified.");
-      }
-      toast.success(notes.join(" "));
+      toast.success("Pack issued. Sending the employee signing link…");
+      void (async () => {
+        const notes: string[] = [];
+        try {
+          if (employee?.email && created) {
+            const copy = await useWorkspace.getState().issueSignCode(id, "employee");
+            const pack = buildEmployeeMail(useWorkspace.getState(), created, confirmSiteUrl(), packSignUrl(copy.token));
+            const sent = await deliverMail(pack, { compose: false });
+            notes.push(sent === "sent" ? `Employee emailed at ${employee.email}.` : "Pack issued. Use Email employee pack if the mail did not arrive.");
+          }
+          if (franchisee?.email && created) {
+            const sent = await deliverMail(
+              buildFranchiseeIssuedMail({
+                toName: franchisee.fullName,
+                toEmail: franchisee.email,
+                title: created.title,
+                employeeName: employee?.fullName ?? "Employee",
+                siteUrl: confirmSiteUrl(),
+              }),
+              { compose: false },
+            );
+            if (sent === "sent") notes.push("Franchisee notified.");
+          }
+          if (notes.length) toast.success(notes.join(" "));
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Pack is issued. Use Email employee pack if the mail did not go out.");
+        }
+      })();
+      return;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the agreement");
     } finally {

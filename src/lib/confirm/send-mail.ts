@@ -21,6 +21,9 @@ export const sendMailFn = createServerFn({ method: "POST" })
       port,
       secure,
       auth: { user, pass },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 12000,
     });
     const publicUrl = (process.env.CONFIRM_PUBLIC_URL || process.env.MAIL_LOGO_URL || "https://confirm.relpdev.uk").replace(/\/$/, "");
     const hostedLogo = `${publicUrl}/skinphd-logo.png`;
@@ -51,14 +54,19 @@ export const sendMailFn = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-export async function deliverMail(mail: EmployeeMail): Promise<"sent" | "compose"> {
+export async function deliverMail(mail: EmployeeMail, opts?: { compose?: boolean }): Promise<"sent" | "compose"> {
   if (!mail.to) return "compose";
   try {
-    const result = await sendMailFn({ data: mail });
+    const result = await Promise.race([
+      sendMailFn({ data: mail }),
+      new Promise<{ ok: false; reason: string }>((resolve) => {
+        window.setTimeout(() => resolve({ ok: false, reason: "timeout" }), 15000);
+      }),
+    ]);
     if (result.ok) return "sent";
   } catch {
     // Fall back to the mail app so Head Office can still send.
   }
-  window.location.href = employeeMailHref(mail);
+  if (opts?.compose !== false) window.location.href = employeeMailHref(mail);
   return "compose";
 }
