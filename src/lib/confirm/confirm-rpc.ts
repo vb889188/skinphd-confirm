@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { sha256Hex } from "./crypto";
+import { randomId, randomToken, sha256Hex } from "./crypto";
 import { bumpConfirmLive } from "./live-bus";
+import { CONFIRM_TENANT_ID } from "./remote-shared";
 import type { Person } from "./types";
 
 type SessionPayload = {
@@ -271,6 +272,79 @@ export const confirmRestFn = createServerFn({ method: "POST" })
     } catch (err) {
       return { ok: false as const, error: err instanceof Error ? err.message : "Database request failed" };
     }
+  });
+
+export const issuePersonalLinkFn = createServerFn({ method: "POST" })
+  .validator((data: { session: string; agreementId: string; role: "employee" | "manager" | "witness" }) => data)
+  .handler(async ({ data }) => {
+    const session = await verifySession(data.session, supabaseConfig().secret);
+    if (!session) return { ok: false as const, error: "Sign in first." };
+    const agreements = await dataRest<Array<{
+      id: string;
+      employee_id: string;
+      manager_id: string;
+      witness_id: string | null;
+      status: string;
+    }>>(`confirm_agreements?id=eq.${encodeURIComponent(data.agreementId)}&select=id,employee_id,manager_id,witness_id,status`);
+    const agreement = agreements[0];
+    if (!agreement) return { ok: false as const, error: "That pack is not on the server." };
+    if (agreement.status === "declined" || agreement.status === "superseded") {
+      return { ok: false as const, error: "This pack is closed. Head Office can reissue a new freeze." };
+    }
+    const signerId =
+      data.role === "manager" ? agreement.manager_id : data.role === "witness" ? agreement.witness_id : agreement.employee_id;
+    if (!signerId) return { ok: false as const, error: "That role is not on this pack." };
+    const people = await dataRest<Array<{ id: string; email: string; full_name: string }>>(
+      `confirm_people?id=eq.${encodeURIComponent(signerId)}&select=id,email,full_name`,
+    );
+    const person = people[0];
+    if (!person?.email) return { ok: false as const, error: "That signer has no work email." };
+    const token = randomToken();
+    const tokenHash = await sha256Hex(token);
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    const link = {
+      id: randomId("LNK"),
+      agreementId: agreement.id,
+      signerId: person.id,
+      role: data.role,
+      tokenHash,
+      status: "pending" as const,
+      expiresAt,
+      consumedAt: null,
+      createdBy: session.personId,
+      createdAt: now,
+    };
+    try {
+      await dataRest("confirm_signing_links?on_conflict=id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({
+          id: link.id,
+          tenant_id: CONFIRM_TENANT_ID,
+          agreement_id: agreement.id,
+          payload: link,
+          created_at: now,
+        }),
+      });
+      await dataRest("confirm_audit?on_conflict=id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({
+          id: randomId("AUD"),
+          tenant_id: CONFIRM_TENANT_ID,
+          agreement_id: agreement.id,
+          actor: person.full_name,
+          action: "Personal link issued",
+          detail: `A personal link was stored for ${person.full_name} (${data.role}).`,
+          created_at: now,
+        }),
+      });
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : "The personal link could not be stored." };
+    }
+    bumpConfirmLive();
+    return { ok: true as const, token, email: person.email, expiresAt, link };
   });
 
 export async function allowConfirmLive(session?: string, linkToken?: string) {

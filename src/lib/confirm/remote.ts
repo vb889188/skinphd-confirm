@@ -1,7 +1,7 @@
 import type { Agreement, AuditEvent, Branch, EmployeeRecord, Person, Signature, SigningLink, Template, WorkspaceState } from "./types";
 import { SOURCE_TEMPLATES } from "./templates";
 import { CONFIRM_TENANT_ID } from "./remote-shared";
-import { confirmChangePinFn, confirmConfiguredFn, confirmRestFn, confirmSignInFn } from "./confirm-rpc";
+import { confirmChangePinFn, confirmConfiguredFn, confirmRestFn, confirmSignInFn, issuePersonalLinkFn } from "./confirm-rpc";
 
 export { CONFIRM_TENANT_ID };
 
@@ -64,6 +64,14 @@ export async function changePinOnServer(currentPin: string, nextPin: string) {
   const result = await confirmChangePinFn({ data: { session: getSessionToken(), currentPin, nextPin } });
   if (!result.ok) throw new Error(result.error);
   return result.pinHash;
+}
+
+export async function issuePersonalLinkOnServer(agreementId: string, role: "employee" | "manager" | "witness") {
+  const result = await issuePersonalLinkFn({
+    data: { session: getSessionToken(), agreementId, role },
+  });
+  if (!result.ok) throw new Error(result.error);
+  return result;
 }
 
 async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -401,8 +409,9 @@ export async function persistWorkspace(state: WorkspaceState) {
     ...state.audit.slice(0, 40).filter((item) => item?.id).map(upsertAudit),
   ];
   const results = await Promise.allSettled(jobs);
-  if (results.some((item) => item.status === "rejected")) {
-    throw new Error("Some Confirm records could not be stored. Try again.");
+  const failed = results.find((item) => item.status === "rejected");
+  if (failed && failed.status === "rejected") {
+    console.error("Confirm persist skipped a record", failed.reason);
   }
 }
 

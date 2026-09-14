@@ -11,7 +11,7 @@ import {
   requiredSignatureCount,
 } from "./rules";
 import type { Agreement, AuditEvent, EmployeeRecord, Person, Role, Signature, SigningLink, Snapshot, Template, WorkspaceState } from "./types";
-import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile, upsertLink, upsertAudit } from "./remote";
+import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile, issuePersonalLinkOnServer } from "./remote";
 import { requireCapability } from "./access";
 import { recognizeDocument } from "./ocr";
 
@@ -693,42 +693,18 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (state.signatures.some((item) => item.agreementId === agreementId && item.role === role && item.outcome === "signed")) {
           throw new Error("This role has already signed");
         }
-        const now = new Date();
-        const token = randomToken();
-        const tokenHash = await sha256Hex(token);
-        const expiresAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
-        const link = {
-          id: randomId("LNK"),
-          agreementId,
-          signerId: signer.id,
-          role,
-          tokenHash,
-          status: "pending" as const,
-          expiresAt,
-          consumedAt: null,
-          createdBy: ACTOR,
-          createdAt: now.toISOString(),
-        };
+        const issued = await issuePersonalLinkOnServer(agreementId, role);
         const event = {
           id: randomId("AUD"),
           agreementId,
           actor: ACTOR,
           action: "Signing link issued",
-          detail: `Workspace signing link issued for ${role} (${signer.name}). Token ending ${token.slice(-4)}.`,
-          createdAt: now.toISOString(),
+          detail: `Workspace signing link issued for ${role} (${signer.name}). Token ending ${issued.token.slice(-4)}.`,
+          createdAt: issued.link.createdAt,
         };
-        const links = state.links.map((item) =>
-          item.agreementId === agreementId && item.role === role && item.status === "pending"
-            ? { ...item, status: "revoked" as const }
-            : item,
-        );
-        set({ links: [link, ...links], audit: [event, ...state.audit] });
-        if (remoteEnabled()) {
-          await upsertLink(link);
-          await upsertAudit(event);
-        }
+        set({ links: [issued.link, ...state.links], audit: [event, ...state.audit] });
         persistLive(get());
-        return { token, expiresAt };
+        return { token: issued.token, expiresAt: issued.expiresAt };
       },
       issueSignCode: async (agreementId, role) => {
         const state = get();
@@ -750,48 +726,20 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (!alreadySigned && !canSign(agreement.status)) {
           throw new Error("A personal link cannot be issued for this status");
         }
-        const now = new Date();
-        const token = randomToken();
-        const tokenHash = await sha256Hex(token);
-        const expiresAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
-        const link = {
-          id: randomId("LNK"),
-          agreementId,
-          signerId: signer.id,
-          role,
-          tokenHash,
-          status: "pending" as const,
-          expiresAt,
-          consumedAt: null,
-          createdBy: ACTOR,
-          createdAt: now.toISOString(),
-        };
+        const issued = await issuePersonalLinkOnServer(agreementId, role);
         const event = {
           id: randomId("AUD"),
           agreementId,
           actor: ACTOR,
           action: alreadySigned ? "Personal copy link issued" : "Personal link issued",
           detail: alreadySigned
-            ? `A copy link was prepared for ${signer.name} so they can open the pack they signed. This is not a PIN.`
-            : `A personal link was prepared for ${signer.name} (${role}). They can sign from home, or open this same link later for their copy. This is not a PIN.`,
-          createdAt: now.toISOString(),
+            ? `A copy link was stored for ${signer.name} so they can open the pack they signed.`
+            : `A personal link was stored for ${signer.name} (${role}). They can sign from home, or open this same link later for their copy.`,
+          createdAt: issued.link.createdAt,
         };
-        const links = state.links.map((item) =>
-          item.agreementId === agreementId && item.role === role && item.status === "pending"
-            ? { ...item, status: "revoked" as const }
-            : item,
-        );
-        set({ links: [link, ...links], audit: [event, ...state.audit] });
-        if (remoteEnabled()) {
-          try {
-            await upsertLink(link);
-            await upsertAudit(event);
-          } catch {
-            throw new Error("The personal link could not be stored. The email was not sent. Try again.");
-          }
-        }
+        set({ links: [issued.link, ...state.links], audit: [event, ...state.audit] });
         persistLive(get());
-        return { token, email: person.email, expiresAt };
+        return { token: issued.token, email: issued.email, expiresAt: issued.expiresAt };
       },
       openAgreement: (agreementId, surface = "workspace") => {
         const state = get();

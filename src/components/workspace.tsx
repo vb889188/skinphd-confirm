@@ -2716,19 +2716,17 @@ function Detail({
                 onClick={() => {
                   void (async () => {
                     const origin = confirmSiteUrl();
-                    let packUrl: string | undefined;
                     try {
                       const copy = await useWorkspace.getState().issueSignCode(agreement.id, "employee");
-                      packUrl = packSignUrl(copy.token);
-                    } catch {
-                      /* still send the notice */
+                      const pack = buildEmployeeMail(useWorkspace.getState(), agreement, origin, undefined, packSignUrl(copy.token));
+                      if (!pack.to) throw new Error("That employee has no work email.");
+                      recordEmail(agreement.id, pack.to);
+                      const sent = await deliverMail(pack);
+                      setPackPreview(false);
+                      toast.success(sent === "sent" ? `Pack emailed to ${pack.to}.` : "Finish the pack email in your mail app.");
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "The pack email was not sent.");
                     }
-                    const pack = buildEmployeeMail(useWorkspace.getState(), agreement, origin, undefined, packUrl);
-                    if (!pack.to) return;
-                    recordEmail(agreement.id, pack.to);
-                    const sent = await deliverMail(pack);
-                    setPackPreview(false);
-                    toast.success(sent === "sent" ? `Pack emailed to ${pack.to}.` : "Finish the pack email in your mail app.");
                   })();
                 }}
               >
