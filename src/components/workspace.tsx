@@ -220,7 +220,7 @@ const toneClass: Record<string, string> = {
   slate: "bg-status-slate-bg text-status-slate-fg",
 };
 
-export function Workspace() {
+export function Workspace({ signToken }: { signToken?: string }) {
   const store = useWorkspace();
   const reduceMotion = useReducedMotion();
   const { expireSessionIfNeeded, hydrateRemote } = store;
@@ -673,8 +673,7 @@ export function Workspace() {
   };
 
   if (!current) {
-    const personalToken = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("sign");
-    if (personalToken) return <PersonalLinkSign token={personalToken} />;
+    if (signToken) return <PersonalLinkSign token={signToken} />;
     return (
       <WorkspaceGate
         onEnter={async (email, pin) => {
@@ -3226,18 +3225,11 @@ function PersonalLinkSign({ token }: { token: string }) {
       }
     };
     void pull();
-    const stopLive = startConfirmLive({
-      linkToken: token,
-      onChange: () => {
-        if (!document.hidden) void pull();
-      },
-    });
     const timer = window.setInterval(() => {
       if (!document.hidden) void pull();
     }, 30_000);
     return () => {
       cancelled = true;
-      stopLive();
       window.clearInterval(timer);
     };
   }, [token]);
@@ -3250,6 +3242,16 @@ function PersonalLinkSign({ token }: { token: string }) {
       agreement &&
       store.signatures.some((item) => item.agreementId === agreement.id && item.role === link.role && item.outcome === "signed"),
   );
+
+  useEffect(() => {
+    if (!link) return;
+    return startConfirmLive({
+      linkToken: token,
+      onChange: () => {
+        if (!document.hidden) void useWorkspace.getState().hydrateRemote();
+      },
+    });
+  }, [token, link?.id]);
 
   useEffect(() => {
     if (agreement) useWorkspace.getState().openAgreement(agreement.id, "personal_link");

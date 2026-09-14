@@ -37,10 +37,10 @@ export function Card({ className, padding, elevation, radius, children, ...props
   return (
     <motion.div
       className={cn(cardVariants({ padding, elevation, radius }), className)}
-      initial={reduce ? false : { opacity: 0, y: 16, filter: "blur(4px)" }}
-      whileInView={reduce ? undefined : { opacity: 1, y: 0, filter: "blur(0px)" }}
-      viewport={{ once: true, amount: 0.12, margin: "0px 0px -24px 0px" }}
-      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+      initial={false}
+      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       {...props}
     >
       {children}

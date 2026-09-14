@@ -903,7 +903,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             const who = input.role === "manager" ? "franchisee" : input.role;
             throw new Error(`This personal link is not valid for the ${who}. Head Office can send a new one.`);
           }
-          if (link.status === "consumed") throw new Error("This signing link has already been used");
+          if (link.status === "consumed") throw new Error("This pack already has your signature. Open the same link to view your copy.");
           if (link.status === "revoked" || link.status === "declined") throw new Error("This signing link is no longer valid");
           if (link.status !== "pending") {
             throw new Error("This signing link is no longer valid");

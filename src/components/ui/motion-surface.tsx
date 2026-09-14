@@ -19,8 +19,8 @@ export function Reveal({ as = "div", className, delay = 0, children, ...props }:
   return (
     <Comp
       className={cn(className)}
-      initial={reduce ? false : { opacity: 0, y: 18, filter: "blur(4px)" }}
-      whileInView={reduce ? undefined : { opacity: 1, y: 0, filter: "blur(0px)" }}
+      initial={reduce ? false : { opacity: 0, y: 18 }}
+      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.12, margin: "0px 0px -28px 0px" }}
       transition={{ duration: 0.48, delay, ease }}
       {...props}
@@ -38,11 +38,10 @@ export const staggerContainer = {
 };
 
 export const staggerItem = {
-  hidden: { opacity: 0, y: 18, filter: "blur(4px)" },
+  hidden: { opacity: 0, y: 18 },
   show: {
     opacity: 1,
     y: 0,
-    filter: "blur(0px)",
     transition: { duration: 0.45, ease },
   },
 };
