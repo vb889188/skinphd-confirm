@@ -86,7 +86,15 @@ function getPool() {
 export async function ensureConfirmSchema() {
   if (!databaseUrl()) return;
   if (!ready) {
-    ready = getPool().query(SCHEMA_SQL).then(() => undefined);
+    ready = (async () => {
+      const client = getPool();
+      await client.query(SCHEMA_SQL);
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS confirm_signatures_one_signed_role
+          ON confirm_signatures (agreement_id, (payload->>'role'))
+          WHERE payload->>'outcome' = 'signed'
+      `);
+    })();
   }
   await ready;
 }

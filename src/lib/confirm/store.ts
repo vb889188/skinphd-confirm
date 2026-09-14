@@ -49,12 +49,13 @@ function mergeRemote(local: WorkspaceState, remote: Pick<WorkspaceState, "branch
 }
 
 let persistQueue: Promise<void> = Promise.resolve();
+function bumpDesk() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("confirm-live"));
+}
 function persistLive(state: WorkspaceState) {
   persistQueue = persistQueue
     .then(() => persistWorkspace(state))
-    .then(() => {
-      if (typeof window !== "undefined") window.dispatchEvent(new Event("confirm-live"));
-    })
+    .then(() => bumpDesk())
     .catch(() => undefined);
 }
 
@@ -885,7 +886,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
                 ...state.audit,
               ],
             });
-            persistLive(get());
+            bumpDesk();
             return "declined";
           }
           set({
@@ -984,7 +985,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
               ...state.audit,
             ],
           });
-          persistLive(get());
+          bumpDesk();
           return status;
         }
         const signatures = [

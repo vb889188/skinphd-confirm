@@ -454,7 +454,6 @@ export async function persistWorkspace(state: WorkspaceState) {
   if (me) setRemoteActor(me);
   const jobs = [
     ...state.agreements.map(upsertAgreement),
-    ...state.signatures.filter((item) => item?.id).map(upsertSignature),
     ...state.links.filter((item) => item?.id && item.tokenHash).map(upsertLink),
     ...state.audit.slice(0, 20).filter((item) => item?.id).map(upsertAudit),
   ];
