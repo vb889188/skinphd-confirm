@@ -276,7 +276,6 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         try {
           const remote = await loadRemoteWorkspace();
           set(mergeRemote(get(), remote));
-          if (get().currentPersonId) persistLive(get());
           return "remote";
         } catch {
           return "unavailable";
@@ -1018,6 +1017,20 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
     }),
-    { name: "skinphd-confirm.workspace.v11" },
+    {
+      name: "skinphd-confirm.workspace.v11",
+      partialize: (state) => ({
+        currentPersonId: state.currentPersonId,
+        sessionStartedAt: state.sessionStartedAt,
+        branches: state.branches,
+        people: state.people,
+        templates: state.templates,
+        records: state.records,
+        agreements: [],
+        signatures: [],
+        links: [],
+        audit: [],
+      }),
+    },
   ),
 );
