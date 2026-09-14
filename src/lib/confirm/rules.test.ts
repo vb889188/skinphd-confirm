@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canSign, namesMatch, nextStatus, requiredFieldErrors, requiredSignatureCount } from "./rules.ts";
+import { assertSigningOrder, canSign, namesMatch, nextStatus, requiredFieldErrors, requiredSignatureCount } from "./rules.ts";
 
 test("create validation requires operational fields", () => {
   assert.equal(requiredFieldErrors({}).length, 6);
@@ -30,4 +30,12 @@ test("witness increases required signatures and status follows counts", () => {
 test("typed names must match official seeded names", () => {
   assert.equal(namesMatch("  Lerato   Mokoena ", "Lerato Mokoena"), true);
   assert.equal(namesMatch("Amelia Naidoo", "Lerato Mokoena"), false);
+});
+
+test("employee must sign before franchisee and witness", () => {
+  const required = ["employee", "manager", "witness"] as const;
+  assert.doesNotThrow(() => assertSigningOrder("employee", [...required], []));
+  assert.throws(() => assertSigningOrder("manager", [...required], []), /employee must sign/);
+  assert.throws(() => assertSigningOrder("witness", [...required], ["employee"]), /franchisee must sign/);
+  assert.doesNotThrow(() => assertSigningOrder("witness", [...required], ["employee", "manager"]));
 });

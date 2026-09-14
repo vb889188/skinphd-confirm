@@ -113,12 +113,28 @@ function orderSql(order?: string | null) {
   return ` ORDER BY ${ident(col)} ${direction}`;
 }
 
+function headerMap(init: RequestInit): Record<string, string> {
+  const raw = init.headers;
+  if (!raw) return {};
+  if (raw instanceof Headers) return Object.fromEntries(raw.entries());
+  return raw as Record<string, string>;
+}
+
+function clinicScope(init: RequestInit): { org: boolean; branchId: string } | null {
+  const headers = headerMap(init);
+  const scope = (headers["x-confirm-scope"] || headers["X-Confirm-Scope"] || "").trim();
+  const branchId = (headers["x-confirm-branch"] || headers["X-Confirm-Branch"] || "").trim();
+  if (!scope || !branchId) return null;
+  return { org: scope === "organisation", branchId };
+}
+
 export async function localRest<T>(path: string, init: RequestInit = {}): Promise<T> {
   await ensureConfirmSchema();
   const method = (init.method || "GET").toUpperCase();
   const parsed = parsePath(path);
   const client = getPool();
-  const prefer = String((init.headers as Record<string, string> | undefined)?.Prefer || "");
+  const prefer = headerMap(init).Prefer || headerMap(init).prefer || "";
+  const clinic = clinicScope(init);
 
   if (method === "GET") {
     const values: unknown[] = [];
@@ -126,6 +142,24 @@ export async function localRest<T>(path: string, init: RequestInit = {}): Promis
       values.push(filter.value);
       return `${ident(filter.col)} = $${values.length}`;
     });
+    if (clinic && !clinic.org) {
+      if (parsed.table === "confirm_agreements" || parsed.table === "confirm_people") {
+        values.push(clinic.branchId);
+        where.push(`${ident("clinic_id")} = $${values.length}`);
+      } else if (parsed.table === "confirm_clinics") {
+        values.push(clinic.branchId);
+        where.push(`${ident("id")} = $${values.length}`);
+      } else if (parsed.table === "confirm_signatures" || parsed.table === "confirm_signing_links" || parsed.table === "confirm_audit") {
+        values.push(clinic.branchId);
+        where.push(`agreement_id IN (SELECT id FROM confirm_agreements WHERE clinic_id = $${values.length})`);
+      } else if (parsed.table === "confirm_employee_records") {
+        values.push(clinic.branchId);
+        where.push(`person_id IN (SELECT id FROM confirm_people WHERE clinic_id = $${values.length})`);
+      } else if (parsed.table === "confirm_source_files") {
+        values.push(clinic.branchId);
+        where.push(`(agreement_id IS NULL OR agreement_id IN (SELECT id FROM confirm_agreements WHERE clinic_id = $${values.length}))`);
+      }
+    }
     const sql = `SELECT ${parsed.columns} FROM ${ident(parsed.table)}${where.length ? ` WHERE ${where.join(" AND ")}` : ""}${orderSql(parsed.order)}`;
     const result = await client.query(sql, values);
     return result.rows as T;
@@ -134,6 +168,10 @@ export async function localRest<T>(path: string, init: RequestInit = {}): Promis
   const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
   const keys = Object.keys(body).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key));
   if (!keys.length) return undefined as T;
+
+  if (clinic && !clinic.org) {
+    await assertClinicMutation(client, parsed.table, parsed.filters, body, clinic.branchId);
+  }
 
   if (method === "PATCH") {
     const values: unknown[] = [];
@@ -145,6 +183,10 @@ export async function localRest<T>(path: string, init: RequestInit = {}): Promis
       values.push(filter.value);
       return `${ident(filter.col)} = $${values.length}`;
     });
+    if (clinic && !clinic.org && parsed.table === "confirm_agreements") {
+      values.push(clinic.branchId);
+      where.push(`${ident("clinic_id")} = $${values.length}`);
+    }
     await client.query(
       `UPDATE ${ident(parsed.table)} SET ${sets.join(", ")}${where.length ? ` WHERE ${where.join(" AND ")}` : ""}`,
       values,
@@ -164,4 +206,47 @@ export async function localRest<T>(path: string, init: RequestInit = {}): Promis
     : `INSERT INTO ${ident(parsed.table)} (${keys.map(ident).join(", ")}) VALUES (${placeholders.join(", ")})`;
   await client.query(sql, values);
   return undefined as T;
+}
+
+async function assertClinicMutation(
+  client: pg.Pool,
+  table: string,
+  filters: { col: string; value: string }[],
+  body: Record<string, unknown>,
+  branchId: string,
+) {
+  if (table === "confirm_templates" || table === "confirm_clinics") {
+    throw new Error("That change is limited to Head Office.");
+  }
+  if (table === "confirm_agreements") {
+    const clinicId = String(body.clinic_id ?? "");
+    if (clinicId && clinicId !== branchId) throw new Error("That pack belongs to another clinic.");
+    const id = String(body.id ?? filters.find((item) => item.col === "id")?.value ?? "");
+    if (id) {
+      const existing = await client.query("SELECT clinic_id FROM confirm_agreements WHERE id = $1", [id]);
+      if (existing.rows[0] && existing.rows[0].clinic_id !== branchId) {
+        throw new Error("That pack belongs to another clinic.");
+      }
+    }
+  }
+  if (table === "confirm_people") {
+    const clinicId = String(body.clinic_id ?? "");
+    if (clinicId && clinicId !== branchId) throw new Error("That staff record belongs to another clinic.");
+    const id = String(body.id ?? filters.find((item) => item.col === "id")?.value ?? "");
+    if (id) {
+      const existing = await client.query("SELECT clinic_id FROM confirm_people WHERE id = $1", [id]);
+      if (existing.rows[0] && existing.rows[0].clinic_id !== branchId) {
+        throw new Error("That staff record belongs to another clinic.");
+      }
+    }
+  }
+  if (table === "confirm_signatures" || table === "confirm_signing_links" || table === "confirm_audit") {
+    const agreementId = String(body.agreement_id ?? filters.find((item) => item.col === "agreement_id")?.value ?? "");
+    if (agreementId) {
+      const existing = await client.query("SELECT clinic_id FROM confirm_agreements WHERE id = $1", [agreementId]);
+      if (existing.rows[0] && existing.rows[0].clinic_id !== branchId) {
+        throw new Error("That pack belongs to another clinic.");
+      }
+    }
+  }
 }

@@ -18,7 +18,12 @@ function supabaseConfig() {
     url: (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || vite.VITE_SUPABASE_URL || "").trim(),
     key: (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || vite.VITE_SUPABASE_ANON_KEY || "").trim(),
     workspace: (process.env.CONFIRM_WORKSPACE_KEY || process.env.VITE_CONFIRM_WORKSPACE_KEY || vite.VITE_CONFIRM_WORKSPACE_KEY || "").trim(),
-    secret: (process.env.CONFIRM_SESSION_SECRET || process.env.CONFIRM_WORKSPACE_KEY || process.env.VITE_CONFIRM_WORKSPACE_KEY || vite.VITE_CONFIRM_WORKSPACE_KEY || "confirm-dev-session").trim(),
+    secret: (
+      process.env.CONFIRM_SESSION_SECRET ||
+      process.env.SESSION_SECRET ||
+      (process.env.DATABASE_URL ? `confirm-db:${process.env.DATABASE_URL}` : "") ||
+      ""
+    ).trim(),
   };
 }
 
@@ -35,6 +40,7 @@ function decodeJson<T>(value: string): T {
 }
 
 async function signPayload(payload: SessionPayload, secret: string) {
+  if (!secret) throw new Error("CONFIRM_SESSION_SECRET is not configured");
   const body = encodeJson(payload);
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
@@ -42,7 +48,7 @@ async function signPayload(payload: SessionPayload, secret: string) {
 }
 
 async function verifySession(token: string | undefined, secret: string): Promise<SessionPayload | null> {
-  if (!token || !token.includes(".")) return null;
+  if (!secret || !token || !token.includes(".")) return null;
   const [body, signature] = token.split(".");
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const expected = toHex(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body))));
@@ -122,6 +128,26 @@ function filterLinkRows(path: string, rows: unknown, link: { agreement: Agreemen
     return rows.filter((row) => (row as { agreement_id?: string }).agreement_id === agreement.id);
   }
   return [];
+}
+
+function sessionHeaders(session: SessionPayload, extra?: Record<string, string>): Record<string, string> {
+  return {
+    "x-confirm-person": session.personId,
+    "x-confirm-role": session.role,
+    "x-confirm-scope": session.scope,
+    "x-confirm-branch": session.branchId,
+    ...(extra ?? {}),
+  };
+}
+
+function filterSessionRows(path: string, rows: unknown, session: SessionPayload) {
+  if (!Array.isArray(rows) || session.scope === "organisation") return rows;
+  if (path.startsWith("confirm_agreements")) return rows.filter((row) => (row as { clinic_id?: string }).clinic_id === session.branchId);
+  if (path.startsWith("confirm_people")) {
+    return stripPeople(rows.filter((row) => (row as { clinic_id?: string }).clinic_id === session.branchId));
+  }
+  if (path.startsWith("confirm_clinics")) return rows.filter((row) => (row as { id?: string }).id === session.branchId);
+  return rows;
 }
 
 function bodyAgreementId(body?: string) {
@@ -246,12 +272,7 @@ export const confirmRestFn = createServerFn({ method: "POST" })
 
     const headers: Record<string, string> = {};
     if (data.prefer) headers.Prefer = data.prefer;
-    if (session) {
-      headers["x-confirm-person"] = session.personId;
-      headers["x-confirm-role"] = session.role;
-      headers["x-confirm-scope"] = session.scope;
-      headers["x-confirm-branch"] = session.branchId;
-    }
+    if (session) Object.assign(headers, sessionHeaders(session));
 
     try {
       const rows = await dataRest<unknown>(path, {
@@ -260,15 +281,11 @@ export const confirmRestFn = createServerFn({ method: "POST" })
         body: data.body && method !== "GET" ? data.body : undefined,
       });
       if (method !== "GET") bumpConfirmLive();
-      if (method === "GET" && path.startsWith("confirm_people")) {
-        const stripped = stripPeople(rows);
-        const filtered = link?.agreement ? filterLinkRows(path, stripped, { agreement: link.agreement }) : stripped;
-        return { ok: true as const, body: JSON.stringify(filtered ?? null) };
-      }
-      if (method === "GET" && link?.agreement) {
-        return { ok: true as const, body: JSON.stringify(filterLinkRows(path, rows, { agreement: link.agreement }) ?? null) };
-      }
-      return { ok: true as const, body: JSON.stringify(rows ?? null) };
+      let body: unknown = rows;
+      if (method === "GET" && path.startsWith("confirm_people")) body = stripPeople(rows);
+      if (method === "GET" && session) body = filterSessionRows(path, body, session);
+      if (method === "GET" && link?.agreement) body = filterLinkRows(path, body, { agreement: link.agreement });
+      return { ok: true as const, body: JSON.stringify(body ?? null) };
     } catch (err) {
       return { ok: false as const, error: err instanceof Error ? err.message : "Database request failed" };
     }
@@ -284,11 +301,15 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const session = await verifySession(data.session, supabaseConfig().secret);
     if (!session) return { ok: false as const, error: "Sign in first." };
+    const scoped = sessionHeaders(session, { Prefer: "resolution=merge-duplicates,return=minimal" });
     if (data.pack?.id === data.agreementId) {
+      if (session.scope !== "organisation" && data.pack.clinic_id && data.pack.clinic_id !== session.branchId) {
+        return { ok: false as const, error: "That pack belongs to another clinic." };
+      }
       try {
         await dataRest("confirm_agreements?on_conflict=id", {
           method: "POST",
-          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          headers: scoped,
           body: JSON.stringify(data.pack),
         });
       } catch (err) {
@@ -297,13 +318,19 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
     }
     const agreements = await dataRest<Array<{
       id: string;
+      clinic_id: string;
       employee_id: string;
       manager_id: string;
       witness_id: string | null;
       status: string;
-    }>>(`confirm_agreements?id=eq.${encodeURIComponent(data.agreementId)}&select=id,employee_id,manager_id,witness_id,status`);
+    }>>(`confirm_agreements?id=eq.${encodeURIComponent(data.agreementId)}&select=id,clinic_id,employee_id,manager_id,witness_id,status`, {
+      headers: sessionHeaders(session),
+    });
     const agreement = agreements[0];
     if (!agreement) return { ok: false as const, error: "That pack is not on the server." };
+    if (session.scope !== "organisation" && agreement.clinic_id !== session.branchId) {
+      return { ok: false as const, error: "That pack belongs to another clinic." };
+    }
     if (agreement.status === "declined" || agreement.status === "superseded") {
       return { ok: false as const, error: "This pack is closed. Head Office can reissue a new freeze." };
     }
@@ -334,7 +361,7 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
     try {
       await dataRest("confirm_signing_links?on_conflict=id", {
         method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        headers: scoped,
         body: JSON.stringify({
           id: link.id,
           tenant_id: CONFIRM_TENANT_ID,
@@ -345,7 +372,7 @@ export const issuePersonalLinkFn = createServerFn({ method: "POST" })
       });
       await dataRest("confirm_audit?on_conflict=id", {
         method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        headers: scoped,
         body: JSON.stringify({
           id: randomId("AUD"),
           tenant_id: CONFIRM_TENANT_ID,

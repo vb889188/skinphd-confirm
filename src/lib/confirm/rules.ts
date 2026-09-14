@@ -35,6 +35,18 @@ export function consentCopy(): string {
   return "I have read this pack and I intend this typed name to be my signature on it. This does not decide competence, treatment authorisation, payroll deductions, or legal enforceability.";
 }
 
+export const SIGN_ORDER: Role[] = ["employee", "manager", "witness"];
+
+export function assertSigningOrder(role: Role, required: Role[], signed: Role[]): void {
+  for (const prior of SIGN_ORDER) {
+    if (prior === role) return;
+    if (required.includes(prior) && !signed.includes(prior)) {
+      const who = prior === "manager" ? "franchisee" : prior;
+      const current = role === "manager" ? "franchisee" : role;
+      throw new Error(`The ${who} must sign before the ${current}.`);
+    }
+  }
+}
 export function assertAssigned(
   role: Role,
   signerId: string,

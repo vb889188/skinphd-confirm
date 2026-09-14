@@ -63,7 +63,8 @@ export function annotateSource(fileName: string, content: string): ExtractedSour
 
 function cleanExtractedText(value: string) {
   return value
-    .replace(/\u0000/g, "")
+    .split("\0")
+    .join("")
     .replace(/A black background with green and white letters[^\n]*/gi, "")
     .replace(/AI-generated content may be incorrect\.?/gi, "")
     .replace(/Text, logo\s+Description automatically generated/gi, "")

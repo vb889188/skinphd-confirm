@@ -1,16 +1,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { ACTOR, createSeed } from "./seed";
-import { randomId, randomToken, sha256Hex } from "./crypto";
+import { randomId, sha256Hex } from "./crypto";
 import {
   assertAssigned,
+  assertSigningOrder,
   canSign,
   namesMatch,
   nextStatus,
   requiredFieldErrors,
   requiredSignatureCount,
 } from "./rules";
-import type { Agreement, AuditEvent, EmployeeRecord, Person, Role, Signature, SigningLink, Snapshot, Template, WorkspaceState } from "./types";
+import type { Agreement, Role, Snapshot, WorkspaceState } from "./types";
 import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile, issuePersonalLinkOnServer, upsertAgreement, upsertSignature } from "./remote";
 import { requireCapability } from "./access";
 import { recognizeDocument } from "./ocr";
@@ -783,10 +784,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         const agreement = state.agreements.find((item) => item.id === agreementId);
         if (!agreement) throw new Error("Agreement not found");
         requireCapability(actor(state), "issue", "Reissue a pack", agreement.branchId);
-        if (agreement.status !== "completed" && agreement.status !== "superseded" && agreement.status !== "declined") {
-          get().voidAgreement(agreementId, "Replaced by a new freeze");
-        }
-        return get().createAgreement({
+        const nextId = await get().createAgreement({
           title: agreement.title,
           activity: agreement.activity,
           branchId: agreement.branchId,
@@ -807,6 +805,11 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           equipmentSerial: agreement.snapshot.fields.equipmentSerial ?? undefined,
           additionalDescription: agreement.snapshot.fields.additionalDescription ?? undefined,
         });
+        const latest = get().agreements.find((item) => item.id === agreementId);
+        if (latest && latest.status !== "completed" && latest.status !== "superseded" && latest.status !== "declined") {
+          get().voidAgreement(agreementId, "Replaced by a new freeze");
+        }
+        return nextId;
       },
       captureSignature: async (input) => {
         const state = get();
@@ -912,6 +915,11 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (state.signatures.some((item) => item.agreementId === agreement.id && item.role === input.role && item.outcome === "signed")) {
           throw new Error(`${input.role} has already signed this agreement`);
         }
+        const requiredRoles = agreement.snapshot.signers.map((item) => item.role);
+        const signedRoles = state.signatures
+          .filter((item) => item.agreementId === agreement.id && item.outcome === "signed")
+          .map((item) => item.role);
+        assertSigningOrder(input.role, requiredRoles, signedRoles);
         const signatures = [
           ...state.signatures,
           {
