@@ -59,6 +59,9 @@ CREATE INDEX IF NOT EXISTS confirm_people_email ON confirm_people (email);
 CREATE INDEX IF NOT EXISTS confirm_agreements_updated ON confirm_agreements (updated_at DESC);
 CREATE INDEX IF NOT EXISTS confirm_links_agreement ON confirm_signing_links (agreement_id);
 CREATE INDEX IF NOT EXISTS confirm_signatures_agreement ON confirm_signatures (agreement_id);
+CREATE UNIQUE INDEX IF NOT EXISTS confirm_signatures_one_signed_role
+  ON confirm_signatures (agreement_id, (payload->>'role'))
+  WHERE payload->>'outcome' = 'signed';
 `;
 
 let pool: pg.Pool | null = null;
@@ -198,7 +201,15 @@ export async function localRest<T>(path: string, init: RequestInit = {}, actor?:
   const conflict = parsed.onConflict === "id" || prefer.includes("merge-duplicates");
   const updates = keys
     .filter((key) => key !== "id")
-    .map((key) => `${ident(key)} = EXCLUDED.${ident(key)}`)
+    .map((key) => {
+      if (parsed.table === "confirm_agreements" && key === "status") {
+        return `${ident(key)} = CASE
+          WHEN ${ident(parsed.table)}.status IN ('completed', 'declined', 'superseded') THEN ${ident(parsed.table)}.status
+          ELSE EXCLUDED.${ident(key)}
+        END`;
+      }
+      return `${ident(key)} = EXCLUDED.${ident(key)}`;
+    })
     .join(", ");
   const sql = conflict
     ? `INSERT INTO ${ident(parsed.table)} (${keys.map(ident).join(", ")}) VALUES (${placeholders.join(", ")}) ON CONFLICT (id) DO UPDATE SET ${updates}`
@@ -223,6 +234,8 @@ export async function recordDurableSignature(input: {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", ["confirm_agreements", input.agreementId]);
     const agr = await client.query(
       "SELECT id, clinic_id, status, required_signatures, snapshot, snapshot_json FROM confirm_agreements WHERE id = $1 FOR UPDATE",
       [input.agreementId],
@@ -239,7 +252,10 @@ export async function recordDurableSignature(input: {
       throw new Error("This pack is not open for signatures");
     }
     const snapshot = (row.snapshot ?? (row.snapshot_json ? JSON.parse(row.snapshot_json) : { signers: [] })) as Snapshot;
-    const sigs = await client.query("SELECT payload FROM confirm_signatures WHERE agreement_id = $1", [input.agreementId]);
+    const sigs = await client.query(
+      "SELECT payload FROM confirm_signatures WHERE agreement_id = $1 FOR UPDATE",
+      [input.agreementId],
+    );
     const existing = sigs.rows.map((item) => item.payload as Signature);
     if (existing.some((item) => item.role === input.signature.role && item.outcome === "signed")) {
       throw new Error(`${input.signature.role} has already signed this agreement`);
@@ -253,7 +269,10 @@ export async function recordDurableSignature(input: {
       [input.signature.id, CONFIRM_TENANT_ID, input.agreementId, JSON.stringify(input.signature), input.signature.signedAt],
     );
 
-    const links = await client.query("SELECT id, payload FROM confirm_signing_links WHERE agreement_id = $1", [input.agreementId]);
+    const links = await client.query(
+      "SELECT id, payload FROM confirm_signing_links WHERE agreement_id = $1 FOR UPDATE ORDER BY id",
+      [input.agreementId],
+    );
     for (const link of links.rows as Array<{ id: string; payload: { status?: string; consumedAt?: string | null } }>) {
       const payload = { ...link.payload };
       if (payload.status !== "pending") continue;
@@ -282,7 +301,14 @@ export async function recordDurableSignature(input: {
     await client.query("COMMIT");
     return { status, signedCount, required: row.required_signatures, signature: input.signature };
   } catch (err) {
-    await client.query("ROLLBACK");
+    await client.query("ROLLBACK").catch(() => undefined);
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code) : "";
+    if (code === "55P03" || code === "40P01") {
+      throw new Error("This pack is being signed at another desk. Wait a moment and try again.");
+    }
+    if (code === "23505") {
+      throw new Error("That role has already signed this agreement");
+    }
     throw err;
   } finally {
     client.release();
