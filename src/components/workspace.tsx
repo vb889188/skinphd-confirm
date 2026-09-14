@@ -486,17 +486,15 @@ export function Workspace({ signToken }: { signToken?: string }) {
       );
       if (action === "sign" && latest?.status === "completed") {
         const origin = confirmSiteUrl();
-        let recordUrl = origin;
         try {
           const copy = await useWorkspace.getState().issueSignCode(latest.id, "employee");
-          recordUrl = packSignUrl(copy.token);
-        } catch {
-          /* pack email still goes out without a copy link */
-        }
-        const mail = buildSignedRecordMail(useWorkspace.getState(), latest, origin, recordUrl);
-        if (mail.to) {
-          const sent = await deliverMail(mail);
-          toast.success(sent === "sent" ? "Signed pack emailed, including the employee copy link." : "Finish the signed-pack email in your mail app.");
+          const mail = buildSignedRecordMail(useWorkspace.getState(), latest, origin, packSignUrl(copy.token));
+          if (mail.to) {
+            const sent = await deliverMail(mail);
+            toast.success(sent === "sent" ? "Signed pack emailed, including the employee copy link." : "Finish the signed-pack email in your mail app.");
+          }
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Signed pack stored, but the copy email was not sent.");
         }
       } else if (action === "sign" && latest) {
         const snapshot = useWorkspace.getState();
@@ -505,26 +503,27 @@ export function Workspace({ signToken }: { signToken?: string }) {
         );
         const person = next ? snapshot.people.find((item) => item.id === next.id) : null;
         if (person?.email && next) {
-          let packUrl: string | undefined;
-          if (next.role !== "manager") {
-            try {
+          try {
+            let packUrl: string | undefined;
+            if (next.role !== "manager") {
               const copy = await useWorkspace.getState().issueSignCode(latest.id, next.role);
               packUrl = packSignUrl(copy.token);
-            } catch {
-              /* notice still goes out */
             }
+            const sent = await deliverMail(
+              buildNextSignerMail({
+                toName: person.fullName,
+                toEmail: person.email,
+                title: latest.title,
+                role: next.role === "manager" ? "franchisee" : next.role,
+                previousSigner: typedName,
+                siteUrl: confirmSiteUrl(),
+                packUrl,
+              }),
+            );
+            if (sent !== "sent") toast.message("Finish the next-signer email in your mail app.");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Next signer was not emailed.");
           }
-          await deliverMail(
-            buildNextSignerMail({
-              toName: person.fullName,
-              toEmail: person.email,
-              title: latest.title,
-              role: next.role === "manager" ? "franchisee" : next.role,
-              previousSigner: typedName,
-              siteUrl: confirmSiteUrl(),
-              packUrl,
-            }),
-          );
         }
       }
       setConsent(false);
@@ -636,7 +635,17 @@ export function Workspace({ signToken }: { signToken?: string }) {
   async function remindAgreement(item: Agreement) {
     setError("");
     try {
-      const reminder = buildReminderMail(store, item, confirmSiteUrl());
+      const employeeDue = item.snapshot.signers.some(
+        (signer) =>
+          signer.role === "employee" &&
+          !useWorkspace.getState().signatures.some((entry) => entry.agreementId === item.id && entry.role === "employee" && entry.outcome === "signed"),
+      );
+      let packUrl: string | undefined;
+      if (employeeDue) {
+        const copy = await useWorkspace.getState().issueSignCode(item.id, "employee");
+        packUrl = packSignUrl(copy.token);
+      }
+      const reminder = buildReminderMail(useWorkspace.getState(), item, confirmSiteUrl(), packUrl);
       if (!reminder.to) throw new Error("No outstanding signer email is available for this pack.");
       store.noteEmailSent(item.id, reminder.to);
       store.markReminded(item.id);
@@ -1235,6 +1244,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
                         <div className="absolute left-0 top-full z-50 mt-1 grid min-w-52 gap-1 rounded-lg border border-line bg-paper p-1.5 shadow-lg">
                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => { setArchivePersonId(person.id); setStaffMenuId(null); }}>Upload completed pack</button>
                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => { setEditingPersonId(person.id); setStaffMenuId(null); }}>Edit details</button>
+                          {person.role === "manager" && (
                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => {
                             setStaffMenuId(null);
                             void store.issueTemporaryPin(person.id).then(async (pin) => {
@@ -1244,6 +1254,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
                               toast.success(sent === "sent" ? `PIN emailed to ${person.email}.` : `Temporary PIN ready for ${person.fullName}.`);
                             });
                           }}>Email new PIN</button>
+                          )}
                           {person.status === "active" ? (
                             <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-bold text-danger-fg hover:bg-danger-bg" onClick={() => {
                               void store.removePerson(person.id).then(() => {
@@ -1907,6 +1918,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
               <Button size="sm" variant="secondary" onClick={() => { setProfilePersonId(null); setEditingPersonId(profile.id); }}>
                 Edit details
               </Button>
+              {profile.role === "manager" && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -1929,6 +1941,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
               >
                 Email new PIN
               </Button>
+              )}
               <Button
                 size="sm"
                 variant="secondary"
@@ -2718,7 +2731,7 @@ function Detail({
                     const origin = confirmSiteUrl();
                     try {
                       const copy = await useWorkspace.getState().issueSignCode(agreement.id, "employee");
-                      const pack = buildEmployeeMail(useWorkspace.getState(), agreement, origin, undefined, packSignUrl(copy.token));
+                      const pack = buildEmployeeMail(useWorkspace.getState(), agreement, origin, packSignUrl(copy.token));
                       if (!pack.to) throw new Error("That employee has no work email.");
                       recordEmail(agreement.id, pack.to);
                       const sent = await deliverMail(pack);
@@ -2756,13 +2769,28 @@ function Detail({
             size="sm"
             variant="secondary"
             onClick={() => {
-              const reminder = buildReminderMail(state, agreement, confirmSiteUrl());
-              if (!reminder.to) return;
-              recordEmail(agreement.id, reminder.to);
-              useWorkspace.getState().markReminded(agreement.id);
-              void deliverMail(reminder).then((sent) => {
-                toast.success(sent === "sent" ? "Reminder emailed." : "Finish the reminder in your mail app.");
-              });
+              void (async () => {
+                try {
+                  const employeeDue = agreement.snapshot.signers.some(
+                    (signer) =>
+                      signer.role === "employee" &&
+                      !useWorkspace.getState().signatures.some((entry) => entry.agreementId === agreement.id && entry.role === "employee" && entry.outcome === "signed"),
+                  );
+                  let packUrl: string | undefined;
+                  if (employeeDue) {
+                    const copy = await useWorkspace.getState().issueSignCode(agreement.id, "employee");
+                    packUrl = packSignUrl(copy.token);
+                  }
+                  const reminder = buildReminderMail(useWorkspace.getState(), agreement, confirmSiteUrl(), packUrl);
+                  if (!reminder.to) throw new Error("No outstanding signer email is available for this pack.");
+                  recordEmail(agreement.id, reminder.to);
+                  useWorkspace.getState().markReminded(agreement.id);
+                  const sent = await deliverMail(reminder);
+                  toast.success(sent === "sent" ? "Reminder emailed." : "Finish the reminder in your mail app.");
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Reminder was not sent.");
+                }
+              })();
             }}
           >
             Remind outstanding signers

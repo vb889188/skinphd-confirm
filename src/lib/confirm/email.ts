@@ -147,7 +147,7 @@ export function buildWelcomeMail(input: {
 }
 
 export function buildSignCodeMail(input: { fullName: string; email: string; title: string; code: string; siteUrl: string }): EmployeeMail {
-  const link = `${input.siteUrl}?sign=${input.code}`;
+  const link = packSignUrl(input.code);
   return {
     to: input.email,
     subject: `Please sign your SkinPhD pack — at the salon or from home`,
@@ -235,7 +235,7 @@ export function buildNextSignerMail(input: {
   };
 }
 
-export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, siteUrl: string, pin?: string, packUrl?: string): EmployeeMail {
+export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, siteUrl: string, packUrl?: string): EmployeeMail {
   const employee = state.people.find((person) => person.id === agreement.employeeId);
   const manager = state.people.find((person) => person.id === agreement.managerId);
   const clinic = state.branches.find((branch) => branch.id === agreement.branchId);
@@ -276,10 +276,11 @@ export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, s
   };
 }
 
-export function buildReminderMail(state: WorkspaceState, agreement: Agreement, siteUrl: string): EmployeeMail {
+export function buildReminderMail(state: WorkspaceState, agreement: Agreement, siteUrl: string, packUrl?: string): EmployeeMail {
   const outstanding = agreement.snapshot.signers.filter((signer) =>
     !state.signatures.some((item) => item.agreementId === agreement.id && item.role === signer.role && item.outcome === "signed"),
   );
+  const employeeDue = outstanding.some((item) => item.role === "employee");
   const recipients = outstanding
     .map((signer) => state.people.find((person) => person.id === signer.id)?.email)
     .filter((email): email is string => Boolean(email));
@@ -298,7 +299,10 @@ export function buildReminderMail(state: WorkspaceState, agreement: Agreement, s
       `Pack: ${agreement.title}`,
       `Still needed: ${names || "none"}`,
       "",
-      "If you are the employee: you can sign at the salon on the tablet, or from home on the personal link Head Office emailed you. Read the pack on the page before you put your name on it. If you cannot find that email, ask Head Office to send the link again.",
+      employeeDue
+        ? "If you are the employee: read the pack on the page, then type your legal name. You can do this at the salon on the tablet, or from home on the personal link below."
+        : "If you are the employee: use the personal link Head Office already emailed, or sign on the salon tablet.",
+      ...(employeeDue && packUrl ? ["", "Your personal link:", packUrl] : []),
       "",
       "If you are the franchisee: open Confirm and sign after the employee.",
       "",
@@ -327,7 +331,7 @@ export function buildSignedRecordMail(state: WorkspaceState, agreement: Agreemen
       recordUrl
         ? "Open your copy any time — from home or anywhere — on this personal link:"
         : "If you want a phone copy, ask Head Office to email your personal link.",
-      recordUrl ?? siteUrl,
+      recordUrl || "",
       "",
       "Keep this email. If you are at the salon, they can also print the certificate of record for you.",
       "",
