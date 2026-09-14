@@ -434,6 +434,13 @@ export function Workspace({ signToken }: { signToken?: string }) {
       const created = useWorkspace.getState().agreements.find((item) => item.id === id);
       const franchisee = store.people.find((person) => person.id === String(values.managerId));
       const employee = store.people.find((person) => person.id === String(values.employeeId));
+      const notes: string[] = ["Pack issued."];
+      if (employee?.email && created) {
+        const copy = await useWorkspace.getState().issueSignCode(id, "employee");
+        const pack = buildEmployeeMail(useWorkspace.getState(), created, confirmSiteUrl(), packSignUrl(copy.token));
+        const sent = await deliverMail(pack);
+        notes.push(sent === "sent" ? `Employee emailed at ${employee.email}.` : "Finish the employee email in your mail app.");
+      }
       if (franchisee?.email && created) {
         const sent = await deliverMail(
           buildFranchiseeIssuedMail({
@@ -444,10 +451,9 @@ export function Workspace({ signToken }: { signToken?: string }) {
             siteUrl: confirmSiteUrl(),
           }),
         );
-        toast.success(sent === "sent" ? "Pack issued and emailed to the franchisee." : "Pack issued. Finish the franchisee email in your mail app.");
-      } else {
-        toast.success("Pack issued.");
+        if (sent === "sent") notes.push("Franchisee notified.");
       }
+      toast.success(notes.join(" "));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the agreement");
     } finally {

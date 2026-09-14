@@ -275,10 +275,26 @@ export const confirmRestFn = createServerFn({ method: "POST" })
   });
 
 export const issuePersonalLinkFn = createServerFn({ method: "POST" })
-  .validator((data: { session: string; agreementId: string; role: "employee" | "manager" | "witness" }) => data)
+  .validator((data: {
+    session: string;
+    agreementId: string;
+    role: "employee" | "manager" | "witness";
+    pack?: Record<string, unknown>;
+  }) => data)
   .handler(async ({ data }) => {
     const session = await verifySession(data.session, supabaseConfig().secret);
     if (!session) return { ok: false as const, error: "Sign in first." };
+    if (data.pack?.id === data.agreementId) {
+      try {
+        await dataRest("confirm_agreements?on_conflict=id", {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify(data.pack),
+        });
+      } catch (err) {
+        return { ok: false as const, error: err instanceof Error ? `The pack was not stored: ${err.message}` : "The pack was not stored." };
+      }
+    }
     const agreements = await dataRest<Array<{
       id: string;
       employee_id: string;

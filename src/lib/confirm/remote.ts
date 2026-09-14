@@ -66,9 +66,38 @@ export async function changePinOnServer(currentPin: string, nextPin: string) {
   return result.pinHash;
 }
 
-export async function issuePersonalLinkOnServer(agreementId: string, role: "employee" | "manager" | "witness") {
+export async function issuePersonalLinkOnServer(
+  agreementId: string,
+  role: "employee" | "manager" | "witness",
+  agreement?: Agreement,
+) {
+  const pack = agreement
+    ? {
+        id: agreement.id,
+        tenant_id: CONFIRM_TENANT_ID,
+        clinic_id: agreement.branchId,
+        employee_id: agreement.employeeId,
+        manager_id: agreement.managerId,
+        witness_id: agreement.witnessId,
+        template_id: agreement.templateId,
+        title: agreement.title,
+        activity: agreement.activity,
+        status: agreement.status,
+        cost_cents: agreement.costCents,
+        starts_on: agreement.startsOn,
+        ends_on: agreement.endsOn,
+        required_signatures: agreement.requiredSignatures,
+        snapshot: agreement.snapshot,
+        snapshot_json: agreement.snapshotJson,
+        snapshot_hash: agreement.snapshotHash,
+        created_by: agreement.createdBy,
+        created_at: agreement.createdAt,
+        updated_at: agreement.updatedAt,
+        last_reminded_at: agreement.lastRemindedAt,
+      }
+    : undefined;
   const result = await issuePersonalLinkFn({
-    data: { session: getSessionToken(), agreementId, role },
+    data: { session: getSessionToken(), agreementId, role, pack },
   });
   if (!result.ok) throw new Error(result.error);
   return result;

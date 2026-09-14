@@ -11,7 +11,7 @@ import {
   requiredSignatureCount,
 } from "./rules";
 import type { Agreement, AuditEvent, EmployeeRecord, Person, Role, Signature, SigningLink, Snapshot, Template, WorkspaceState } from "./types";
-import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile, issuePersonalLinkOnServer } from "./remote";
+import { persistWorkspace, persistPerson, loadRemoteWorkspace, remoteEnabled, setRemoteActor, setLinkToken, clearSessionToken, signInOnServer, changePinOnServer, upsertEmployeeRecord, upsertSourceFile, issuePersonalLinkOnServer, upsertAgreement } from "./remote";
 import { requireCapability } from "./access";
 import { recognizeDocument } from "./ocr";
 
@@ -679,6 +679,13 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
             ...state.audit,
           ],
         });
+        if (remoteEnabled()) {
+          try {
+            await upsertAgreement(agreement);
+          } catch (err) {
+            throw new Error(err instanceof Error ? `The pack was not stored: ${err.message}` : "The pack was not stored on the server.");
+          }
+        }
         persistLive(get());
         return id;
       },
@@ -693,7 +700,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (state.signatures.some((item) => item.agreementId === agreementId && item.role === role && item.outcome === "signed")) {
           throw new Error("This role has already signed");
         }
-        const issued = await issuePersonalLinkOnServer(agreementId, role);
+        const issued = await issuePersonalLinkOnServer(agreementId, role, agreement);
         const event = {
           id: randomId("AUD"),
           agreementId,
@@ -726,7 +733,14 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         if (!alreadySigned && !canSign(agreement.status)) {
           throw new Error("A personal link cannot be issued for this status");
         }
-        const issued = await issuePersonalLinkOnServer(agreementId, role);
+        if (remoteEnabled()) {
+          try {
+            await upsertAgreement(agreement);
+          } catch (err) {
+            throw new Error(err instanceof Error ? `The pack was not stored: ${err.message}` : "The pack was not stored on the server.");
+          }
+        }
+        const issued = await issuePersonalLinkOnServer(agreementId, role, agreement);
         const event = {
           id: randomId("AUD"),
           agreementId,
