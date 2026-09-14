@@ -38,21 +38,10 @@ function mergeRemote(local: WorkspaceState, remote: Pick<WorkspaceState, "branch
     branches: remote.branches.length ? mergeById(local.branches, remote.branches, (_a, b) => b) : local.branches,
     people: remote.people.length ? mergeById(local.people, remote.people, (_a, b) => ({ ...b, pinHash: null })) : local.people,
     templates: remote.templates.length ? mergeById(local.templates, remote.templates, (_a, b) => b) : local.templates,
-    agreements: mergeById(local.agreements, remote.agreements, (a, b) => (stamp(a.updatedAt) >= stamp(b.updatedAt) ? a : b)).sort(
-      (a, b) => stamp(b.updatedAt) - stamp(a.updatedAt),
-    ),
-    signatures: mergeById(local.signatures, remote.signatures, (a, b) => {
-      if (a.outcome === "signed" && b.outcome !== "signed") return a;
-      if (b.outcome === "signed" && a.outcome !== "signed") return b;
-      return stamp(a.signedAt) >= stamp(b.signedAt) ? a : b;
-    }),
-    links: mergeById(local.links, remote.links, (a, b) => {
-      const rank = (status: SigningLink["status"]) => (status === "consumed" ? 3 : status === "pending" ? 2 : 1);
-      return rank(a.status) >= rank(b.status) ? a : b;
-    }),
-    audit: mergeById(local.audit, remote.audit, (a, b) => (stamp(a.createdAt) >= stamp(b.createdAt) ? a : b))
-      .sort((a, b) => stamp(b.createdAt) - stamp(a.createdAt))
-      .slice(0, 200),
+    agreements: [...remote.agreements].sort((a, b) => stamp(b.updatedAt) - stamp(a.updatedAt)),
+    signatures: [...remote.signatures],
+    links: [...remote.links],
+    audit: [...remote.audit].sort((a, b) => stamp(b.createdAt) - stamp(a.createdAt)).slice(0, 200),
     records: mergeById(local.records ?? [], remote.records ?? [], (a) => a),
   };
 }
@@ -293,25 +282,7 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
           return "unavailable";
         }
       },
-      ensurePilotPack: async () => {
-        const state = get();
-        if (state.agreements.length > 0) return null;
-        return get().createAgreement({
-          title: "Training Costs Agreement: HydroDerm — Brooklyn pilot",
-          activity: "SkinPhD HydroDerm training module",
-          branchId: "branch-brooklyn",
-          employeeId: "person-lerato",
-          managerId: "person-amelia",
-          witnessId: "person-witness",
-          templateId: "tpl-tr-hydroderm",
-          costRands: 1500,
-          startsOn: "2026-09-15",
-          endsOn: "2026-09-15",
-          days: 1,
-          contractEndOn: "2027-10-01",
-          employeeTitle: "Aesthetic Therapist",
-        });
-      },
+      ensurePilotPack: async () => null,
       addPerson: async (input) => {
         requireCapability(actor(get()), "directory_write", "Add staff", input.branchId);
         const fullName = input.fullName.trim();
@@ -1047,6 +1018,6 @@ export const useWorkspace = create<WorkspaceState & Actions>()(
         return id;
       },
     }),
-    { name: "skinphd-confirm.workspace.v10" },
+    { name: "skinphd-confirm.workspace.v11" },
   ),
 );
