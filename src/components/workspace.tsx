@@ -1202,7 +1202,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
                   return (!peopleQuery || haystack.includes(peopleQuery.toLowerCase())) && (peopleStatus === "all" || person.status === peopleStatus);
                 })
                  .map((person) => (
-                <Card key={person.id} radius="section" elevation="sm" padding="md" className="confirm-card overflow-visible">
+                <Card key={person.id} radius="section" elevation="sm" padding="md" className={cn("confirm-card overflow-visible", staffMenuId === person.id && "relative z-50")}>
                   <div className="flex items-start justify-between gap-3">
                     <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => setProfilePersonId(person.id)}>
                       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-sage text-[11px] font-extrabold text-accent">{initials(person.fullName)}</span>
@@ -1232,7 +1232,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
                         More
                       </Button>
                       {staffMenuId === person.id && (
-                        <div className="absolute left-0 z-30 mt-1 grid min-w-52 gap-1 rounded-lg border border-line bg-paper p-1.5 shadow-lg">
+                        <div className="absolute left-0 top-full z-50 mt-1 grid min-w-52 gap-1 rounded-lg border border-line bg-paper p-1.5 shadow-lg">
                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => { setArchivePersonId(person.id); setStaffMenuId(null); }}>Upload completed pack</button>
                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => { setEditingPersonId(person.id); setStaffMenuId(null); }}>Edit details</button>
                           <button type="button" className="rounded px-3 py-2 text-left text-[11px] font-semibold hover:bg-ground" onClick={() => {

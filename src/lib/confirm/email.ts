@@ -92,7 +92,7 @@ function whereYouCanSign(link?: string) {
     "• Not at the shop — open the personal link on your phone. Read the pack first. You can do this from home, in the car, or before you come in.",
     "• After you have signed — keep this email. The same link opens your copy of the pack.",
     "",
-    "This link is only for this one pack.",
+    "This link is only for this one pack. Keep this email. Tap the full link below — it must open as one address.",
     "",
     link ? "Your personal link:" : "If you do not have a personal link yet, ask Head Office to email one, or sign on the tablet when you are in the salon.",
     ...(link ? [link] : []),

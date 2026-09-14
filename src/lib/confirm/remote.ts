@@ -211,8 +211,8 @@ export async function loadRemoteWorkspace(): Promise<Pick<WorkspaceState, "branc
       updatedAt: row.updated_at,
       lastRemindedAt: row.last_reminded_at ?? null,
     })),
-    signatures: signatures.map((row) => row.payload as Signature),
-    links: links.map((row) => row.payload as SigningLink),
+    signatures: signatures.map((row) => row.payload as Signature).filter((item) => Boolean(item?.id)),
+    links: links.map((row) => row.payload as SigningLink).filter((item) => Boolean(item?.id && item.tokenHash)),
     audit: audit.map((row) => ({
       id: row.id,
       agreementId: row.agreement_id ?? null,
@@ -391,15 +391,19 @@ export async function persistWorkspace(state: WorkspaceState) {
   if (!remoteEnabled()) return;
   const me = state.people.find((item) => item.id === state.currentPersonId);
   if (me) setRemoteActor(me);
-  await Promise.all([
+  const jobs = [
     ...state.branches.map(upsertClinic),
     ...state.people.map(upsertPerson),
     ...state.templates.map(upsertTemplate),
     ...state.agreements.map(upsertAgreement),
-    ...state.signatures.map(upsertSignature),
-    ...state.links.map(upsertLink),
-    ...state.audit.slice(0, 40).map(upsertAudit),
-  ]);
+    ...state.signatures.filter((item) => item?.id).map(upsertSignature),
+    ...state.links.filter((item) => item?.id && item.tokenHash).map(upsertLink),
+    ...state.audit.slice(0, 40).filter((item) => item?.id).map(upsertAudit),
+  ];
+  const results = await Promise.allSettled(jobs);
+  if (results.some((item) => item.status === "rejected")) {
+    throw new Error("Some Confirm records could not be stored. Try again.");
+  }
 }
 
 export async function upsertSourceFile(file: {
