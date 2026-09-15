@@ -278,7 +278,7 @@ export async function recordDurableSignature(input: {
     );
 
     const links = await client.query(
-      "SELECT id, payload FROM confirm_signing_links WHERE agreement_id = $1 FOR UPDATE ORDER BY id",
+      "SELECT id, payload FROM confirm_signing_links WHERE agreement_id = $1 ORDER BY id FOR UPDATE",
       [input.agreementId],
     );
     for (const link of links.rows as Array<{ id: string; payload: { status?: string; consumedAt?: string | null } }>) {
