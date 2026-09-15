@@ -21,7 +21,7 @@ import { sha256Hex } from "@/lib/confirm/crypto";
 import { can, canViewAgreement } from "@/lib/confirm/access";
 import { fetchEmployeeRecordFile, fetchSourceFile, isProductionMode, remoteEnabled, setLinkToken } from "@/lib/confirm/remote";
 import { startConfirmLive } from "@/lib/confirm/live";
-import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMails, buildSignedRecordMail, buildSignedRecordMails, buildSignCodeMail, buildWelcomeMail, confirmSiteUrl, packSignUrl } from "@/lib/confirm/email";
+import { buildEmployeeMail, buildFranchiseeIssuedMail, buildNextSignerMail, buildReminderMail, buildSignedRecordMail, buildSignCodeMail, buildWelcomeMail, confirmSiteUrl, packSignUrl } from "@/lib/confirm/email";
 import { deliverMail } from "@/lib/confirm/send-mail";
 import { extractSourceDocument } from "@/lib/confirm/extract";
 import { haptic } from "@/lib/confirm/haptics";
@@ -524,14 +524,10 @@ export function Workspace({ signToken }: { signToken?: string }) {
         try {
           if (latest.status === "completed") {
             const copy = await useWorkspace.getState().issueSignCode(packId, "employee");
-            const mails = buildSignedRecordMails(useWorkspace.getState(), latest, confirmSiteUrl(), packSignUrl(copy.token));
-            let sentAny = false;
-            for (const mail of mails) {
+            const mail = buildSignedRecordMail(useWorkspace.getState(), latest, confirmSiteUrl(), packSignUrl(copy.token));
+            if (mail.to) {
               const sent = await deliverMail(mail, { compose: false });
-              if (sent === "sent") sentAny = true;
-            }
-            if (mails.length) {
-              toast.success(sentAny ? "Signed pack emailed to the employee and franchisee." : "Signed pack stored. Email the copy from Email employee pack if needed.");
+              toast.success(sent === "sent" ? "Signed pack emailed, including the employee copy link." : "Signed pack stored. Email the copy from Email employee pack if needed.");
             }
             return;
           }
@@ -586,13 +582,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
       const origin = confirmSiteUrl();
       const sent = await deliverMail(
         alreadySigned
-          ? buildSignedRecordMail(
-              useWorkspace.getState(),
-              selected,
-              origin,
-              packSignUrl(result.token),
-              role === "manager" ? "franchisee" : "employee",
-            )
+          ? buildSignedRecordMail(useWorkspace.getState(), selected, origin, packSignUrl(result.token))
           : buildSignCodeMail({
               fullName: signer?.name ?? "",
               email: result.email,
@@ -664,26 +654,22 @@ export function Workspace({ signToken }: { signToken?: string }) {
   async function remindAgreement(item: Agreement) {
     setError("");
     try {
-      const snapshot = useWorkspace.getState();
-      const packUrls: { employee?: string; witness?: string } = {};
-      for (const signer of item.snapshot.signers) {
-        const signed = snapshot.signatures.some((entry) => entry.agreementId === item.id && entry.role === signer.role && entry.outcome === "signed");
-        if (signed || signer.role === "manager") continue;
-        const copy = await useWorkspace.getState().issueSignCode(item.id, signer.role);
-        if (signer.role === "employee") packUrls.employee = packSignUrl(copy.token);
-        if (signer.role === "witness") packUrls.witness = packSignUrl(copy.token);
+      const employeeDue = item.snapshot.signers.some(
+        (signer) =>
+          signer.role === "employee" &&
+          !useWorkspace.getState().signatures.some((entry) => entry.agreementId === item.id && entry.role === "employee" && entry.outcome === "signed"),
+      );
+      let packUrl: string | undefined;
+      if (employeeDue) {
+        const copy = await useWorkspace.getState().issueSignCode(item.id, "employee");
+        packUrl = packSignUrl(copy.token);
       }
-      const reminders = buildReminderMails(useWorkspace.getState(), item, confirmSiteUrl(), packUrls);
-      if (!reminders.length) throw new Error("No outstanding signer email is available for this pack.");
-      store.noteEmailSent(item.id, reminders.map((mail) => mail.to).join(", "));
+      const reminder = buildReminderMail(useWorkspace.getState(), item, confirmSiteUrl(), packUrl);
+      if (!reminder.to) throw new Error("No outstanding signer email is available for this pack.");
+      store.noteEmailSent(item.id, reminder.to);
       store.markReminded(item.id);
-      let sentCount = 0;
-      for (const reminder of reminders) {
-        const sent = await deliverMail(reminder, { compose: false });
-        if (sent === "sent") sentCount += 1;
-      }
-      if (sentCount === 0) await deliverMail(reminders[0]);
-      toast.success(sentCount ? `Reminder emailed to ${sentCount} signer${sentCount === 1 ? "" : "s"}.` : "Finish the reminder in your mail app.");
+      const sent = await deliverMail(reminder);
+      toast.success(sent === "sent" ? "Reminder emailed." : "Finish the reminder in your mail app.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not prepare the reminder.");
     }
@@ -2167,7 +2153,6 @@ export function Workspace({ signToken }: { signToken?: string }) {
             onIssue={onIssue}
             onIssueCode={onIssueCode}
             onSign={onSign}
-            onRemind={() => void remindAgreement(selected)}
             error={error}
           />
         </Modal>
@@ -2707,7 +2692,6 @@ function Detail({
   onIssue: _onIssue,
   onIssueCode,
   onSign,
-  onRemind,
   error,
 }: {
   state: WorkspaceState;
@@ -2727,7 +2711,6 @@ function Detail({
   onIssue: (role: Role) => Promise<void>;
   onIssueCode: (role: Role) => Promise<void>;
   onSign: (action: "sign" | "decline") => Promise<void>;
-  onRemind: () => void;
   error: string;
 }) {
   const open = agreement.status === "awaiting_signatures" || agreement.status === "partially_signed";
@@ -2808,7 +2791,30 @@ function Detail({
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => onRemind()}
+            onClick={() => {
+              void (async () => {
+                try {
+                  const employeeDue = agreement.snapshot.signers.some(
+                    (signer) =>
+                      signer.role === "employee" &&
+                      !useWorkspace.getState().signatures.some((entry) => entry.agreementId === agreement.id && entry.role === "employee" && entry.outcome === "signed"),
+                  );
+                  let packUrl: string | undefined;
+                  if (employeeDue) {
+                    const copy = await useWorkspace.getState().issueSignCode(agreement.id, "employee");
+                    packUrl = packSignUrl(copy.token);
+                  }
+                  const reminder = buildReminderMail(useWorkspace.getState(), agreement, confirmSiteUrl(), packUrl);
+                  if (!reminder.to) throw new Error("No outstanding signer email is available for this pack.");
+                  recordEmail(agreement.id, reminder.to);
+                  useWorkspace.getState().markReminded(agreement.id);
+                  const sent = await deliverMail(reminder);
+                  toast.success(sent === "sent" ? "Reminder emailed." : "Finish the reminder in your mail app.");
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Reminder was not sent.");
+                }
+              })();
+            }}
           >
             Remind outstanding signers
           </Button>
