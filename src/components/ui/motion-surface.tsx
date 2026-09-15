@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- stagger variants are imported with Reveal */
 import { motion, useReducedMotion, type HTMLMotionProps } from "framer-motion";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
