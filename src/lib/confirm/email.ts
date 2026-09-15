@@ -4,6 +4,8 @@ export type EmployeeMail = {
   to: string;
   subject: string;
   body: string;
+  heading?: string;
+  cta?: { label: string; url: string };
 };
 
 export function employeeMailHref(mail: EmployeeMail) {
@@ -11,7 +13,7 @@ export function employeeMailHref(mail: EmployeeMail) {
 }
 
 export function confirmSiteUrl() {
-  const configured = (import.meta.env.VITE_CONFIRM_PUBLIC_URL as string | undefined)?.trim();
+  const configured = (import.meta.env?.VITE_CONFIRM_PUBLIC_URL as string | undefined)?.trim();
   if (configured) return configured.replace(/\/$/, "");
   if (typeof window === "undefined") return "https://confirm.relpdev.uk";
   const host = window.location.hostname;
@@ -31,6 +33,10 @@ export function packSignUrl(token: string) {
   return `${confirmSiteUrl()}?sign=${encodeURIComponent(token)}`;
 }
 
+export function firstName(fullName: string) {
+  return fullName.trim().split(/\s+/).find(Boolean) || "there";
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "\u0026amp;")
@@ -47,9 +53,37 @@ function bodyToHtml(body: string) {
     .join("");
 }
 
-export function brandedHtml(subject: string, body: string, logoUrl?: string, heartbeatUrl?: string) {
+function ctaButton(cta: { label: string; url: string }) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;">
+  <tr>
+    <td>
+      <a href="${escapeHtml(cta.url)}" style="display:block;width:100%;max-width:100%;box-sizing:border-box;background:#0f3329;color:#fbfcfa;text-align:center;text-decoration:none;font-family:'Segoe UI',Arial,sans-serif;font-size:16px;font-weight:700;line-height:1.2;padding:14px 20px;border-radius:10px;">${escapeHtml(cta.label)}</a>
+    </td>
+  </tr>
+</table>`;
+}
+
+export function brandedHtml(
+  subject: string,
+  body: string,
+  logoUrl?: string,
+  heartbeatUrl?: string,
+  extras?: { heading?: string; cta?: { label: string; url: string } },
+) {
   const logo = logoUrl || "https://confirm.relpdev.uk/skinphd-logo.png";
   const heartbeat = heartbeatUrl || "https://confirm.relpdev.uk/skinphd-heartbeat.png";
+  const heading = extras?.heading || subject;
+  const splitAt = "If the button does not work, open this link:";
+  const cta = extras?.cta;
+  let htmlBody: string;
+  if (cta) {
+    const idx = body.indexOf(splitAt);
+    const before = idx >= 0 ? body.slice(0, idx).trimEnd() : body;
+    const after = idx >= 0 ? body.slice(idx).trim() : `If the button does not work, open this link:\n${cta.url}`;
+    htmlBody = `${bodyToHtml(before)}${ctaButton(cta)}${bodyToHtml(after)}`;
+  } else {
+    htmlBody = bodyToHtml(body);
+  }
   return `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#edf3ef;">
@@ -65,9 +99,9 @@ export function brandedHtml(subject: string, body: string, logoUrl?: string, hea
             </td>
           </tr>
           <tr>
-            <td style="padding:28px;font-family:'Segoe UI',Arial,sans-serif;color:#17231f;">
-              <h1 style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;font-weight:500;color:#0f3329;">${escapeHtml(subject)}</h1>
-              ${bodyToHtml(body)}
+            <td style="padding:28px 24px;font-family:'Segoe UI',Arial,sans-serif;color:#17231f;">
+              <h1 style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;font-weight:500;color:#0f3329;">${escapeHtml(heading)}</h1>
+              ${htmlBody}
             </td>
           </tr>
           <tr>
@@ -97,6 +131,46 @@ function whereYouCanSign(link?: string) {
     link ? "Your personal link:" : "If you do not have a personal link yet, ask Head Office to email one, or sign on the tablet when you are in the salon.",
     ...(link ? [link] : []),
   ];
+}
+
+function reviewAndSignMail(input: {
+  to: string;
+  fullName: string;
+  packName: string;
+  branchName: string;
+  personalLink?: string;
+}): EmployeeMail {
+  const link = input.personalLink;
+  return {
+    to: input.to,
+    subject: "Your SkinPhD documents are ready to review and sign",
+    heading: "Your SkinPhD documents are ready",
+    cta: link ? { label: "Review and sign", url: link } : undefined,
+    body: [
+      `Hi ${firstName(input.fullName)},`,
+      "",
+      "SkinPhD Head Office has prepared the following documents for you to review and sign:",
+      "",
+      `Document pack: ${input.packName}`,
+      `Branch: ${input.branchName}`,
+      "",
+      "You can complete this on your phone, tablet or computer, or ask your salon team for the salon tablet.",
+      "",
+      "Please read the documents carefully, enter your full legal name as recorded on the staff list, and follow the on-screen instructions to complete your signature.",
+      "",
+      ...(link
+        ? ["If the button does not work, open this link:", link, ""]
+        : ["If you do not have a personal link yet, ask Head Office to email one, or sign on the salon tablet.", ""]),
+      "After signing, you can use the same link to view your completed documents. Keep this email for your records.",
+      "",
+      "This link is personal to you and applies only to this document pack. Please do not share it.",
+      "",
+      "If you have any questions before signing, please contact your salon manager or SkinPhD Head Office.",
+      "",
+      "Kind regards,",
+      "SkinPhD Head Office",
+    ].join("\n"),
+  };
 }
 
 export function buildWelcomeMail(input: {
@@ -146,24 +220,21 @@ export function buildWelcomeMail(input: {
   };
 }
 
-export function buildSignCodeMail(input: { fullName: string; email: string; title: string; code: string; siteUrl: string }): EmployeeMail {
-  const link = packSignUrl(input.code);
-  return {
+export function buildSignCodeMail(input: {
+  fullName: string;
+  email: string;
+  title: string;
+  code: string;
+  siteUrl: string;
+  branchName?: string;
+}): EmployeeMail {
+  return reviewAndSignMail({
     to: input.email,
-    subject: `Please sign your SkinPhD pack — at the salon or from home`,
-    body: [
-      `Hello ${input.fullName},`,
-      "",
-      "Head Office has a SkinPhD pack waiting for your name.",
-      `Pack: ${input.title}`,
-      "",
-      ...whereYouCanSign(link),
-      "",
-      "When the page opens, read the full pack first so you know what you are putting your name on. Then type your legal name exactly as it appears on the staff list, tick the box, and record your signature. You may also draw a mark with your finger.",
-      "",
-      "SkinPhD Confirm",
-    ].join("\n"),
-  };
+    fullName: input.fullName,
+    packName: input.title,
+    branchName: input.branchName || "SkinPhD",
+    personalLink: packSignUrl(input.code),
+  });
 }
 
 export function buildFranchiseeIssuedMail(input: {
@@ -241,38 +312,34 @@ export function buildEmployeeMail(state: WorkspaceState, agreement: Agreement, s
   const clinic = state.branches.find((branch) => branch.id === agreement.branchId);
   const complete = agreement.status === "completed";
   const name = employee?.fullName ?? "colleague";
+  const branchName = clinic ? clinic.name : "Not set";
+  if (!complete) {
+    return reviewAndSignMail({
+      to: employee?.email ?? "",
+      fullName: name,
+      packName: agreement.title,
+      branchName,
+      personalLink: packUrl,
+    });
+  }
   return {
     to: employee?.email ?? "",
-    subject: complete
-      ? `Your signed SkinPhD pack is stored`
-      : `Your SkinPhD pack — sign at the salon or from home`,
-    body: complete
-      ? [
-          `Hello ${name},`,
-          "",
-          "Your pack is complete. SkinPhD Head Office has stored the signed copy.",
-          `Pack: ${agreement.title}`,
-          `Branch: ${clinic ? clinic.name : "Not set"}`,
-          `Franchisee: ${manager?.fullName ?? "Not set"}`,
-          "",
-          packUrl
-            ? "Open your copy on this personal link. Keep this email."
-            : "Ask Head Office to email your personal copy link if you want to open this pack from home.",
-          packUrl ?? "",
-          "",
-          "SkinPhD Confirm",
-        ].filter((line) => line !== "").join("\n")
-      : [
-          `Hello ${name},`,
-          "",
-          "Head Office has a SkinPhD pack waiting for your name. Read the pack on the page before you sign.",
-          `Pack: ${agreement.title}`,
-          `Branch: ${clinic ? clinic.name : "Not set"}`,
-          "",
-          ...whereYouCanSign(packUrl),
-          "",
-          "SkinPhD Confirm",
-        ].filter((line) => line !== "").join("\n"),
+    subject: "Your signed SkinPhD pack is stored",
+    body: [
+      `Hello ${name},`,
+      "",
+      "Your pack is complete. SkinPhD Head Office has stored the signed copy.",
+      `Pack: ${agreement.title}`,
+      `Branch: ${branchName}`,
+      `Franchisee: ${manager?.fullName ?? "Not set"}`,
+      "",
+      packUrl
+        ? "Open your copy on this personal link. Keep this email."
+        : "Ask Head Office to email your personal copy link if you want to open this pack from home.",
+      packUrl ?? "",
+      "",
+      "SkinPhD Confirm",
+    ].filter((line) => line !== "").join("\n"),
   };
 }
 

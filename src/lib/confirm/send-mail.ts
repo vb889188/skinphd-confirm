@@ -53,6 +53,7 @@ export const sendMailFn = createServerFn({ method: "POST" })
             data.body,
             embedded ? "cid:skinphd-logo" : hostedLogo,
             heartbeat ? "cid:skinphd-heartbeat" : `${publicUrl}/skinphd-heartbeat.png`,
+            { heading: data.heading, cta: data.cta },
           ),
           attachments,
         }),

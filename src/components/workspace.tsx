@@ -589,6 +589,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
               title: selected.title,
               code: result.token,
               siteUrl: origin,
+              branchName: branchLabel(store, selected.branchId),
             }),
       );
       toast.success(
