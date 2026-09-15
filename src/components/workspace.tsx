@@ -351,9 +351,12 @@ export function Workspace({ signToken }: { signToken?: string }) {
       const matchesQuery = !query || haystack.includes(query.trim().toLowerCase());
       const matchesStatus =
         !statusFilter ||
+        statusFilter === "all" ||
         item.status === statusFilter ||
         (statusFilter === "needs_action" && (item.status === "awaiting_signatures" || item.status === "partially_signed"));
-      return matchesQuery && matchesStatus && (!clinicFilter || item.branchId === clinicFilter) && (!templateFilter || item.templateId === templateFilter);
+      const matchesClinic = !clinicFilter || clinicFilter === "all" || item.branchId === clinicFilter;
+      const matchesTemplate = !templateFilter || templateFilter === "all" || item.templateId === templateFilter;
+      return matchesQuery && matchesStatus && matchesClinic && matchesTemplate;
     })
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
@@ -696,8 +699,8 @@ export function Workspace({ signToken }: { signToken?: string }) {
     settings: "PIN reset, export of records, and what this system will not decide.",
   };
 
+  if (signToken) return <PersonalLinkSign token={signToken} />;
   if (!current) {
-    if (signToken) return <PersonalLinkSign token={signToken} />;
     return (
       <WorkspaceGate
         onEnter={async (email, pin) => {
@@ -1042,7 +1045,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
                 aria-label="Search agreements"
                 className="min-h-10 min-w-48 flex-1 rounded-md border border-line bg-paper px-3 text-sm"
               />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter || "all"} onValueChange={setStatusFilter}>
                 <SelectTrigger aria-label="Filter by status">
                   <SelectValue placeholder="All statuses" />
                   <SelectIcon />
@@ -1056,7 +1059,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
                 </SelectContent>
               </Select>
               {can(current, "clinics") && (
-              <Select value={clinicFilter} onValueChange={setClinicFilter}>
+              <Select value={clinicFilter || "all"} onValueChange={setClinicFilter}>
                 <SelectTrigger aria-label="Filter by SkinPhD branch">
                   <SelectValue placeholder="All SkinPhD branches" />
                   <SelectIcon />
@@ -1070,7 +1073,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
               </Select>
               )}
               {can(current, "templates") && (
-              <Select value={templateFilter} onValueChange={setTemplateFilter}>
+              <Select value={templateFilter || "all"} onValueChange={setTemplateFilter}>
                 <SelectTrigger aria-label="Filter by source form">
                   <SelectValue placeholder="All source forms" />
                   <SelectIcon />
@@ -1088,7 +1091,12 @@ export function Workspace({ signToken }: { signToken?: string }) {
               <AgreementQueue
                 state={store}
                 items={filtered}
-                hasFilters={Boolean(query || statusFilter || clinicFilter || templateFilter)}
+                hasFilters={Boolean(
+                  query ||
+                    (statusFilter && statusFilter !== "all") ||
+                    (clinicFilter && clinicFilter !== "all") ||
+                    (templateFilter && templateFilter !== "all"),
+                )}
                 filterKey={`${query}|${statusFilter}|${clinicFilter}|${templateFilter}`}
                 canCreate={isManager}
                 onOpen={(id) => {
