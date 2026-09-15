@@ -186,11 +186,10 @@ export function brandedHtml(
   subject: string,
   body: string,
   logoUrl?: string,
-  heartbeatUrl?: string,
+  _heartbeatUrl?: string,
   extras?: { heading?: string; cta?: { label: string; url: string } },
 ) {
   const logo = logoUrl || "https://confirm.relpdev.uk/skinphd-logo.png";
-  const heartbeat = heartbeatUrl || "https://confirm.relpdev.uk/skinphd-heartbeat.png";
   const heading = extras?.heading || subject;
   return `<!DOCTYPE html>
 <html>
@@ -205,7 +204,6 @@ export function brandedHtml(
           <tr>
             <td style="background:#ffffff;padding:22px 28px 16px;border-bottom:3px solid #b8863a;">
               <img src="${escapeHtml(logo)}" alt="SkinPhD" width="190" style="display:block;height:auto;max-width:190px;border:0;">
-              <img src="${escapeHtml(heartbeat)}" alt="Heartbeat of skincare" width="168" style="display:block;height:auto;max-width:168px;margin-top:8px;border:0;">
               <p style="margin:12px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#176b50;">Confirm</p>
             </td>
           </tr>

@@ -41,6 +41,35 @@ import { cn } from "@/lib/utils";
 
 type View = "overview" | "agreements" | "templates" | "people" | "locations" | "clients" | "audit" | "settings";
 
+function SkinPhDLogo({
+  size = "md",
+  plate = false,
+  kicker,
+  kickerClassName,
+}: {
+  size?: "sm" | "md" | "lg";
+  plate?: boolean;
+  kicker?: string;
+  kickerClassName?: string;
+}) {
+  const height = size === "lg" ? "h-11 max-w-[220px]" : size === "sm" ? "h-8 max-w-[168px]" : "h-9 max-w-[196px]";
+  const mark = (
+    <img src="/skinphd-logo.png" alt="SkinPhD" className={cn("w-auto object-contain object-left", height)} />
+  );
+  return (
+    <div>
+      {plate ? (
+        <div className="inline-flex rounded-2xl bg-paper px-5 py-4 shadow-[0_10px_28px_rgba(9,36,29,0.18)]">{mark}</div>
+      ) : (
+        mark
+      )}
+      {kicker ? (
+        <small className={cn("confirm-kicker mt-3 block text-[10px] tracking-[0.16em] uppercase", kickerClassName ?? "text-muted")}>{kicker}</small>
+      ) : null}
+    </div>
+  );
+}
+
 function nextStep(state: WorkspaceState, agreement: Agreement) {
   if (agreement.status === "completed") return "Finished. Print or email the pack.";
   if (agreement.status === "declined") return "Declined. Issue a new pack if needed.";
@@ -716,11 +745,7 @@ export function Workspace({ signToken }: { signToken?: string }) {
     <main className="confirm-shell min-h-[100dvh] bg-transparent text-ink lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="confirm-sidebar relative hidden flex-col px-3 py-4 text-sidebar-text shadow-[8px_0_40px_rgba(10,36,29,0.18)] lg:sticky lg:top-0 lg:h-screen lg:px-4 lg:py-7 lg:flex">
         <div className="mb-7 border-b border-white/10 px-2 pb-6">
-          <div className="rounded-lg bg-paper px-3 py-2.5">
-            <img src="/skinphd-logo.png" alt="SkinPhD" className="h-8 w-auto max-w-[168px] object-contain object-left" />
-            <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-1.5 h-3 w-auto max-w-[168px] object-contain object-left" />
-          </div>
-          <small className="confirm-kicker mt-3 block text-[10px] text-sidebar-soft uppercase">Confirm · Head Office</small>
+          <SkinPhDLogo size="sm" plate kicker="Confirm · Head Office" kickerClassName="text-sidebar-soft" />
         </div>
         <nav aria-label="Primary navigation" className="flex gap-2 lg:block lg:overflow-visible">
           <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.12em] text-sidebar-label uppercase lg:block">Work</p>
@@ -3071,8 +3096,7 @@ function Detail({
       <article className="print-document my-4 rounded-md border border-line bg-paper p-5">
         <div className="flex items-center gap-3 border-b border-line pb-4">
           <div>
-            <img src="/skinphd-logo.png" alt="SkinPhD" className="h-9 w-auto max-w-[180px] object-contain object-left" />
-            <img src="/skinphd-heartbeat.png" alt="" className="mt-1 h-3 w-auto max-w-[180px] object-contain object-left" />
+            <SkinPhDLogo size="sm" />
           </div>
           <div>
             <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
@@ -3358,8 +3382,7 @@ function PersonalLinkSign({ token }: { token: string }) {
           <article className="print-document mt-5 rounded-md border border-line bg-paper p-4">
             <div className="flex items-center gap-3 border-b border-line pb-3">
               <div>
-                <img src="/skinphd-logo.png" alt="SkinPhD" className="h-8 w-auto max-w-[160px] object-contain object-left" />
-                <img src="/skinphd-heartbeat.png" alt="" className="mt-1 h-2.5 w-auto max-w-[160px] object-contain object-left" />
+                <SkinPhDLogo size="sm" />
               </div>
               <div>
                 <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
@@ -3424,17 +3447,13 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
   ];
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="relative hidden overflow-hidden bg-linear-to-br from-forest to-forest-dark px-12 py-16 text-paper lg:flex lg:flex-col lg:justify-between">
+      <section className="confirm-sidebar relative hidden overflow-hidden px-12 py-16 text-paper lg:flex lg:flex-col lg:justify-between">
         <div
           aria-hidden
           className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-paper/5 blur-[100px]"
         />
-        <div className="mb-10">
-          <div className="inline-block rounded-xl bg-paper px-4 py-3">
-            <img src="/skinphd-logo.png" alt="SkinPhD" className="h-12 w-auto max-w-[240px] object-contain object-left" />
-            <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-2 h-4 w-auto max-w-[240px] object-contain object-left" />
-          </div>
-          <small className="mt-4 block text-[11px] tracking-[0.16em] text-sidebar-soft uppercase">Confirm</small>
+        <div className="relative mb-10">
+          <SkinPhDLogo size="lg" plate kicker="Confirm · Head Office" kickerClassName="text-sidebar-soft" />
         </div>
         <div className="relative">
           <p className="text-[11px] font-extrabold tracking-[0.18em] text-sage uppercase">Employee records</p>
@@ -3458,9 +3477,7 @@ function WorkspaceGate({ onEnter }: { onEnter: (email: string, pin: string) => P
       <Card radius="tile" elevation="lg" className="w-full max-w-md">
         <div className="border-b border-line px-6 py-6">
           <div className="mb-4">
-            <img src="/skinphd-logo.png" alt="SkinPhD" className="h-10 w-auto max-w-[200px] object-contain object-left" />
-            <img src="/skinphd-heartbeat.png" alt="Heartbeat of skincare" className="mt-2 h-3.5 w-auto max-w-[200px] object-contain object-left" />
-            <small className="mt-3 block text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Confirm</small>
+            <SkinPhDLogo size="md" kicker="Confirm" />
           </div>
           <p className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">Staff sign-in</p>
           <h2 className="mt-2 font-display text-3xl font-medium">Head Office and franchisee desk</h2>

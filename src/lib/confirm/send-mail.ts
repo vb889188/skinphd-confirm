@@ -37,10 +37,8 @@ export const sendMailFn = createServerFn({ method: "POST" })
         return path ? readFileSync(path) : null;
       };
       const embedded = readPublic("skinphd-logo.png");
-      const heartbeat = readPublic("skinphd-heartbeat.png");
       const attachments = [
         embedded ? { filename: "skinphd-logo.png", content: embedded, cid: "skinphd-logo", contentType: "image/png" } : null,
-        heartbeat ? { filename: "skinphd-heartbeat.png", content: heartbeat, cid: "skinphd-heartbeat", contentType: "image/png" } : null,
       ].filter((item): item is NonNullable<typeof item> => Boolean(item));
       await Promise.race([
         transport.sendMail({
@@ -52,7 +50,7 @@ export const sendMailFn = createServerFn({ method: "POST" })
             data.subject,
             data.body,
             embedded ? "cid:skinphd-logo" : hostedLogo,
-            heartbeat ? "cid:skinphd-heartbeat" : `${publicUrl}/skinphd-heartbeat.png`,
+            undefined,
             { heading: data.heading, cta: data.cta },
           ),
           attachments,
