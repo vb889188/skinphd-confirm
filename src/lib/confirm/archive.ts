@@ -13,7 +13,7 @@ function roleLabel(role: string) {
 
 function surfaceLabel(value: string) {
   if (value === "salon_table") return "in the room";
-  if (value === "personal_link") return "on her phone";
+  if (value === "personal_link") return "on their phone";
   if (value === "workspace") return "at the desk";
   return value || "not recorded";
 }
