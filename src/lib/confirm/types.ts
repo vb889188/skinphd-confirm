@@ -93,6 +93,8 @@ export type Agreement = {
   createdAt: string;
   updatedAt: string;
   lastRemindedAt: string | null;
+  archiveMailedAt?: string | null;
+  archiveMailError?: string | null;
 };
 export type Signature = {
   id: string;
