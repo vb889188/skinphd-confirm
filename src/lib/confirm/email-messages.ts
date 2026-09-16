@@ -1,5 +1,5 @@
-import type { Agreement, WorkspaceState } from "./types";
-import { type EmployeeMail, firstName, packSignUrl } from "./email-html";
+import type { Agreement, WorkspaceState } from "./types.ts";
+import { type EmployeeMail, firstName, packSignUrl } from "./email-html.ts";
 
 function signOff() {
   return ["Kind regards,", "SkinPhD Head Office"];
