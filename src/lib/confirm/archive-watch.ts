@@ -8,14 +8,14 @@ let watching = false;
 
 export function startArchiveWatch() {
   if (watching) return;
+  if (typeof window === "undefined") return;
   watching = true;
   useWorkspace.subscribe((state, previous) => {
     for (const agreement of state.agreements) {
       if (agreement.status !== "completed" || agreement.archiveMailedAt) continue;
       const before = previous.agreements.find((item) => item.id === agreement.id);
-      if (before && before.status === "completed" && before.archiveMailError === agreement.archiveMailError) {
-        continue;
-      }
+      // Hydrate and refresh load already-complete packs. Mail only when this session just completed it.
+      if (!before || before.status === "completed") continue;
       void sendArchiveMailIfDue(state, agreement.id).then((result) => {
         const now = new Date().toISOString();
         const latest = useWorkspace.getState();
