@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Workspace } from "@/components/workspace";
+import { startArchiveWatch } from "@/lib/confirm/archive-watch";
+
+startArchiveWatch();
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => ({
