@@ -1,11 +1,11 @@
-export type { EmployeeMail } from "./email-html";
+export type { EmployeeMail } from "./email-html.ts";
 export {
   employeeMailHref,
   confirmSiteUrl,
   packSignUrl,
   firstName,
   brandedHtml,
-} from "./email-html";
+} from "./email-html.ts";
 export {
   buildWelcomeMail,
   buildSignCodeMail,
@@ -14,4 +14,4 @@ export {
   buildEmployeeMail,
   buildReminderMail,
   buildSignedRecordMail,
-} from "./email-messages";
+} from "./email-messages.ts";

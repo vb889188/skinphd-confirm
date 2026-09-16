@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { EmployeeMail } from "./email";
-import { brandedHtml, employeeMailHref } from "./email";
+import type { EmployeeMail } from "./email-html.ts";
+import { brandedHtml, employeeMailHref } from "./email-html.ts";
 
 export const sendMailFn = createServerFn({ method: "POST" })
   .validator((data: EmployeeMail) => data)
