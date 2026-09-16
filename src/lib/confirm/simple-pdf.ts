@@ -1,7 +1,62 @@
-/** Minimal multi-page text PDF. No extra dependency. */
+/** Minimal multi-page text PDF. WinAnsi + wrapped lines. No extra dependency. */
 
-function pdfEscape(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+function foldPdfText(value: string) {
+  const map: Record<string, string> = {
+    "\u2018": "'",
+    "\u2019": "'",
+    "\u201C": '"',
+    "\u201D": '"',
+    "\u2013": "-",
+    "\u2014": "-",
+    "\u2026": "...",
+    "\u00B7": "-",
+    "\u2022": "-",
+  };
+  let out = "";
+  for (const ch of value.normalize("NFKD")) {
+    if (map[ch]) {
+      out += map[ch];
+      continue;
+    }
+    const code = ch.charCodeAt(0);
+    if (code >= 0x0300 && code <= 0x036f) continue;
+    if (code <= 255) out += ch;
+    else out += "?";
+  }
+  return out;
+}
+
+function pdfLiteral(value: string) {
+  let s = "";
+  for (const ch of foldPdfText(value)) {
+    const code = ch.charCodeAt(0);
+    if (ch === "\\" || ch === "(" || ch === ")") s += `\\${ch}`;
+    else if (code < 32 || code > 126) s += `\\${code.toString(8).padStart(3, "0")}`;
+    else s += ch;
+  }
+  return s;
+}
+
+function wrapLine(raw: string, width: number) {
+  const text = foldPdfText(raw);
+  if (text.length <= width) return [text];
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (!word) continue;
+    if (!current) {
+      current = word.length > width ? word.slice(0, width) : word;
+      continue;
+    }
+    if (`${current} ${word}`.length <= width) current = `${current} ${word}`;
+    else {
+      lines.push(current);
+      current = word.length > width ? word.slice(0, width) : word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
 }
 
 export function textPagesToPdf(lines: string[]): Uint8Array {
@@ -11,10 +66,10 @@ export function textPagesToPdf(lines: string[]): Uint8Array {
   const top = 800;
   const leading = 13;
   const maxLines = 54;
+  const wrapped = lines.flatMap((line) => wrapLine(line, 90));
   const pages: string[][] = [];
   let current: string[] = [];
-  for (const raw of lines) {
-    const line = raw.length > 110 ? `${raw.slice(0, 107)}...` : raw;
+  for (const line of wrapped) {
     current.push(line);
     if (current.length >= maxLines) {
       pages.push(current);
@@ -39,7 +94,7 @@ export function textPagesToPdf(lines: string[]): Uint8Array {
     );
     const commands = ["BT", "/F1 10 Tf", `${left} ${top} Td`, `${leading} TL`];
     pageLines.forEach((line, idx) => {
-      const text = pdfEscape(line || " ");
+      const text = pdfLiteral(line || " ");
       if (idx === 0) commands.push(`(${text}) Tj`);
       else commands.push(`T* (${text}) Tj`);
     });
@@ -47,7 +102,7 @@ export function textPagesToPdf(lines: string[]): Uint8Array {
     const stream = commands.join("\n");
     objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
   });
-  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>");
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>");
 
   let out = "%PDF-1.4\n";
   const offsets = [0];
