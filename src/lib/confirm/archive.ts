@@ -1,6 +1,6 @@
 import type { Agreement, Signature, WorkspaceState } from "./types.ts";
 import type { EmployeeMail } from "./email-html.ts";
-import { bytesToBase64, textPagesToPdf } from "./simple-pdf.ts";
+import { bytesToBase64, pngDataUrlToRgb, signedRecordToPdf, textPagesToPdf } from "./simple-pdf.ts";
 import { deliverMail } from "./send-mail.ts";
 
 export const ARCHIVE_RECORDS_INBOX = "info@relpdev.uk";
@@ -23,6 +23,7 @@ function evidenceOf(signature: Signature) {
     return JSON.parse(signature.evidence || "{}") as {
       identityAssurance?: string;
       drawn?: boolean;
+      drawnPng?: string | null;
       snapshotHash?: string;
     };
   } catch {
@@ -44,7 +45,6 @@ export function buildCertificateLines(state: WorkspaceState, agreement: Agreemen
     .sort((a, b) => a.signedAt.localeCompare(b.signedAt));
 
   const lines = [
-    "SkinPhD Confirm  ·  Certificate of record",
     "This is the kept copy. Confirm does not decide competence or pay.",
     "",
     `Pack: ${agreement.title}`,
@@ -59,33 +59,13 @@ export function buildCertificateLines(state: WorkspaceState, agreement: Agreemen
     `Employee: ${employee?.fullName ?? "Not set"}`,
     `Franchisee: ${manager?.fullName ?? "Not set"}`,
     `Witness: ${witness?.fullName ?? (agreement.witnessId ? "Named" : "Not required")}`,
-    "",
-    "Signatures",
-    "----------",
   ];
 
-  for (const signature of packSigs) {
-    const ev = evidenceOf(signature);
-    lines.push(
-      `${roleLabel(signature.role)}: ${signature.typedName}`,
-      `  Time: ${signature.signedAt}`,
-      `  How: ${surfaceLabel(ev.identityAssurance || "")}`,
-      `  Consent tick: ${signature.consentAccepted ? "yes" : "no"}`,
-      `  Drawn mark: ${ev.drawn ? "yes" : "no"}`,
-      "",
-    );
-  }
-
-  lines.push("Frozen wording", "---------------");
-  const wording = (agreement.snapshot.template.content || "").split(/\r?\n/);
-  for (const line of wording) lines.push(line);
-  lines.push("");
-  lines.push("SkinPhD (Pty) Ltd · skinphd.co.za");
-  lines.push("Mailbox copy only. The live record stays in Confirm.");
+  void packSigs;
   return lines;
 }
 
-export function buildArchiveMail(state: WorkspaceState, agreement: Agreement): EmployeeMail {
+export async function buildArchiveMail(state: WorkspaceState, agreement: Agreement): Promise<EmployeeMail> {
   const employee = state.people.find((person) => person.id === agreement.employeeId);
   const clinic = state.branches.find((branch) => branch.id === agreement.branchId);
   const hash = shortHash(agreement.snapshotHash);
@@ -94,13 +74,41 @@ export function buildArchiveMail(state: WorkspaceState, agreement: Agreement): E
     month: "short",
     year: "numeric",
   });
-  const lines = buildCertificateLines(state, agreement, state.signatures);
-  const pdf = textPagesToPdf(lines);
+  const packSigs = state.signatures
+    .filter((item) => item.agreementId === agreement.id && item.outcome === "signed")
+    .sort((a, b) => a.signedAt.localeCompare(b.signedAt));
+  const header = buildCertificateLines(state, agreement, packSigs);
+  const marks = [];
+  for (const signature of packSigs) {
+    const ev = evidenceOf(signature);
+    marks.push({
+      role: roleLabel(signature.role),
+      typedName: signature.typedName,
+      signedAt: signature.signedAt,
+      how: surfaceLabel(ev.identityAssurance || ""),
+      consent: signature.consentAccepted,
+      pngRgb: await pngDataUrlToRgb(ev.drawnPng),
+    });
+  }
+  const wording = [
+    "Frozen wording",
+    "---------------",
+    ...(agreement.snapshot.template.content || "").split(/\r?\n/),
+    "",
+    "SkinPhD (Pty) Ltd \u00b7 skinphd.co.za",
+    "Mailbox copy only. The live record stays in Confirm.",
+  ];
+  let pdf: Uint8Array;
+  try {
+    pdf = signedRecordToPdf(header, marks, wording);
+  } catch {
+    pdf = textPagesToPdf([...header, "", ...wording]);
+  }
   const filename = `Confirm-kept-${(clinic?.code || clinic?.name || "clinic").replace(/\s+/g, "-")}-${(employee?.fullName || "employee").replace(/\s+/g, "-")}-${hash}.pdf`;
 
   return {
     to: ARCHIVE_RECORDS_INBOX,
-    subject: `Confirm kept · ${clinic?.name ?? "Clinic"} · ${agreement.title} · ${employee?.fullName ?? "employee"} · ${date} · #${hash}`,
+    subject: `Confirm kept \u00b7 ${clinic?.name ?? "Clinic"} \u00b7 ${agreement.title} \u00b7 ${employee?.fullName ?? "employee"} \u00b7 ${date} \u00b7 #${hash}`,
     heading: "A sealed pack was kept",
     body: [
       "A SkinPhD Confirm pack is complete. This mailbox holds the second copy.",
@@ -111,7 +119,7 @@ export function buildArchiveMail(state: WorkspaceState, agreement: Agreement): E
       `Completed: ${agreement.updatedAt}`,
       `Snapshot hash: ${agreement.snapshotHash}`,
       "",
-      "The attached PDF is the certificate of record plus the frozen wording and signatures.",
+      "The attached PDF shows the typed names and the drawn marks, plus the frozen wording.",
       "Confirm remains the live record. If this mail and Confirm ever disagree, Confirm wins.",
       "",
       "Kind regards,",
@@ -138,7 +146,7 @@ export async function sendArchiveMailIfDue(state: WorkspaceState, agreementId: s
   const required = agreement.requiredSignatures;
   const signed = state.signatures.filter((item) => item.agreementId === agreement.id && item.outcome === "signed").length;
   if (signed < required) return "skipped";
-  const mail = buildArchiveMail(state, agreement);
+  const mail = await buildArchiveMail(state, agreement);
   const result = await deliverMail(mail, { compose: false });
   return result === "sent" ? "sent" : "failed";
 }
