@@ -37,8 +37,14 @@ export const sendMailFn = createServerFn({ method: "POST" })
         return path ? readFileSync(path) : null;
       };
       const embedded = readPublic("skinphd-logo.png");
+      const extra = (data.attachments ?? []).map((item) => ({
+        filename: item.filename,
+        content: Buffer.from(item.contentBase64, "base64"),
+        contentType: item.contentType || "application/octet-stream",
+      }));
       const attachments = [
         embedded ? { filename: "skinphd-logo.png", content: embedded, cid: "skinphd-logo", contentType: "image/png" } : null,
+        ...extra,
       ].filter((item): item is NonNullable<typeof item> => Boolean(item));
       await Promise.race([
         transport.sendMail({
