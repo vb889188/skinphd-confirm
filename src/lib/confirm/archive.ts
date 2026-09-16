@@ -1,7 +1,7 @@
-import type { Agreement, Signature, WorkspaceState } from "./types";
-import type { EmployeeMail } from "./email";
-import { bytesToBase64, textPagesToPdf } from "./simple-pdf";
-import { deliverMail } from "./send-mail";
+import type { Agreement, Signature, WorkspaceState } from "./types.ts";
+import type { EmployeeMail } from "./email-html.ts";
+import { bytesToBase64, textPagesToPdf } from "./simple-pdf.ts";
+import { deliverMail } from "./send-mail.ts";
 
 export const ARCHIVE_RECORDS_INBOX = "v@bdroyalengine.co.za";
 
