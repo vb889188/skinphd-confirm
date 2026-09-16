@@ -132,6 +132,9 @@ export async function sendArchiveMailIfDue(state: WorkspaceState, agreementId: s
   if (!agreement) return "skipped";
   if (agreement.status !== "completed") return "skipped";
   if (agreement.archiveMailedAt) return "skipped";
+  if (state.audit.some((item) => item.agreementId === agreement.id && item.action === "Archive mail sent")) {
+    return "skipped";
+  }
   const required = agreement.requiredSignatures;
   const signed = state.signatures.filter((item) => item.agreementId === agreement.id && item.outcome === "signed").length;
   if (signed < required) return "skipped";
