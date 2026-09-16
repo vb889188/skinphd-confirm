@@ -3,6 +3,7 @@ import { randomId } from "./crypto";
 import { useWorkspace } from "./store";
 import { sendArchiveMailIfDue } from "./archive";
 import { persistWorkspace } from "./remote";
+import { persistArchiveStamp } from "./archive-remote";
 
 let watching = false;
 
@@ -14,7 +15,6 @@ export function startArchiveWatch() {
     for (const agreement of state.agreements) {
       if (agreement.status !== "completed" || agreement.archiveMailedAt) continue;
       const before = previous.agreements.find((item) => item.id === agreement.id);
-      // Hydrate and refresh load already-complete packs. Mail only when this session just completed it.
       if (!before || before.status === "completed") continue;
       void sendArchiveMailIfDue(state, agreement.id).then((result) => {
         const now = new Date().toISOString();
@@ -37,6 +37,7 @@ export function startArchiveWatch() {
             ],
           });
           void persistWorkspace(useWorkspace.getState());
+          void persistArchiveStamp({ agreementId: agreement.id, mailedAt: now, error: null }).catch(() => undefined);
         } else if (result === "failed") {
           useWorkspace.setState({
             agreements: latest.agreements.map((item) =>
@@ -54,6 +55,7 @@ export function startArchiveWatch() {
               ...latest.audit,
             ],
           });
+          void persistArchiveStamp({ agreementId: agreement.id, error: "mail_not_landed" }).catch(() => undefined);
         }
       });
     }
