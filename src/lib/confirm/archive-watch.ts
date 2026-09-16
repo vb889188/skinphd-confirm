@@ -30,7 +30,7 @@ export function startArchiveWatch() {
                 agreementId: agreement.id,
                 actor: ACTOR,
                 action: "Archive mail sent",
-                detail: "Sealed PDF sent to v@bdroyalengine.co.za.",
+                detail: "Sealed PDF sent to info@relpdev.uk.",
                 createdAt: now,
               },
               ...latest.audit,

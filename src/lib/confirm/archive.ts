@@ -3,7 +3,7 @@ import type { EmployeeMail } from "./email-html.ts";
 import { bytesToBase64, textPagesToPdf } from "./simple-pdf.ts";
 import { deliverMail } from "./send-mail.ts";
 
-export const ARCHIVE_RECORDS_INBOX = "v@bdroyalengine.co.za";
+export const ARCHIVE_RECORDS_INBOX = "info@relpdev.uk";
 
 function roleLabel(role: string) {
   if (role === "manager") return "Franchisee / Head Office";
